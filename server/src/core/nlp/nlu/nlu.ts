@@ -19,7 +19,8 @@ import {
   SOCKET_SERVER,
   MODEL_LOADER,
   NER,
-  LLM_MANAGER
+  LLM_MANAGER,
+  OLLAMA
 } from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
 import { LangHelper } from '@/helpers/lang-helper'
@@ -486,6 +487,10 @@ export default class NLU {
           this.conversation.activeContext.currentEntities
         // Pass context entities to the NLU result object
         this._nluResult.entities = this.conversation.activeContext.entities
+
+        console.log('this._nluResult', JSON.stringify(this._nluResult, null, 2))
+
+        await OLLAMA.chooseSkill(utterance)
 
         try {
           const processedData = await BRAIN.execute(this._nluResult)

@@ -22,6 +22,7 @@ interface SkillDomain {
       name: string
       path: string
       bridge: SkillBridgeSchema
+      friendlyPrompt: string
     }
   }
 }
@@ -38,6 +39,24 @@ interface SkillActionObject {
 }
 
 export class SkillDomainHelper {
+  /**
+   * List all skills friendly prompts
+   */
+  public static async listSkillFriendlyPrompts(): Promise<string[]> {
+    const skillDomains = await this.getSkillDomains()
+
+    const skillFriendlyPrompts: string[] = []
+    skillDomains.forEach((skillDomain) => {
+      Object.values(skillDomain.skills).forEach((skill) => {
+        skillFriendlyPrompts.push(skill.friendlyPrompt)
+      })
+    })
+
+    skillFriendlyPrompts.sort()
+
+    return skillFriendlyPrompts
+  }
+
   /**
    * List all skills domains with skills data inside
    */
@@ -69,7 +88,11 @@ export class SkillDomainHelper {
                 continue
               }
 
-              const { name: skillName, bridge: skillBridge } = JSON.parse(
+              const {
+                name: skillName,
+                bridge: skillBridge,
+                description: skillDescription
+              } = JSON.parse(
                 await fs.promises.readFile(skillJSONPath, 'utf8')
               ) as SkillSchema
 
@@ -77,7 +100,8 @@ export class SkillDomainHelper {
                 domainId,
                 name: skillAliasName,
                 path: skillPath,
-                bridge: skillBridge
+                bridge: skillBridge,
+                friendlyPrompt: `${skillAliasName}_skill: ${skillDescription}`
               }
             }
 
