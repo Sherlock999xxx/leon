@@ -19,28 +19,30 @@
             "type": "string",
             "description": "The name of the to-do list to create."
           }
-        },
-        "required": ["list_name"]
+        }
+      },
+      "missing_param_follow_ups": {
+        "list_name": [
+          "%CREATE_LIST_MISSING_LIST_NAME_1%",
+          "%CREATE_LIST_MISSING_LIST_NAME_2%"
+        ]
       }
     },
     "add_todos": {
       "type": "logic",
       "description": "Add items to a specific to-do list.",
       "parameters": {
-        "properties": {
-          "list_name": {
-            "type": "string",
-            "description": "The name of the to-do list to add items to."
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "The items to add to the list."
-          }
+        "list_name": {
+          "type": "string",
+          "description": "The name of the to-do list to add items to."
         },
-        "required": ["list_name", "items"]
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The items to add to the list."
+        }
       }
     }
   },

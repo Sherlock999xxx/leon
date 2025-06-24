@@ -4,6 +4,45 @@ import { Type } from '@sinclair/typebox'
 import { globalResolverSchemaObject } from '@/schemas/global-data-schemas'
 import { SkillBridges } from '@/core/brain/types'
 
+const actionParametersType = Type.Recursive((self) =>
+  Type.Union([
+    Type.Object({}), // Base case for nested objects
+    Type.String(),
+    Type.Number(),
+    Type.Boolean(),
+    Type.Array(self), // Recursive for arrays
+    Type.Literal('custom'), // Enums via literals
+    Type.Object({
+      type: Type.Literal('object'),
+      properties: Type.Record(Type.String(), self),
+      description: Type.Optional(
+        Type.String({
+          minLength: 8,
+          maxLength: 128
+        })
+      )
+    }),
+    Type.Object({
+      type: Type.Literal('string'),
+      enum: Type.Optional(Type.Array(Type.String())),
+      description: Type.Optional(
+        Type.String({
+          minLength: 8,
+          maxLength: 128
+        })
+      )
+    }),
+    Type.Object({
+      type: Type.Literal('number'),
+      description: Type.Optional(
+        Type.String({
+          minLength: 8,
+          maxLength: 128
+        })
+      )
+    })
+  ])
+)
 const skillBridges = [
   Type.Literal(SkillBridges.Python),
   Type.Literal(SkillBridges.NodeJS),
@@ -179,6 +218,12 @@ export const skillSchemaObject = Type.Strict(
             maxLength: 128,
             description:
               'This helps to understand what your action does. Also used by the LLM (Large Language Model) to match the action.'
+          }),
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-expect-error
+          parameters: Type.Record(Type.String(), actionParametersType, {
+            description:
+              'Parameters are used to define the data that the action expects to receive. They can be used to pass data from the utterance to the action code.'
           })
           /**
            * TODO: add:

@@ -365,7 +365,8 @@ export default class LLMManager {
          *      Implement duties correctly with the NLU class
          *      Create new structure tools in bridges with skills folder; remove domains
          *      Create the fake weather skill
-         *      Implement config/{lang}.json in skills with new properties (cf. Trello card description)
+         *      Implement locales/{lang}.json in skills with new properties, and dynamic translation %PLACEHOLDER%
+         *      (PLAN CHANGED, DO NOT DO THIS) -> Implement config/{lang}.json in skills with new properties (cf. Trello card description)
          *      Implement slot filling duty > missing params > conversation state
          *      Research (redevelop next_action?) and create resolver duty / loop in skills (guess the number, rochambeau, MBTI test, etc.)
          *      If action is not found, then fallback to a duty for chitchat/help with Leon's personality

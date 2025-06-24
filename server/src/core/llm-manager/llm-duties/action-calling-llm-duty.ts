@@ -108,7 +108,7 @@ You must adhere to the following rules without exception:
     LogHelper.info('Executing...')
 
     try {
-      // TODO: get action notes + functions
+      // TODO: get functions (actions) from the skill config
       const skillConfig = await SkillDomainHelper.getNewSkillConfig(
         this.skillName as string
       )
@@ -124,6 +124,7 @@ You must adhere to the following rules without exception:
 
       const config = LLM_MANAGER.coreLLMDuties[LLMDuties.ActionCalling]
       const completionParams = {
+        // TODO: add functions
         functions: {},
         dutyType: LLMDuties.ActionCalling,
         systemPrompt: this.systemPrompt as string,
