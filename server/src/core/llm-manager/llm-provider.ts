@@ -4,7 +4,8 @@ import type { AxiosResponse } from 'axios'
 
 import {
   type CompletionParams,
-  LLMDuties,
+  type LLMDuties,
+  type PromptOrChatHistory,
   LLMProviders
 } from '@/core/llm-manager/types'
 import { LLM_PROVIDER, SERVER_CORE_PATH } from '@/constants'
@@ -145,7 +146,7 @@ export default class LLMProvider {
    * Run the completion inference
    */
   public async prompt(
-    prompt: string,
+    promptOrChatHistory: PromptOrChatHistory,
     completionParams: CompletionParams
   ): Promise<CompletionResult | null> {
     const measureExecutionTimeLabel = `Inference time for "${completionParams.dutyType}" duty`
@@ -178,7 +179,7 @@ export default class LLMProvider {
     const isJSONMode = completionParams.data !== null
 
     const rawResultPromise = this.llmProvider.runChatCompletion(
-      prompt,
+      promptOrChatHistory,
       completionParams
     )
 
@@ -259,7 +260,9 @@ export default class LLMProvider {
 
     rawResultString = rawResult as string
 
-    rawResultString = this.cleanUpResult(rawResultString)
+    if (typeof rawResult === 'string') {
+      rawResultString = this.cleanUpResult(rawResultString)
+    }
 
     if (isJSONMode) {
       // If a closing bracket is missing, add it
@@ -275,7 +278,10 @@ export default class LLMProvider {
       dutyType: completionParams.dutyType,
       systemPrompt: completionParams.systemPrompt,
       temperature: completionParams.temperature,
-      input: prompt,
+      input:
+        typeof promptOrChatHistory === 'string'
+          ? promptOrChatHistory
+          : JSON.stringify(promptOrChatHistory),
       output: isJSONMode ? JSON.parse(rawResultString) : rawResultString,
       data: completionParams.data,
       functions: completionParams.functions,

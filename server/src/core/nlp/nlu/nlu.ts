@@ -12,7 +12,12 @@ import type {
   NLPUtterance,
   NLUResult
 } from '@/core/nlp/types'
-import type { ActionCallingOutput } from '@/core/llm-manager/types'
+import {
+  ActionCallingMissingParamsOutput,
+  ActionCallingOutput,
+  ActionCallingStatus,
+  ActionCallingSuccessOutput
+} from '@/core/llm-manager/types'
 import { LANG_CONFIGS, PYTHON_TCP_SERVER_BIN_PATH } from '@/constants'
 import {
   PYTHON_TCP_CLIENT,
@@ -336,6 +341,66 @@ export default class NLU {
     return null
   }
 
+  private handleActionSuccess(
+    actionCallingOutput: ActionCallingSuccessOutput
+  ): void {
+    LogHelper.title('NLU')
+    LogHelper.success(`Action calling succeeded: ${actionCallingOutput.name}`)
+
+    // TODO
+  }
+
+  private handleActionMissingParams(
+    actionCallingOutput: ActionCallingMissingParamsOutput
+  ): void {
+    LogHelper.title('NLU')
+    LogHelper.warning(
+      `Action calling missing params: ${actionCallingOutput.name}`
+    )
+
+    // TODO
+  }
+
+  private handleActionNotFound(): void {
+    LogHelper.title('NLU')
+    LogHelper.warning('Action calling not found')
+
+    // TODO
+  }
+
+  /**
+   * Route the action calling output based on its status
+   * and handle the action calling result accordingly
+   */
+  private route(actionCallingOutput: ActionCallingOutput): void {
+    const routeMap = {
+      [ActionCallingStatus.Success]: (): void => {
+        this.handleActionSuccess(
+          actionCallingOutput as ActionCallingSuccessOutput
+        )
+      },
+      [ActionCallingStatus.MissingParams]: (): void => {
+        this.handleActionMissingParams(
+          actionCallingOutput as ActionCallingMissingParamsOutput
+        )
+      },
+      [ActionCallingStatus.NotFound]: (): void => {
+        this.handleActionNotFound()
+      }
+    }
+
+    const actionStatus = actionCallingOutput.status as ActionCallingStatus
+    if (routeMap[actionStatus]) {
+      LogHelper.title('NLU')
+      LogHelper.info(`Routing action calling status: ${actionStatus}`)
+
+      routeMap[actionStatus]()
+    } else {
+      LogHelper.title('NLU')
+      LogHelper.error(`Unknown action calling status: ${actionStatus}`)
+    }
+  }
+
   /**
    * Classify the utterance,
    * pick up the right classification
@@ -372,23 +437,14 @@ export default class NLU {
           JSON.parse(actionCallingOutput)
 
         if ('status' in parsedActionCallingOutput) {
-          if (parsedActionCallingOutput.status === 'not_found') {
-            // TODO: handle skill action not found
-          } else if (parsedActionCallingOutput.status === 'missing_params') {
-            // TODO: handle missing params
-          }
+          this.route(parsedActionCallingOutput)
 
           return
         }
 
-        console.log(
-          'parsedActionCallingOutput',
-          JSON.stringify(parsedActionCallingOutput, null, 2)
-        )
+        // TODO: handle error in action calling
 
-        // TODO: handle success
-
-        console.log('ACTION CALLING RESULT', actionCallingResult)
+        //////////////////////////////////
 
         if (!MODEL_LOADER.hasNlpModels()) {
           if (!BRAIN.isMuted) {

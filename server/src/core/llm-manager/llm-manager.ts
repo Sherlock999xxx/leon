@@ -76,7 +76,7 @@ const CORE_LLM_DUTIES: CoreLLMDuties = {
      */
     contextSize: 2_048,
     maxTokens: 512,
-    temperature: 0
+    temperature: 0.7
   },
   [LLMDuties.CustomNER]: {
     contextSize: DEFAULT_CORE_LLM_DUTIES_CONTEXT_SIZE
@@ -361,7 +361,7 @@ export default class LLMManager {
          *   [ok] 4.a. Provide more context (for skill router + action calling) to handle such cases: "Show me the groceries list" then "The lessons list too"
          *   4.b. Handle missing params:
          *     Start to reorganize everything correctly:
-         *      Fully implement the skill router and action calling duties
+         *      [ok] Fully implement the skill router and action calling duties
          *      Implement duties correctly with the NLU class (create dedicated methods in NLU class)
          *      If a skill only has one action, then directly execute it after the skill router duty (no need to go through the action calling duty)
          *      Create new structure tools in bridges with skills folder; remove domains (no need to implement tools for now)
@@ -377,7 +377,7 @@ export default class LLMManager {
          *      After everything is confirmed, then migrate all skills with the new configs
          *      Clean up NLU class, etc. if not used anymore
          *
-         *     In DSL, at the same level as "type": "logic", need to add field: "optional_params": []
+         *     [ok] In DSL, at the same level as "type": "logic", need to add field: "optional_params": []
          *      If this param is missing, but is included in the optional_params array, then still execute the action and let the skill developer handles the logic
          *
          *     Create a conversation state

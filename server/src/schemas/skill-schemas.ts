@@ -226,11 +226,19 @@ export const skillSchemaObject = Type.Strict(
               description:
                 'Parameters are used to define the data that the action expects to receive. They can be used to pass data from the utterance to the action code.'
             })
+          ),
+          optional_parameters: Type.Optional(
+            Type.Array(
+              Type.String({
+                minLength: 1,
+                description:
+                  'By default, all parameters are required, but you can define optional parameters that can be used to pass data to the action code. They are not mandatory and can be omitted.'
+              })
+            )
           )
           /**
            * TODO: add:
-           * missing_param_follow_ups
-           * optional_params
+           * missing_parameter_follow_ups
            */
         },
         { additionalProperties: false }

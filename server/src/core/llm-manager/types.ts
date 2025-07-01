@@ -1,7 +1,9 @@
 import type {
   LlamaChatSession,
+  LlamaChat,
   Token,
-  ChatSessionModelFunctions
+  ChatSessionModelFunctions,
+  ChatHistoryItem
 } from 'node-llama-cpp'
 
 import type { MessageLog } from '@/types'
@@ -27,6 +29,14 @@ export enum LLMProviders {
   Groq = 'groq'
 }
 
+export enum ActionCallingStatus {
+  Success = 'success',
+  MissingParams = 'missing_params',
+  NotFound = 'not_found'
+}
+
+export type PromptOrChatHistory = string | ChatHistoryItem[]
+
 export interface CompletionParams {
   dutyType: LLMDuties
   systemPrompt: string
@@ -35,7 +45,7 @@ export interface CompletionParams {
   temperature?: number | undefined
   timeout?: number
   maxRetries?: number
-  session?: LlamaChatSession | null
+  session?: LlamaChatSession | LlamaChat | null
   functions?: ChatSessionModelFunctions | undefined
   data?: Record<string, unknown> | null
   history?: MessageLog[]
@@ -48,15 +58,16 @@ export interface CompletionParams {
  * not found: {"status": "not_found"}
  * success: {"name": "create_list", "arguments": {"list_name": "chore"}}
  */
-interface ActionCallingMissingParamsOutput {
-  status: 'missing_params'
+export interface ActionCallingMissingParamsOutput {
+  status: ActionCallingStatus.MissingParams
   required_params: string[]
   name: string
 }
-interface ActionCallingNotFoundOutput {
-  status: 'not_found'
+export interface ActionCallingNotFoundOutput {
+  status: ActionCallingStatus.NotFound
 }
-interface ActionCallingSuccessOutput {
+export interface ActionCallingSuccessOutput {
+  status: ActionCallingStatus.Success
   name: string
   arguments: Record<string, unknown>
 }

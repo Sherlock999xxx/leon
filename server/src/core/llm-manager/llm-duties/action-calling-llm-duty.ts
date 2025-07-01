@@ -15,7 +15,12 @@ import {
 import { type SkillSchema } from '@/schemas/skill-schemas'
 import { LogHelper } from '@/helpers/log-helper'
 import { LLM_MANAGER, LLM_PROVIDER } from '@/core'
-import { LLMDuties, LLMProviders } from '@/core/llm-manager/types'
+import {
+  ActionCallingOutput,
+  ActionCallingStatus,
+  LLMDuties,
+  LLMProviders
+} from '@/core/llm-manager/types'
 import { LLM_PROVIDER as LLM_PROVIDER_NAME } from '@/constants'
 import { SkillDomainHelper } from '@/helpers/skill-domain-helper'
 
@@ -75,6 +80,45 @@ You must adhere to the following rules without exception:
   }
 
   /**
+   * This method parses the optional parameters from the skill configuration
+   * and omits them from the required parameters if they are present
+   */
+  private parseOptionalParameters(
+    skillConfig: SkillSchema,
+    dutyOutput: ActionCallingOutput
+  ): ActionCallingOutput {
+    if (dutyOutput.status !== ActionCallingStatus.MissingParams) {
+      return dutyOutput
+    }
+
+    const actionConfig = skillConfig.actions[dutyOutput.name]
+    if (!actionConfig?.optional_parameters) {
+      return dutyOutput
+    }
+
+    const optionalParams = actionConfig.optional_parameters
+    const remainingRequiredParams = dutyOutput.required_params.filter(
+      (param: string) => !optionalParams.includes(param)
+    )
+
+    if (remainingRequiredParams.length === 0) {
+      return {
+        status: ActionCallingStatus.Success,
+        name: dutyOutput.name,
+        /**
+         * TODO: handle multi required/optional parameters
+         * Because now no matter how many parameters are required and we have optional parameters,
+         * it will return an empty object
+         */
+        arguments: {}
+      }
+    }
+
+    dutyOutput.required_params = remainingRequiredParams
+    return dutyOutput
+  }
+
+  /**
    * This method converts the action schema from the skill configuration
    * to a function schema that can be used by the LLM provider
    */
@@ -95,26 +139,7 @@ You must adhere to the following rules without exception:
       const { description, parameters } = action
       let functionSchema = {
         description,
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
-        handler: async (params): Promise<boolean> => {
-          /**
-           * Sometimes the model will call the functions. It was more stable with the 3.8.1 version.
-           * It started to break since this change: https://github.com/withcatai/node-llama-cpp/issues/471
-           */
-          console.log(`function handler from "${actionName}"`, params)
-          console.log(
-            JSON.stringify(
-              {
-                name: actionName,
-                arguments: params
-              },
-              null,
-              2
-            )
-          )
-          return true
-        }
+        handler: (): void => undefined
       }
 
       if (parameters) {
@@ -164,11 +189,6 @@ You must adhere to the following rules without exception:
             contextSequence: LLM_MANAGER.context.getSequence(),
             autoDisposeSequence: true
           })
-          /*ActionCallingLLMDuty.session = new LlamaChatSession({
-            contextSequence: LLM_MANAGER.context.getSequence(),
-            autoDisposeSequence: true,
-            systemPrompt: this.systemPrompt as string
-          })*/
 
           ActionCallingLLMDuty.chatHistory =
             ActionCallingLLMDuty.session.chatWrapper.generateInitialChatHistory(
@@ -210,23 +230,6 @@ You must adhere to the following rules without exception:
         return null
       }
 
-      ActionCallingLLMDuty.chatHistory.push({
-        type: 'user',
-        text: ''
-      })
-      ActionCallingLLMDuty.chatHistory.push({
-        type: 'model',
-        response: []
-      })
-
-      // TODO: if function calling, then use ".generateResponse()" in the local-provider; set thinking budget to 0, etc.
-
-      // TODO: only get the last 8 messages from cleanHistory
-      // ActionCallingLLMDuty.chatHistory = response.lastEvaluation.cleanHistory
-
-      /////////////
-
-      const functionsSchema = this.actionsToFunctionsSchema(actions)
       let prompt = `User Query: "${this.input}"`
 
       if (actionNotes.length > 0) {
@@ -235,6 +238,16 @@ You must adhere to the following rules without exception:
         )}\n${prompt}`
       }
 
+      ActionCallingLLMDuty.chatHistory.push({
+        type: 'user',
+        text: prompt
+      })
+      ActionCallingLLMDuty.chatHistory.push({
+        type: 'model',
+        response: []
+      })
+
+      const functionsSchema = this.actionsToFunctionsSchema(actions)
       const config = LLM_MANAGER.coreLLMDuties[LLMDuties.ActionCalling]
       const completionParams = {
         functions: functionsSchema,
@@ -244,207 +257,123 @@ You must adhere to the following rules without exception:
         maxTokens: config.maxTokens
       }
       let completionResult
+      let dutyOutput = null
 
       if (LLM_PROVIDER_NAME === LLMProviders.Local) {
-        console.log('BEFORE PROMPT')
-        completionResult = await LLM_PROVIDER.prompt(prompt, {
-          ...completionParams
-          // TODO?
-          // session: ActionCallingLLMDuty.session
-        })
-        console.log('AFTER PROMPT')
-
-        // console.log('CURRENT CONTEXT', ActionCallingLLMDuty.session.
-
-        /*const create_list = defineChatSessionFunction({
-          description: 'Create a new to-do list based on the given list name.',
-          params: {
-            type: 'object',
-            properties: {
-              list_name: {
-                type: 'string',
-                description: 'The name of the to-do list to create.'
-              }
-            }
-          },
-          handler: async (params) => {
-            console.log('function handler', params)
-          }
-        })
-        const get_all_lists = defineChatSessionFunction({
-          description: 'Retrieve all existing to-do lists.',
-          handler: async (params) => {
-            console.log('function handler', params)
-          }
-        })
-        const get_list_items = defineChatSessionFunction({
-          description: 'Retrieve all items from a specific to-do list.',
-          params: {
-            type: 'object',
-            properties: {
-              list_name: {
-                type: 'string',
-                description: 'The name of the to-do list to retrieve items from.'
-              }
-            }
-          },
-          handler: async (params) => {
-            console.log('function handler', params)
-          }
-        })
-        const add_todos = defineChatSessionFunction({
-          description: 'Add items to a specific to-do list.',
-          params: {
-            type: 'object',
-            properties: {
-              list_name: {
-                type: 'string',
-                description: 'The name of the to-do list to add items to.'
-              },
-              items: {
-                type: 'array',
-                items: {
-                  type: 'string'
-                },
-                description: 'The items to add to the list.'
-              }
-            }
-          },
-          handler: async (params) => {
-            console.log('function handler', params)
-          }
-        })
-        const delete_list = defineChatSessionFunction({
-          description: 'Delete a specific to-do list.',
-          params: {
-            type: 'object',
-            properties: {
-              list_name: {
-                type: 'string',
-                description: 'The name of the to-do list to delete.'
-              }
-            }
-          },
-          handler: async (params) => {
-            console.log('function handler', params)
-          }
-        })*/
-        /*const get_weather = defineChatSessionFunction({
-          description: 'Get the current weather.',
-          params: {
-            type: 'object',
-            properties: {
-              location: {
-                type: 'string',
-                description: 'The location to get the weather for.'
-              }
-            }
-          },
-          handler: async (params) => {
-            console.log('function handler', params)
-          }
-        })
-        const get_temperature = defineChatSessionFunction({
-          description: 'Get the current temperature.',
-          params: {
-            type: 'object',
-            properties: {
-              location: {
-                type: 'string',
-                description: 'The location to get the temperature for.'
-              }
-            }
-          },
-          handler: async (params) => {
-            console.log('function handler', params)
-          }
-        })
-        const get_humidity = defineChatSessionFunction({
-          description: 'Get the current humidity.',
-          params: {
-            type: 'object',
-            properties: {
-              location: {
-                type: 'string',
-                description: 'The location to get the humidity for.'
-              }
-            }
-          },
-          handler: async (params) => {
-            console.log('function handler', params)
-          }
-        })
-        const get_wind_speed = defineChatSessionFunction({
-          description: 'Get the current wind speed.',
-          params: {
-            type: 'object',
-            properties: {
-              location: {
-                type: 'string',
-                description: 'The location to get the wind speed for.'
-              }
-            }
-          },
-          handler: async (params) => {
-            console.log('function handler', params)
-          }
-        })*/
-
-        /**
-         * @see https://node-llama-cpp.withcat.ai/api/type-aliases/GbnfJsonSchema
-         */
-        /*const zodSchema = z.object({
-          status: z.enum(['valid', 'missing_params', 'not_found']),
-          name: z.string().optional(),
-          required_params: z.array(z.string()).optional()
-        })*/
-        // const jsonSchema = z.toJSONSchema(zodSchema)
-        // const grammar = new LlamaJsonSchemaGrammar(LLM_MANAGER.llama, jsonSchema)
-        /**
-         * @see https://qwen.readthedocs.io/en/latest/framework/function_call.html
-         * @see https://platform.openai.com/docs/guides/function-calling?api-mode=responses&lang=javascript
-         */
-        /*const res = await ActionCallingLLMDuty.session.prompt(
-          prompt as string,
+        completionResult = await LLM_PROVIDER.prompt(
+          ActionCallingLLMDuty.chatHistory,
           {
-            temperature: 0,
-            // grammar,
-            functions: {
-              create_list,
-            get_all_lists,
-            get_list_items,
-            add_todos,
-            delete_list
-              /!*get_weather,
-              get_temperature,
-              get_humidity,
-              get_wind_speed*!/
-            }
+            ...completionParams,
+            session: ActionCallingLLMDuty.session
           }
-        )*/
+        )
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const response = completionResult?.output as any
+
+        // Reset chat history to the last 8 messages
+        ActionCallingLLMDuty.chatHistory =
+          response.lastEvaluation.cleanHistory.slice(-8)
 
         /**
-         * TODO
-         * If res has "<tool_call>" and "</tool_call>"
-         * then parse the action call
+         * The model decided to call a function
          */
+        if (response.functionCalls && response.functionCalls.length > 0) {
+          const call = response.functionCalls[0]
+          const functionName = call.functionName
+          const params = call.params
+          const functionDefinition = functionsSchema[functionName]
 
-        // console.log('res', res)
+          if (!functionDefinition) {
+            dutyOutput = {
+              status: ActionCallingStatus.NotFound
+            }
+          } else {
+            /**
+             * Check if the parameters are provided
+             */
+            const requiredParams = functionDefinition?.params?.required || []
+            const missingParams = requiredParams.filter(
+              (required: string) => params[required] == null
+            )
 
-        /*completionResult = await LLM_PROVIDER.prompt(prompt, {
-          ...completionParams,
-          session: ActionCallingLLMDuty.session
-        })*/
+            if (missingParams.length > 0) {
+              dutyOutput = {
+                status: ActionCallingStatus.MissingParams,
+                required_params: missingParams,
+                name: functionName
+              }
+            } else {
+              dutyOutput = {
+                status: ActionCallingStatus.Success,
+                name: functionName,
+                arguments: params
+              }
+            }
+          }
+        } else {
+          LogHelper.title(this.name)
+          LogHelper.warning(
+            'The duty did not call a function, trying manual parsing...'
+          )
+
+          /**
+           * The model did not call a function
+           *
+           * TODO:
+           * Maybe it did not call a function, but still returned a JSON object that can be usable.
+           * Need to see on the long-term if adjustments are needed
+           */
+          try {
+            // In case it returned a JSON object
+            const tmpResponse = JSON.parse(response.response)
+
+            if (tmpResponse.status) {
+              if (tmpResponse.status === ActionCallingStatus.MissingParams) {
+                dutyOutput = {
+                  status: ActionCallingStatus.MissingParams,
+                  required_params: tmpResponse.required_params || [],
+                  name: tmpResponse.name || ''
+                }
+              } else if (tmpResponse.status === ActionCallingStatus.NotFound) {
+                dutyOutput = {
+                  status: ActionCallingStatus.NotFound
+                }
+              }
+            } else if (tmpResponse.name) {
+              dutyOutput = {
+                status: ActionCallingStatus.Success,
+                name: tmpResponse.name,
+                arguments: tmpResponse.arguments || {}
+              }
+            } else {
+              dutyOutput = {
+                status: ActionCallingStatus.NotFound
+              }
+            }
+          } catch {
+            dutyOutput = {
+              status: ActionCallingStatus.NotFound
+            }
+          }
+        }
       } else {
-        // completionResult = await LLM_PROVIDER.prompt(prompt, completionParams)
+        completionResult = await LLM_PROVIDER.prompt(prompt, completionParams)
       }
 
-      // TODO: handle optional_params and structure output format
+      dutyOutput = this.parseOptionalParameters(
+        skillConfig as SkillSchema,
+        dutyOutput as ActionCallingOutput
+      )
+
+      if (completionResult) {
+        completionResult.output = JSON.stringify(dutyOutput)
+      }
 
       LogHelper.title(this.name)
       LogHelper.success('Duty executed')
       LogHelper.success(`Prompt — ${prompt}`)
-      LogHelper.success(`Output — ${JSON.stringify(completionResult?.output)}
+      LogHelper.success(`Output — ${completionResult?.output}
 usedInputTokens: ${completionResult?.usedInputTokens}
 usedOutputTokens: ${completionResult?.usedOutputTokens}`)
 
