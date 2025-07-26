@@ -589,13 +589,133 @@ export default class Brain {
   }
 
   private handleDialogActionSkill(
-    nluProcessResult: NLUProcessResult
+    nluProcessResult: NLUProcessResult,
+    utteranceId: string
   ): Promise<Partial<BrainProcessResult>> {
     return new Promise((resolve) => {
-      // nluProcessResult.actionConfig.answers
-      // TODO: 2025-07-23
+      /**
+       * For dialog skills, we consider that answers are always arrays of strings,
+       * cause there is no need for object answers here
+       */
+      const answers = nluProcessResult.actionConfig?.answers as
+        | SkillAnswerConfigSchema[]
+        | undefined
+
+      if (!answers || answers.length === 0) {
+        LogHelper.title('Brain')
+        LogHelper.error(
+          `No answers found for the action "${nluProcessResult.actionName}" in the skill "${nluProcessResult.skillName}"`
+        )
+
+        return resolve({})
+      }
+
+      let randomAnswer = answers[
+        Math.floor(Math.random() * answers.length)
+      ] as SkillAnswerConfigSchema
+
+      const { actionArguments, entities } = nluProcessResult.context
+      const entitiesAsObject = entities.reduce(
+        (acc, entity) => {
+          // TODO: mapping to resolution.value may not always be correct. E.g. date entity, etc. See if this should be improved according to future needs
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-expect-error
+          acc[entity.entity] = entity.resolution.value
+          return acc
+        },
+        {} as Record<string, unknown>
+      )
+      const actionArgumentsAsObject = (
+        actionArguments as Record<string, unknown>[]
+      ).reduce((acc, arg) => ({ ...acc, ...arg }), {})
+      // Prioritize actionArguments over entities
+      const data = { ...entitiesAsObject, ...actionArgumentsAsObject }
+      // Map data to placeholders
+      const dataToMap = Object.entries(data).reduce(
+        (acc, [key, value]) => {
+          acc[`{{ ${key} }}`] = value
+          return acc
+        },
+        {} as Record<string, unknown>
+      )
+      const placeholderRegex = /{{(.*?)}}/
+
+      // Check if the answer has placeholders
+      const answerHasPlaceholders = (
+        answer: SkillAnswerConfigSchema
+      ): boolean => {
+        if (typeof answer === 'string') {
+          return placeholderRegex.test(answer)
+        }
+        if (typeof answer === 'object') {
+          return (
+            placeholderRegex.test(answer.text || '') ||
+            placeholderRegex.test(answer.speech)
+          )
+        }
+        return false
+      }
+      // If the answer has placeholders and no data to map, we need to find a fallback answer that does not have placeholders
+      if (
+        answerHasPlaceholders(randomAnswer) &&
+        Object.keys(data).length === 0
+      ) {
+        const fallbackAnswers = answers.filter(
+          (ans) => !answerHasPlaceholders(ans)
+        )
+
+        if (fallbackAnswers.length > 0) {
+          randomAnswer =
+            fallbackAnswers[
+              Math.floor(Math.random() * fallbackAnswers.length)
+            ] || ''
+        }
+      }
+
+      let finalAnswer: SkillAnswerConfigSchema = randomAnswer
+
+      // In case the answer is a type of { text: '...', speech: '...' }
+      if (typeof randomAnswer === 'object') {
+        const { text, speech } = randomAnswer
+        const newText =
+          text && placeholderRegex.test(text)
+            ? StringHelper.findAndMap(text, dataToMap)
+            : text
+        const newSpeech = placeholderRegex.test(speech)
+          ? StringHelper.findAndMap(speech, dataToMap)
+          : speech
+
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        finalAnswer = {
+          text: newText,
+          speech: newSpeech
+        }
+      } else if (
+        typeof randomAnswer === 'string' &&
+        placeholderRegex.test(randomAnswer)
+      ) {
+        finalAnswer = StringHelper.findAndMap(randomAnswer, dataToMap)
+      }
+
+      if (!this.isMuted) {
+        this.talk(finalAnswer, true)
+      }
+
+      // TODO: core rewrite suggestion after dialog skill
+      // Send suggestions to the client
+      /*if (nextAction?.suggestions) {
+        SOCKET_SERVER.socket?.emit('suggest', nextAction.suggestions)
+      }*/
+
       console.log('nluProcessResult', nluProcessResult)
-      resolve({})
+      resolve({
+        utteranceId,
+        lang: this._lang,
+        core: {}
+        // action,
+        // nextAction
+      })
     })
   }
 
@@ -708,7 +828,7 @@ export default class Brain {
         nluProcessResult: NLUProcessResult
       ): Promise<Partial<BrainProcessResult>> => {
         // TODO
-        return this.handleDialogActionSkill(nluProcessResult)
+        return this.handleDialogActionSkill(nluProcessResult, utteranceId)
       }
     }
 

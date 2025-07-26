@@ -383,8 +383,9 @@ export default class LLMManager {
          *      [ok] Fix Python skill execution. Somehow the action file name needed to be renamed from "run.py" to "greet.py"
          *      [ok] Implement helper getSkillActionLocaleConfig
          *      [ok] Fix context duplicate data because of "await this.updateNLUProcessResult(...)"
+         *      [ok] Copy the "good_bye" skill and implement the dialog type. Need to handle the "locales/{lang}.json" structure first since it's based on the answers
+         *      [ok] In dialog skills answers, check from the context if there is any actionArgument or entities that would match any {{ PLACEHOLDER }} and replace it with the actual value
          *      TODO NEXT 2025-07-23: rebuild the "good_bye", "partner_assistant", "color" and "translator-poc" skills
-         *      TODO NEXT 2025-07-20: copy the "good_bye" skill and implement the dialog type. Need to handle the "locales/{lang}.json" structure first since it's based on the answers
          *      TODO NEXT 2025-07-18: copy translator-poc skill (do this later since it involves the loop concept), handle dialog action logic. Need to handle the "locales/{lang}.json" structure first since it's based on the answers
          *      In fetch-widget/get.ts, need to execute new brain method; and replace "currentEntities", "classification" with the new structure
          *      Delete or refactor the chunks where there are "TODO: core rewrite" comments
