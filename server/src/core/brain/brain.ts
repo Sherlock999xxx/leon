@@ -4,16 +4,8 @@ import { ChildProcessWithoutNullStreams, spawn } from 'node:child_process'
 
 import type { ShortLanguageCode } from '@/types'
 import type { GlobalAnswersSchema } from '@/schemas/global-data-schemas'
-import type {
-  CustomEnumEntity,
-  NERCustomEntity,
-  NLUResult
-} from '@/core/nlp/types'
-import type {
-  SkillAnswerConfigSchema,
-  SkillConfigSchema,
-  SkillSchema
-} from '@/schemas/skill-schemas'
+import type { NLUProcessResult } from '@/core/nlp/types'
+import type { SkillAnswerConfigSchema } from '@/schemas/skill-schemas'
 import type {
   BrainProcessResult,
   IntentObject,
@@ -25,8 +17,7 @@ import {
   HAS_TTS,
   PYTHON_BRIDGE_BIN_PATH,
   NODEJS_BRIDGE_BIN_PATH,
-  TMP_PATH,
-  LANG_CONFIGS
+  TMP_PATH
 } from '@/constants'
 import {
   CONVERSATION_LOGGER,
@@ -35,9 +26,7 @@ import {
   SOCKET_SERVER,
   TTS
 } from '@/core'
-import { LangHelper } from '@/helpers/lang-helper'
 import { LogHelper } from '@/helpers/log-helper'
-import { SkillDomainHelper } from '@/helpers/skill-domain-helper'
 import { StringHelper } from '@/helpers/string-helper'
 import { DateHelper } from '@/helpers/date-helper'
 import { ParaphraseLLMDuty } from '@/core/llm-manager/llm-duties/paraphrase-llm-duty'
@@ -383,35 +372,37 @@ export default class Brain {
     return answer
   }
 
-  private shouldAskToRepeat(nluResult: NLUResult): boolean {
+  // TODO: delete?
+  /*private shouldAskToRepeat(nluResult: NLUResult): boolean {
     return (
       nluResult.classification.confidence <
       LANG_CONFIGS[LangHelper.getLongCode(this._lang)].min_confidence
     )
-  }
+  }*/
 
-  private handleAskToRepeat(nluResult: NLUResult): void {
+  // TODO: delete?
+  /*private handleAskToRepeat(nluResult: NLUResult): void {
     if (!this.isMuted) {
       const speech = `${this.wernicke('random_not_sure')}.`
 
       this.talk(speech, true)
       SOCKET_SERVER.socket?.emit('ask-to-repeat', nluResult)
     }
-  }
+  }*/
 
   /**
    * Create the intent object that will be passed to the skill
    */
   private createIntentObject(
-    nluResult: NLUResult,
-    utteranceID: string,
-    slots: IntentObject['slots']
+    nluProcessResult: NLUProcessResult,
+    utteranceId: string
   ): IntentObject {
     const date = DateHelper.getDateTime()
     const dateObject = new Date(date)
 
-    return {
-      id: utteranceID,
+    // TODO: remove
+    /*return {
+      id: utteranceId,
       lang: this._lang, // TODO: remove once the Python bridge will be updated to use extra_context_data.lang instead
       domain: nluResult.classification.domain,
       skill: nluResult.classification.skill,
@@ -426,6 +417,39 @@ export default class Brain {
       extra_context_data: {
         lang: this._lang,
         sentiment: nluResult.sentiment,
+        date: date.slice(0, 10),
+        time: date.slice(11, 19),
+        timestamp: dateObject.getTime(),
+        date_time: date,
+        week_day: dateObject.toLocaleString('default', { weekday: 'long' })
+      }
+    }*/
+
+    return {
+      id: utteranceId,
+      lang: this._lang, // TODO: remove once the Python bridge will be updated to use extra_context_data.lang instead
+      context_name: nluProcessResult.contextName,
+      skill_name: nluProcessResult.skillName,
+      action_name: nluProcessResult.actionName,
+      skill_config: {
+        name: nluProcessResult.skillConfig.name,
+        bridge: nluProcessResult.skillConfig.bridge as SkillBridges,
+        version: nluProcessResult.skillConfig.version,
+        flow: nluProcessResult.skillConfig.flow as string[]
+      },
+      skill_config_path: nluProcessResult.skillConfigPath,
+      utterance: nluProcessResult.new.utterance,
+      action_arguments: nluProcessResult.new.actionArguments,
+      entities: nluProcessResult.new.entities,
+      sentiment: nluProcessResult.new.sentiment,
+      context: {
+        utterances: nluProcessResult.context.utterances,
+        action_arguments: nluProcessResult.context.actionArguments,
+        entities: nluProcessResult.context.entities,
+        sentiments: nluProcessResult.context.sentiments
+      },
+      extra_context: {
+        lang: this._lang,
         date: date.slice(0, 10),
         time: date.slice(11, 19),
         timestamp: dateObject.getTime(),
@@ -526,25 +550,15 @@ export default class Brain {
    * 3. Run: npm run python-bridge
    */
   private async executeLogicActionSkill(
-    nluResult: NLUResult,
-    skillBridge: SkillSchema['bridge'],
-    utteranceID: string,
+    nluProcessResult: NLUProcessResult,
+    utteranceId: string,
     intentObjectPath: string
   ): Promise<void> {
     // Ensure the process is empty (to be able to execute other processes outside of Brain)
     if (!this.skillProcess) {
-      const slots: IntentObject['slots'] = {}
-
-      if (nluResult.slots) {
-        Object.keys(nluResult.slots)?.forEach((slotName) => {
-          slots[slotName] = nluResult.slots[slotName]?.value
-        })
-      }
-
       const intentObject = this.createIntentObject(
-        nluResult,
-        utteranceID,
-        slots
+        nluProcessResult,
+        utteranceId
       )
 
       try {
@@ -552,6 +566,8 @@ export default class Brain {
           intentObjectPath,
           JSON.stringify(intentObject)
         )
+
+        const { bridge: skillBridge } = nluProcessResult.skillConfig
 
         if (skillBridge === SkillBridges.Python) {
           this.skillProcess = spawn(
@@ -572,10 +588,167 @@ export default class Brain {
     }
   }
 
+  private handleDialogActionSkill(
+    nluProcessResult: NLUProcessResult
+  ): Promise<Partial<BrainProcessResult>> {
+    return new Promise((resolve) => {
+      // nluProcessResult.actionConfig.answers
+      // TODO: 2025-07-23
+      console.log('nluProcessResult', nluProcessResult)
+      resolve({})
+    })
+  }
+
+  private handleLogicActionSkill(
+    nluProcessResult: NLUProcessResult,
+    utteranceId: string
+  ): Promise<Partial<BrainProcessResult>> {
+    return new Promise(async (resolve) => {
+      const intentObjectPath = path.join(TMP_PATH, `${utteranceId}.json`)
+      const {
+        skillConfig: { name: skillFriendlyName }
+      } = nluProcessResult
+
+      await this.executeLogicActionSkill(
+        nluProcessResult,
+        utteranceId,
+        intentObjectPath
+      )
+
+      this.skillFriendlyName = skillFriendlyName
+
+      // Read skill output
+      this.skillProcess?.stdout.on('data', (data: Buffer) => {
+        this.handleLogicActionSkillProcessOutput(data)
+      })
+
+      // Handle error
+      this.skillProcess?.stderr.on('data', (data: Buffer) => {
+        this.handleLogicActionSkillProcessError(data, intentObjectPath)
+      })
+
+      // Catch the end of the skill execution
+      this.skillProcess?.stdout.on('end', () => {
+        LogHelper.title(`${this.skillFriendlyName} skill (on end)`)
+        LogHelper.info(this.skillOutput)
+
+        let skillResult: SkillResult | undefined = undefined
+
+        // Check if there is an output (no skill error)
+        if (this.skillOutput !== '') {
+          try {
+            skillResult = JSON.parse(this.skillOutput)
+          } catch (e) {
+            LogHelper.title(`${this.skillFriendlyName} skill`)
+            LogHelper.error(
+              `There is an error on the final output: ${String(e)}`
+            )
+
+            this.speakSkillError()
+          }
+        }
+
+        Brain.deleteIntentObjFile(intentObjectPath)
+
+        // Send suggestions to the client
+        // TODO: core rewrite
+        /*if (
+          nextAction?.suggestions &&
+          skillResult?.output.core?.showNextActionSuggestions
+        ) {
+          SOCKET_SERVER.socket?.emit('suggest', nextAction.suggestions)
+        }
+        if (
+          action?.suggestions &&
+          skillResult?.output.core?.showSuggestions
+        ) {
+          SOCKET_SERVER.socket?.emit('suggest', action.suggestions)
+        }*/
+
+        resolve({
+          utteranceId,
+          lang: this._lang,
+          ...nluProcessResult,
+          core: skillResult?.output.core
+          // action,
+          // nextAction
+        })
+      })
+
+      // Reset the child process
+      this.skillProcess = undefined
+    })
+  }
+
+  /**
+   * Run skill action
+   */
+  public async runSkillAction(
+    nluProcessResult: NLUProcessResult
+  ): Promise<Partial<BrainProcessResult>> {
+    LogHelper.title('Brain')
+    LogHelper.info(
+      `Running "${nluProcessResult.actionName}" action from "${nluProcessResult.skillName}" skill...`
+    )
+
+    const executionTimeStart = Date.now()
+    const utteranceId = `${Date.now()}-${StringHelper.random(4)}`
+    const actionType = nluProcessResult.actionConfig?.type
+
+    // Reset skill output
+    this.skillOutput = ''
+
+    const actionTypeHandlers = {
+      [SkillActionTypes.Logic]: (
+        nluProcessResult: NLUProcessResult
+      ): Promise<Partial<BrainProcessResult>> => {
+        return this.handleLogicActionSkill(nluProcessResult, utteranceId)
+      },
+      [SkillActionTypes.Dialog]: (
+        nluProcessResult: NLUProcessResult
+      ): Promise<Partial<BrainProcessResult>> => {
+        // TODO
+        return this.handleDialogActionSkill(nluProcessResult)
+      }
+    }
+
+    try {
+      const brainExecutionResult =
+        await actionTypeHandlers[actionType as SkillActionTypes](
+          nluProcessResult
+        )
+
+      const executionTimeEnd = Date.now()
+      const executionTime = executionTimeEnd - executionTimeStart
+
+      return {
+        ...brainExecutionResult,
+        executionTime // In ms, skill execution time only
+      }
+    } catch (e) {
+      const executionTimeEnd = Date.now()
+      const executionTime = executionTimeEnd - executionTimeStart
+
+      LogHelper.title('Brain')
+      LogHelper.error(
+        `Failed to run "${nluProcessResult.actionName}" action from "${
+          nluProcessResult.skillName
+        }" skill: ${String(e)}`
+      )
+
+      this.speakSkillError()
+
+      return {
+        executionTime
+      }
+    }
+  }
+
   /**
    * Execute skills
    */
-  public execute(nluResult: NLUResult): Promise<Partial<BrainProcessResult>> {
+  // TODO: delete?
+  /*public execute(nluResult: NLUResult): Promise<Partial<BrainProcessResult>> {
     const executionTimeStart = Date.now()
 
     return new Promise(async (resolve) => {
@@ -615,9 +788,9 @@ export default class Brain {
           : null
 
         if (actionType === SkillActionTypes.Logic) {
-          /**
+          /!**
            * "Logic" action skill execution
-           */
+           *!/
 
           const domainName = nluResult.classification.domain
           const skillName = nluResult.classification.skill
@@ -701,9 +874,9 @@ export default class Brain {
           // Reset the child process
           this.skillProcess = undefined
         } else {
-          /**
+          /!**
            * "Dialog" action skill execution
-           */
+           *!/
 
           const configFilePath = path.join(
             process.cwd(),
@@ -756,17 +929,17 @@ export default class Brain {
           } else {
             answer = answers[Math.floor(Math.random() * answers.length)]?.answer
 
-            /**
+            /!**
              * In case the utterance contains slots or entities, and the picked up answer too,
              * then map them (utterance <-> answer)
-             */
+             *!/
             if (
               (utteranceHasSlots || utteranceHasEntities) &&
               answer?.indexOf('{{') !== -1
             ) {
-              /**
+              /!**
                * Normalize data to browse (entities and slots)
-               */
+               *!/
               const dataToBrowse = [
                 ...nluResult.currentEntities,
                 ...nluResult.entities,
@@ -782,10 +955,10 @@ export default class Brain {
                     .resolution.value
                 })
 
-                /**
+                /!**
                  * Find matches and map deeper data from the NLU file (global entities)
                  * TODO: handle more entity types, not only enums for global entities?
-                 */
+                 *!/
                 const matches = answer.match(/{{.+?}}/g)
 
                 matches?.forEach((match) => {
@@ -847,5 +1020,5 @@ export default class Brain {
         }
       }
     })
-  }
+  }*/
 }

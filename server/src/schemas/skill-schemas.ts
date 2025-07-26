@@ -3,6 +3,10 @@ import { Type } from '@sinclair/typebox'
 
 import { globalResolverSchemaObject } from '@/schemas/global-data-schemas'
 import { SkillBridges } from '@/core/brain/types'
+import { NLPAction } from '@/core/nlp/types'
+
+const SKILL_ACTION_ANSWERS_DESCRIPTION =
+  'Answers are the responses that Leon can give to the owners. They can be simple strings or objects with speech and text properties to differentiate between spoken and written responses.'
 
 const actionParametersType = Type.Recursive((self) =>
   Type.Union([
@@ -63,13 +67,18 @@ const skillDataTypes = [
   Type.Literal('entity'),
   Type.Literal('utterance')
 ]
-const answerTypes = Type.Union([
-  Type.String(),
-  Type.Object({
-    speech: Type.String(),
-    text: Type.Optional(Type.String())
-  })
-])
+const answerTypes = Type.Union(
+  [
+    Type.String(),
+    Type.Object({
+      speech: Type.String(),
+      text: Type.Optional(Type.String())
+    })
+  ],
+  {
+    description: SKILL_ACTION_ANSWERS_DESCRIPTION
+  }
+)
 const skillCustomEnumEntityType = Type.Object(
   {
     type: Type.Literal('enum', {
@@ -170,6 +179,41 @@ export const domainSchemaObject = Type.Strict(
     name: Type.String({ minLength: 1, description: 'The name of the domain.' })
   })
 )
+
+export const skillActionLocaleConfigObject = Type.Strict(
+  Type.Object({
+    actions: Type.Record(
+      Type.String(),
+      Type.Object({
+        answers: Type.Optional(
+          Type.Union([
+            Type.Record(Type.String(), Type.Array(answerTypes), {
+              description: SKILL_ACTION_ANSWERS_DESCRIPTION
+            }),
+            Type.Array(answerTypes)
+          ])
+        ),
+        missing_param_follow_ups: Type.Optional(
+          Type.Record(
+            Type.String(),
+            Type.Array(Type.String(), {
+              description:
+                'Missing parameter follow-ups are used to ask the owner for more information when a required parameter is missing. They are used to be customized and to guide the owner to provide the necessary information to complete the action.'
+            })
+          )
+        )
+        // unknown_answers: Type.Optional(Type.Array(answerTypes)),
+        // TODO: core rewrite
+        /*suggestions: Type.Optional(
+          Type.Array(Type.String(), {
+            description:
+              'Suggestions are a simple way to suggest Leon owners what can be answered next.'
+          })
+        )*/
+      })
+    )
+  })
+)
 export const skillSchemaObject = Type.Strict(
   Type.Object({
     name: Type.String({ minLength: 1, description: 'The name of the skill.' }),
@@ -207,6 +251,12 @@ export const skillSchemaObject = Type.Strict(
         description:
           'A person who has been involved in creating or maintaining this skill.'
       }
+    ),
+    flow: Type.Optional(
+      Type.Array(Type.String(), {
+        description:
+          'The flow is a sequence of actions that will be executed in order. Only the first action in the flow will be added to the action calling to avoid overloading the context with too many actions.'
+      })
     ),
     actions: Type.Record(
       Type.String(),
@@ -393,6 +443,11 @@ export const skillConfigSchemaObject = Type.Strict(
 export type DomainSchema = Static<typeof domainSchemaObject>
 export type SkillSchema = Static<typeof skillSchemaObject>
 export type SkillConfigSchema = Static<typeof skillConfigSchemaObject>
+export type SkillActionLocaleConfigSchema = Static<
+  typeof skillActionLocaleConfigObject
+>
+export type SkillActionConfig = SkillSchema['actions'][NLPAction] &
+  SkillActionLocaleConfigSchema['actions'][NLPAction]
 export type SkillBridgeSchema = Static<typeof skillSchemaObject.bridge>
 export type SkillCustomTrimEntityTypeSchema = Static<
   typeof skillCustomTrimEntityType

@@ -80,6 +80,16 @@ export class FileHelper {
     const absolutePath = path.resolve(filePath)
     const fileURL = url.pathToFileURL(absolutePath).href
 
-    return import(fileURL, options)
+    /**
+     * This creates a function at runtime that performs the import.
+     * Esbuild won't try to analyze it, resolving the warning when building the Node.js bridge
+     */
+    const importer = new Function(
+      'url',
+      'options',
+      'return import(url, options)'
+    )
+
+    return importer(fileURL, options)
   }
 }

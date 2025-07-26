@@ -141,7 +141,7 @@ export const [, PYTHON_TCP_SERVER_VERSION] = fs
   .readFileSync(PYTHON_TCP_SERVER_VERSION_FILE_PATH, 'utf8')
   .split("'")
 
-export const NODEJS_BRIDGE_BIN_NAME = 'leon-nodejs-bridge.js'
+export const NODEJS_BRIDGE_BIN_NAME = 'leon-nodejs-bridge.cjs'
 export const PYTHON_BRIDGE_BIN_NAME = 'leon-python-bridge'
 export const PYTHON_TCP_SERVER_BIN_NAME = 'leon-tcp-server'
 

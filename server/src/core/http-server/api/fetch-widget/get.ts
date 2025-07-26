@@ -3,8 +3,8 @@ import type { FastifyPluginAsync } from 'fastify'
 import type { APIOptions } from '@/core/http-server/http-server'
 import { BRAIN } from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
-import { DEFAULT_NLU_RESULT } from '@/core/nlp/nlu/nlu'
-import { SkillDomainHelper } from '@/helpers/skill-domain-helper'
+// import { DEFAULT_NLU_RESULT } from '@/core/nlp/nlu/nlu'
+// import { SkillDomainHelper } from '@/helpers/skill-domain-helper'
 
 export const fetchWidget: FastifyPluginAsync<APIOptions> = async (
   fastify,
@@ -51,7 +51,8 @@ export const fetchWidget: FastifyPluginAsync<APIOptions> = async (
 
         // Do not return any speech and new widget
         BRAIN.isMuted = true
-        await BRAIN.execute({
+        // TODO: core rewrite
+        /*await BRAIN.execute({
           ...DEFAULT_NLU_RESULT,
           currentEntities: [
             {
@@ -81,7 +82,7 @@ export const fetchWidget: FastifyPluginAsync<APIOptions> = async (
             action,
             confidence: 1
           }
-        })
+        })*/
 
         const parsedOutput = JSON.parse(BRAIN.skillOutput)
 

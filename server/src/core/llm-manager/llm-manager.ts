@@ -373,10 +373,40 @@ export default class LLMManager {
          *      [ok] Fully implement the skill router and action calling duties
          *      [ok] Implement duties correctly with the NLU class (create dedicated methods in NLU class)
          *      [ok] Pass NLP.js built-in entities (numbers, duration, etc.) to actions as well as the function calling arguments. Can merge them, so skill developers will have more data
-         *      Update NLU result object to pass to the brain execution
+         *      [ok] Update NLU result object to pass to the brain execution
+         *      [ok] newEntities, contextEntities, newArguments, contextArguments, newSentiment, contextSentiment, etc.
+         *        - new = new utterance; context = all previous utterances within the same context
+         *      [ok] Update NLU result to get the current skill config (to get flow later) and current action config
+         *      [ok] "actionFunction" in main.ts and main.py bridges. actionFunction() + TS -> use camelCase; PY -> use snake_case for params naming. Correctly name params, just use single object, same as React component signature
+         *      [ok] Continue on "handleLogicActionSkill"
+         *      [ok] Use esbuild instead of ncc. Try to compile but has error need to follow up
+         *      [ok] Fix Python skill execution. Somehow the action file name needed to be renamed from "run.py" to "greet.py"
+         *      [ok] Implement helper getSkillActionLocaleConfig
+         *      [ok] Fix context duplicate data because of "await this.updateNLUProcessResult(...)"
+         *      TODO NEXT 2025-07-23: rebuild the "good_bye", "partner_assistant", "color" and "translator-poc" skills
+         *      TODO NEXT 2025-07-20: copy the "good_bye" skill and implement the dialog type. Need to handle the "locales/{lang}.json" structure first since it's based on the answers
+         *      TODO NEXT 2025-07-18: copy translator-poc skill (do this later since it involves the loop concept), handle dialog action logic. Need to handle the "locales/{lang}.json" structure first since it's based on the answers
+         *      In fetch-widget/get.ts, need to execute new brain method; and replace "currentEntities", "classification" with the new structure
+         *      Delete or refactor the chunks where there are "TODO: core rewrite" comments
+         *      Rename all Python actions from "run.py" to actual action name, e.g. "greet.py", etc. Because with the LLM approach we need to provide better meaningful names for the actions
+         *      Replace "%owner_name%" placeholder with {{ owner_name }} syntax in skill answers and all generic answers (e.g. %skill_name%, etc.); check "wernicke(" calls
+         *      Create schema for locales/{lang}.json files. With limited action key config (only "answers" and "missing_params_follow_ups" for now?)
+         *      Create new "runSkillAction" brain method and remove legacy "execute" method
+         *      Then continue to rewrite the logic of the brain execution; then continue on the flow and loop
+         *      Build bridges + rewrite all skills with the new params
+         *      Remove "next_action" and implement "flow" (skill schema, get first action of the flow and ignore all other actions within the flow)
+         *      Replace "getSkillConfig", etc. helpers from SkillDomainHelper with new helpers + rename SkillDomainHelper to SkillHelper
+         *      Handle "is_loop"
+         *      Should delete legacy code?
+         *      Make sure telemetry is working well with the new core
          *      Guess The Number skill: rework on loop logic (create "resolving" duty for very custom inputs, cf. MBTI?)
+         *      Rochambeau skill
          *      Rework the MBTI skill with resolver skill. Once done, from there we can consider the rewrite of the core as nearly completed
          *      Check suggestions. Already done with widgets before? Need to check previous progress in Trello cards
+         *        - Re-enable them from brain.ts, search for "// Send suggestions to the client"
+         *      "dialog" skill type: rework it with new core. It is a good solution for Q&A. E.g. specific knowledge base, etc. Create a dialog skill for Leon itself about general questions (what it can do, why Leon has been created, who created Leon, when was the last update, how to develop new skill, how to contribute, some Easter eggs, etc.)
+         *      Recreate all "dialog" skills with the new core. Remove feature for nested data such as in partner_assistant skill (not very useful, medium code complexity, poor ROI)
+         *      Allow "missing_param_follow_ups" in skill config to handle customized missing params follow-ups
          *      Delete all legacy core code
          *      Delete .extractEntities method from NER class to replace with new one (extractBuiltInEntities)
          *      Create new structure tools in bridges with skills folder; remove domains (no need to implement tools for now)

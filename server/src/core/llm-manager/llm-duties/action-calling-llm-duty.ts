@@ -121,6 +121,46 @@ You must adhere to the following rules without exception:
   }
 
   /**
+   * When there is a flow defined in the skill configuration,
+   * only get the first action from the flow.
+   * Also merge the other actions
+   */
+  private filterActionsWithFlow(
+    actions: SkillSchema['actions'],
+    flow: SkillSchema['flow']
+  ): SkillSchema['actions'] {
+    if (!flow || !Array.isArray(flow) || flow.length === 0) {
+      return actions
+    }
+
+    for (const actionName of flow) {
+      if (!actions[actionName]) {
+        LogHelper.error(
+          `Action "${actionName}" in the flow is not found. Please verify the skill configuration`
+        )
+      }
+    }
+
+    const filteredActions: SkillSchema['actions'] = {}
+    const [firstActionName] = flow
+    const firstAction = actions[firstActionName as string]
+    if (firstAction) {
+      filteredActions[firstActionName as string] = firstAction
+    }
+
+    // Merge other actions that are not in the flow
+    for (const actionName in actions) {
+      const action = actions[actionName]
+
+      if (action && !flow.includes(actionName)) {
+        filteredActions[actionName] = action
+      }
+    }
+
+    return filteredActions
+  }
+
+  /**
    * This method converts the action schema from the skill configuration
    * to a function schema that can be used by the LLM provider
    */
@@ -221,7 +261,11 @@ You must adhere to the following rules without exception:
       const skillConfig = await SkillDomainHelper.getNewSkillConfig(
         this.skillName as string
       )
-      const { action_notes: actionNotes = [], actions } = skillConfig || {}
+      const {
+        action_notes: actionNotes = [],
+        actions,
+        flow
+      } = skillConfig || {}
 
       if (!actions || Object.keys(actions).length === 0) {
         LogHelper.title(this.name)
@@ -249,7 +293,8 @@ You must adhere to the following rules without exception:
         response: []
       })
 
-      const functionsSchema = this.actionsToFunctionsSchema(actions)
+      const filteredActions = this.filterActionsWithFlow(actions, flow)
+      const functionsSchema = this.actionsToFunctionsSchema(filteredActions)
       const config = LLM_MANAGER.coreLLMDuties[LLMDuties.ActionCalling]
       const completionParams = {
         functions: functionsSchema,

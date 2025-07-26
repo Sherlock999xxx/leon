@@ -4,9 +4,7 @@ import type {
   NLPDomain,
   NLPSkill,
   NLPUtterance,
-  NLUResolver,
-  NLUResult,
-  NLUSlot,
+  NLUProcessResult,
   NLUSlots
 } from '@/core/nlp/types'
 import type {
@@ -54,18 +52,36 @@ export enum SkillActionTypes {
   Dialog = 'dialog'
 }
 
+/**
+ * What we pass to the action runtime.
+ *
+ * Try to not use types such as `NLUProcessResult`, etc. Prefer direct type since
+ * it is more explicit and easier to understand for skill developers
+ */
 export interface ActionParams {
-  lang: ShortLanguageCode
-  utterance: NLPUtterance
-  new_utterance: NLPUtterance
-  current_entities: NEREntity[]
+  lang: string
+  utterance: string
+  actionArguments: Record<string, unknown>
   entities: NEREntity[]
-  current_resolvers: NLUResolver[]
-  resolvers: NLUResolver[]
-  slots: { [key: string]: NLUSlot['value'] | undefined }
-  extra_context_data: {
-    lang: ShortLanguageCode
-    sentiment: NLUResult['sentiment']
+  sentiment: NLUProcessResult['new']['sentiment']
+  contextName: string
+  skillName: string
+  actionName: string
+  context: {
+    utterances: string[]
+    actionArguments: Record<string, unknown>
+    entities: NEREntity[]
+    sentiments: NLUProcessResult['context']['sentiments']
+  }
+  skillConfig: {
+    name: string
+    bridge: SkillBridges
+    version: string
+    flow: string[]
+  }
+  skillConfigPath: string
+  extraContext: {
+    lang: string
     date: string
     time: string
     timestamp: number
@@ -74,11 +90,49 @@ export interface ActionParams {
   }
 }
 
-export interface IntentObject extends ActionParams {
+// TODO: delete
+/*export interface ActionParams {
+  lang: ShortLanguageCode
+  utterance: NLPUtterance
+  new_utterance: NLPUtterance
+  current_entities: NEREntity[]
+  entities: NEREntity[]
+  current_resolvers: NLUResolver[]
+  resolvers: NLUResolver[]
+  slots: { [key: string]: NLUSlot['value'] | undefined }
+}*/
+
+export interface IntentObject {
   id: string
-  domain: NLPDomain
-  skill: NLPSkill
-  action: NLPAction
+  lang: ShortLanguageCode
+  context_name: NLUProcessResult['contextName']
+  skill_name: NLUProcessResult['skillName']
+  action_name: NLUProcessResult['actionName']
+  skill_config: {
+    name: NLUProcessResult['skillConfig']['name']
+    bridge: NLUProcessResult['skillConfig']['bridge']
+    version: NLUProcessResult['skillConfig']['version']
+    flow: NLUProcessResult['skillConfig']['flow']
+  }
+  skill_config_path: NLUProcessResult['skillConfigPath']
+  utterance: NLUProcessResult['new']['utterance']
+  action_arguments: NLUProcessResult['new']['actionArguments']
+  entities: NLUProcessResult['new']['entities']
+  sentiment: NLUProcessResult['new']['sentiment']
+  context: {
+    utterances: NLUProcessResult['context']['utterances']
+    action_arguments: NLUProcessResult['context']['actionArguments']
+    entities: NLUProcessResult['context']['entities']
+    sentiments: NLUProcessResult['context']['sentiments']
+  }
+  extra_context: {
+    lang: ShortLanguageCode
+    date: string
+    time: string
+    timestamp: number
+    date_time: string
+    week_day: string
+  }
 }
 
 export interface SkillAnswerCoreData {
@@ -106,10 +160,10 @@ export interface SkillAnswerOutput extends IntentObject {
   }
 }
 
-export interface BrainProcessResult extends NLUResult {
+export interface BrainProcessResult extends NLUProcessResult {
   speeches: string[]
   executionTime: number
-  utteranceID?: string
+  utteranceId?: string
   lang?: ShortLanguageCode
   core?: SkillCoreData | undefined
   action?: SkillConfigSchema['actions'][string]

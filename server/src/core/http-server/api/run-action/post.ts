@@ -3,8 +3,8 @@ import type { FastifyPluginAsync } from 'fastify'
 import type { APIOptions } from '@/core/http-server/http-server'
 import { BRAIN } from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
-import { DEFAULT_NLU_RESULT } from '@/core/nlp/nlu/nlu'
-import { SkillDomainHelper } from '@/helpers/skill-domain-helper'
+// import { DEFAULT_NLU_RESULT } from '@/core/nlp/nlu/nlu'
+// import { SkillDomainHelper } from '@/helpers/skill-domain-helper'
 
 export const runAction: FastifyPluginAsync<APIOptions> = async (
   fastify,
@@ -50,7 +50,8 @@ export const runAction: FastifyPluginAsync<APIOptions> = async (
           })
         }
 
-        await BRAIN.execute({
+        // TODO: core rewrite
+        /*await BRAIN.execute({
           ...DEFAULT_NLU_RESULT,
           ...actionParams,
           skillConfigPath: SkillDomainHelper.getSkillConfigPath(
@@ -64,7 +65,7 @@ export const runAction: FastifyPluginAsync<APIOptions> = async (
             action,
             confidence: 1
           }
-        })
+        })*/
 
         const parsedOutput = JSON.parse(BRAIN.skillOutput)
 

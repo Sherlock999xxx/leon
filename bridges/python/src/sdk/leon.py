@@ -38,24 +38,24 @@ class Leon:
             if data:
                 for key, value in data.items():
                     if isinstance(answer, str):
-                        answer = answer.replace(f'%{key}%', str(value))
+                        answer = answer.replace(f"{{{{ {key} }}}}", str(value))
                     else:
                         if 'text' in answer:
-                            answer['text'] = answer['text'].replace(f'%{key}%', str(value))
+                            answer['text'] = answer['text'].replace(f"{{{{ {key} }}}}", str(value))
                         if 'speech' in answer:
-                            answer['speech'] = answer['speech'].replace(f'%{key}%', str(value))
+                            answer['speech'] = answer['speech'].replace(f"{{{{ {key} }}}}", str(value))
 
             if SKILL_CONFIG.get('variables'):
                 variables = SKILL_CONFIG['variables']
 
                 for key, value in variables.items():
                     if isinstance(answer, str):
-                        answer = answer.replace(f'%{key}%', str(value))
+                        answer = answer.replace(f"{{{{ {key} }}}}", str(value))
                     else:
                         if 'text' in answer:
-                            answer['text'] = answer['text'].replace(f'%{key}%', str(value))
+                            answer['text'] = answer['text'].replace(f"{{{{ {key} }}}}", str(value))
                         if 'speech' in answer:
-                            answer['speech'] = answer['speech'].replace(f'%{key}%', str(value))
+                            answer['speech'] = answer['speech'].replace(f"{{{{ {key} }}}}", str(value))
 
             return answer
         except Exception as e:
@@ -81,7 +81,7 @@ class Leon:
             if widget is not None:
                 wrapper_props = widget.wrapper_props if widget.wrapper_props else {}
                 output['output']['widget'] = {
-                    'actionName': f"{INTENT_OBJECT['domain']}:{INTENT_OBJECT['skill']}:{INTENT_OBJECT['action']}",
+                    'actionName': f"{INTENT_OBJECT['skill_name']}:{INTENT_OBJECT['action_action']}",
                     'widget': widget.widget,
                     'id': widget.id,
                     'onFetch': widget.on_fetch if hasattr(widget, 'on_fetch') else None,

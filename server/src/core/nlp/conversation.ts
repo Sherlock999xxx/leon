@@ -12,7 +12,6 @@ import { SkillDomainHelper } from '@/helpers/skill-domain-helper'
 
 interface ConversationState {
   startingUtterance: NLPUtterance | null
-  currentUtterance: NLPUtterance | null
   pendingAction: NLPAction | null
   collectedParameters: Record<string, string>
   missingParameters: string[]
@@ -40,7 +39,6 @@ const MAX_CONTEXT_HISTORY = 5
 
 export const DEFAULT_ACTIVE_STATE: ConversationState = {
   startingUtterance: null,
-  currentUtterance: null,
   pendingAction: null,
   collectedParameters: {},
   missingParameters: []

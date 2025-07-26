@@ -28,18 +28,28 @@ export const INTENT_OBJECT: IntentObject = JSON.parse(
 )
 
 export const SKILLS_PATH = path.join(process.cwd(), 'skills')
-export const SKILL_PATH = path.join(
-  SKILLS_PATH,
-  INTENT_OBJECT.domain,
-  INTENT_OBJECT.skill
+export const SKILL_PATH = path.join(SKILLS_PATH, INTENT_OBJECT.skill_name)
+const SKILL_LOCALE_PATH = path.join(
+  SKILL_PATH,
+  'locales',
+  INTENT_OBJECT.extra_context.lang + '.json'
 )
-export const SKILL_CONFIG: SkillConfigSchema = JSON.parse(
-  fs.readFileSync(
-    path.join(
-      SKILL_PATH,
-      'config',
-      INTENT_OBJECT.extra_context_data.lang + '.json'
-    ),
-    'utf8'
-  )
+const SKILL_LOCALE_CONFIG = JSON.parse(
+  fs.existsSync(SKILL_LOCALE_PATH)
+    ? fs.readFileSync(SKILL_LOCALE_PATH, 'utf8')
+    : `{"actions": {"${INTENT_OBJECT.action_name}": {}}}`
 )
+
+export const SKILL_CONFIG: SkillConfigSchema = {
+  ...JSON.parse(
+    fs.readFileSync(
+      path.join(
+        SKILL_PATH,
+        'config',
+        INTENT_OBJECT.extra_context.lang + '.json'
+      ),
+      'utf8'
+    )
+  ),
+  ...SKILL_LOCALE_CONFIG.actions[INTENT_OBJECT.action_name]
+}

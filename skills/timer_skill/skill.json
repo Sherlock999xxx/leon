@@ -23,7 +23,7 @@
             },
             "unit": {
               "type": "string",
-              "enum": ["hours", "minutes", "seconds"],
+              "enum": ["HOURS", "MINUTES", "SECONDS"],
               "description": "The unit of time for the duration."
             }
           }

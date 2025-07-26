@@ -45,13 +45,13 @@ export abstract class Widget<T = unknown> {
     if (options?.wrapperProps) {
       this.wrapperProps = options.wrapperProps
     }
-    this.actionName = `${INTENT_OBJECT.domain}:${INTENT_OBJECT.skill}:${INTENT_OBJECT.action}`
+    this.actionName = `${INTENT_OBJECT.skill_name}:${INTENT_OBJECT.action_name}`
     this.params = options.params
     this.widget = this.constructor.name
     if (options?.onFetch) {
       this.onFetch = {
         widgetId: options.onFetch.widgetId,
-        actionName: `${INTENT_OBJECT.domain}:${INTENT_OBJECT.skill}:${options.onFetch.actionName}`
+        actionName: `${INTENT_OBJECT.skill_name}:${options.onFetch.actionName}`
       }
     }
     this.id =

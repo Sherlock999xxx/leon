@@ -1,7 +1,11 @@
 import type { ShortLanguageCode } from '@/types'
 import type { BrainProcessResult } from '@/core/brain/types'
 import type { ActionCallingSuccessOutput } from '@/core/llm-manager/types'
-import { SkillConfigSchema } from '@/schemas/skill-schemas'
+import type {
+  SkillConfigSchema,
+  SkillSchema,
+  SkillActionConfig
+} from '@/schemas/skill-schemas'
 
 /**
  * NLP types
@@ -80,17 +84,36 @@ export interface NLUResolver {
   value: string
 }
 
+interface NLUProcessSentiment {
+  vote?: NLPJSProcessResult['sentiment']['vote']
+  score?: NLPJSProcessResult['sentiment']['score']
+}
 export interface NLUProcessResult {
-  utterance: NLPUtterance
+  contextName: string
   skillName: NLPSkill
   actionName: NLPAction
-  actionArguments: ActionCallingSuccessOutput['arguments']
-  entities: NEREntity[]
-  sentiment: {
-    vote?: NLPJSProcessResult['sentiment']['vote']
-    score?: NLPJSProcessResult['sentiment']['score']
+  skillConfig: {
+    name: SkillSchema['name']
+    bridge: SkillSchema['bridge']
+    version: SkillSchema['version']
+    flow: SkillSchema['flow']
+  }
+  skillConfigPath: string
+  actionConfig: SkillActionConfig | null
+  new: {
+    utterance?: NLPUtterance
+    actionArguments?: ActionCallingSuccessOutput['arguments']
+    entities?: NEREntity[]
+    sentiment?: NLUProcessSentiment
+  }
+  context: {
+    utterances: NLPUtterance[]
+    actionArguments: ActionCallingSuccessOutput['arguments'][]
+    entities: NEREntity[]
+    sentiments: NLUProcessSentiment[]
   }
 }
+// TODO: core rewrite delete?
 export interface NLUResult {
   currentEntities: NEREntity[]
   entities: NEREntity[]

@@ -6,7 +6,7 @@ def get_widget_id() -> Optional[str]:
     """
     Get the widget ID if any
     """
-    for entity in INTENT_OBJECT['current_entities']:
+    for entity in INTENT_OBJECT['context']['entities']:
         if entity['entity'] == 'widgetid':
             return entity['sourceText']
 

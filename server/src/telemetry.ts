@@ -136,6 +136,9 @@ export class Telemetry {
   ): Promise<void> {
     if (IS_TELEMETRY_ENABLED) {
       try {
+        // TODO: core rewrite, implement properly
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
         if (processedData?.classification) {
           const {
             classification: {
@@ -174,6 +177,9 @@ export class Telemetry {
             instanceID: this.instanceID,
             data: {
               language: processedData?.lang || null,
+              // TODO: core rewrite, implement properly
+              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+              // @ts-expect-error
               value: processedData?.utterance
             }
           })

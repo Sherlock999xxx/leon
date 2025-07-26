@@ -59,10 +59,9 @@ export class SkillDomainHelper {
   public static async getNewSkillConfig(
     skillName: SkillSchema['name']
   ): Promise<SkillSchema | null> {
-    const skillPath = path.join(SKILLS_PATH, skillName)
-    const skillConfigPath = path.join(skillPath, 'skill.json')
+    const skillConfigPath = SkillDomainHelper.getNewSkillConfigPath(skillName)
 
-    if (!fs.existsSync(skillConfigPath)) {
+    if (!skillConfigPath) {
       return null
     }
 
@@ -72,10 +71,28 @@ export class SkillDomainHelper {
   }
 
   /**
+   * TODO: rename this function when legacy helpers are removed
+   *
+   * Get new skill config path
+   * @param skillName Skill name to get configuration for
+   */
+  public static getNewSkillConfigPath(
+    skillName: SkillSchema['name']
+  ): string | null {
+    const skillPath = path.join(SKILLS_PATH, skillName)
+    const skillConfigPath = path.join(skillPath, 'skill.json')
+
+    if (!fs.existsSync(skillConfigPath)) {
+      return null
+    }
+
+    return skillConfigPath
+  }
+
+  /**
    * List all skills friendly prompts
    */
   public static async listSkillFriendlyPrompts(): Promise<string[]> {
-    // use listSkillFolders and getNewSkillConfig
     const skillNames = await SkillDomainHelper.listSkillFolders()
     const skillFriendlyPrompts: string[] = []
 
@@ -334,5 +351,40 @@ export class SkillDomainHelper {
     ) as SkillConfigSchema
 
     return !!actions[action]
+  }
+
+  /**
+   * Get localized configuration of a skill action
+   * @param lang Language short code
+   * @param skillName Skill name to get configuration for
+   * @param actionName Action name to get configuration for
+   * @example getLocalizedValues('en', 'good_bye_skill', 'say_bye') // { "answers": ["Goodbye!", "See you later!"] }
+   */
+  public static async getSkillActionLocaleConfig(
+    lang: ShortLanguageCode,
+    skillName: SkillSchema['name'],
+    actionName: string
+  ): Promise<Record<string, unknown>> {
+    const skillLocaleConfigPath = path.join(
+      SKILLS_PATH,
+      skillName,
+      'locales',
+      `${lang}.json`
+    )
+
+    if (!fs.existsSync(skillLocaleConfigPath)) {
+      return {}
+    }
+
+    try {
+      const skillLocaleConfig = JSON.parse(
+        await fs.promises.readFile(skillLocaleConfigPath, 'utf8')
+      )['actions'][actionName]
+
+      return skillLocaleConfig
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (e) {
+      return {}
+    }
   }
 }

@@ -1,4 +1,13 @@
 {
-  "CREATE_LIST_MISSING_LIST_NAME_1": "What is the name of the to-do list you want to create?",
-  "CREATE_LIST_MISSING_LIST_NAME_2": "Please provide a name for the to-do list."
+  "$schema": "../../../schemas/skill-schemas/skill-action-locale-config.json",
+  "actions": {
+    "create_list": {
+      "missing_param_follow_ups": {
+        "list_name": [
+          "What is the name of the to-do list you want to create?",
+          "Please provide a name for the to-do list."
+        ]
+      }
+    }
+  }
 }

@@ -7,7 +7,7 @@ import { createTimerMemory } from '../lib/memory'
 export const run: ActionFunction = async function (params) {
   const supportedUnits = ['hours', 'minutes', 'seconds']
   const [duration] = (
-    params.current_entities.find((entity) => entity.type === 'duration')
+    params.context.entities.find((entity) => entity.type === 'duration')
       ?.resolution as BuiltInDurationEntity['resolution']
   ).values
 

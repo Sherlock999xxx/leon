@@ -48,13 +48,13 @@ class Widget(ABC, Generic[T]):
             self.wrapper_props = options.wrapper_props
         else:
             self.wrapper_props = None
-        self.action_name = f"{INTENT_OBJECT['domain']}:{INTENT_OBJECT['skill']}:{INTENT_OBJECT['action']}"
+        self.action_name = f"{INTENT_OBJECT['skill_name']}:{INTENT_OBJECT['action_name']}"
         self.params = options.params
         self.widget = self.__class__.__name__
         if options.on_fetch:
             self.on_fetch = {
                 'widgetId': options.on_fetch.get('widget_id'),
-                'actionName': f"{INTENT_OBJECT['domain']}:{INTENT_OBJECT['skill']}:{options.on_fetch.get('action_name')}"
+                'actionName': f"{INTENT_OBJECT['skill_name']}:{options.on_fetch.get('action_name')}"
             }
         else:
             self.on_fetch = None

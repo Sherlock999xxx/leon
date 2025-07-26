@@ -46,7 +46,7 @@ class Leon {
         for (const key in data) {
           if (typeof answer === 'string') {
             answer = (answer as string).replaceAll(
-              `%${key}%`,
+              `{{ ${key} }}`,
               String(data[key])
             )
           } else {
@@ -54,13 +54,13 @@ class Leon {
 
             if (answer.text) {
               answer.text = answer.text.replaceAll(
-                `%${key}%`,
+                `{{ ${key} }}`,
                 String(data[key])
               )
             }
             if (answer.speech) {
               answer.speech = answer.speech.replaceAll(
-                `%${key}%`,
+                `{{ ${key} }}`,
                 String(data[key])
               )
             }
@@ -74,7 +74,7 @@ class Leon {
         for (const key in variables) {
           if (typeof answer === 'string') {
             answer = (answer as string).replaceAll(
-              `%${key}%`,
+              `{{ ${key} }}`,
               String(variables[key])
             )
           } else {
@@ -82,13 +82,13 @@ class Leon {
 
             if (answer.text) {
               answer.text = answer.text.replaceAll(
-                `%${key}%`,
+                `{{ ${key} }}`,
                 String(variables[key])
               )
             }
             if (answer.speech) {
               answer.speech = answer.speech.replaceAll(
-                `%${key}%`,
+                `{{ ${key} }}`,
                 String(variables[key])
               )
             }
@@ -130,7 +130,7 @@ class Leon {
 
       if (answerInput.widget) {
         answerObject.output.widget = {
-          actionName: `${INTENT_OBJECT.domain}:${INTENT_OBJECT.skill}:${INTENT_OBJECT.action}`,
+          actionName: `${INTENT_OBJECT.skill_name}:${INTENT_OBJECT.action_name}`,
           widget: answerInput.widget.widget,
           id: answerInput.widget.id,
           onFetch: answerInput.widget.onFetch ?? null,
