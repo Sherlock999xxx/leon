@@ -61,26 +61,26 @@ export enum SkillActionTypes {
 export interface ActionParams {
   lang: string
   utterance: string
-  actionArguments: Record<string, unknown>
+  action_arguments: Record<string, unknown>
   entities: NEREntity[]
   sentiment: NLUProcessResult['new']['sentiment']
-  contextName: string
-  skillName: string
-  actionName: string
+  context_name: string
+  skill_name: string
+  action_name: string
   context: {
     utterances: string[]
-    actionArguments: Record<string, unknown>
+    action_arguments: Record<string, unknown>[]
     entities: NEREntity[]
     sentiments: NLUProcessResult['context']['sentiments']
   }
-  skillConfig: {
+  skill_config: {
     name: string
     bridge: SkillBridges
     version: string
     flow: string[]
   }
-  skillConfigPath: string
-  extraContext: {
+  skill_config_path: string
+  extra_context: {
     lang: string
     date: string
     time: string

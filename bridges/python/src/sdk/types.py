@@ -8,9 +8,22 @@ class NLUResultSentiment(TypedDict):
     score: Optional[float]
 
 
-class ExtraContextData(TypedDict):
+class Context(TypedDict):
+    utterances: list[str]
+    action_arguments: Dict[str, Any]
+    entities: list[Any]
+    sentiments: list[NLUResultSentiment]
+
+
+class SkillConfig(TypedDict):
+    name: str
+    bridge: Union[Literal['python'], Literal['nodejs']]
+    version: str
+    flow: list[str]
+
+
+class ExtraContext(TypedDict):
     lang: str
-    sentiment: str
     date: str
     time: str
     timestamp: int
@@ -21,13 +34,16 @@ class ExtraContextData(TypedDict):
 class ActionParams(TypedDict):
     lang: str
     utterance: str
-    new_utterance: str
-    current_entities: list[Any]
+    action_arguments: Dict[str, Any]
     entities: list[Any]
-    current_resolvers: list[Any]
-    resolvers: list[Any]
-    slots: Dict[str, Any]
-    extra_context_data: ExtraContextData
+    sentiment: NLUResultSentiment
+    context_name: str
+    skill_name: str
+    action_name: str
+    context: Context
+    skill_config: SkillConfig
+    skill_config_path: str
+    extra_context: ExtraContext
 
 
 AnswerData = Optional[Union[Dict[str, Union[str, int]], None]]

@@ -1,6 +1,5 @@
 import path from 'node:path'
 
-import { SkillBridges } from '@/core/brain/types'
 import { FileHelper } from '@/helpers/file-helper'
 
 import type { ActionFunction, ActionParams } from '@sdk/types'
@@ -8,39 +7,28 @@ import { INTENT_OBJECT } from '@bridge/constants'
 ;(async (): Promise<void> => {
   const {
     lang,
-    utterance,
-    action_arguments: actionArguments,
-    entities,
     sentiment,
-    context_name: contextName,
-    skill_name: skillName,
-    action_name: actionName,
-    context,
-    skill_config: skillConfig,
-    skill_config_path: skillConfigPath,
-    extra_context: extraContext
+    context_name,
+    skill_name,
+    action_name,
+    skill_config_path,
+    extra_context
   } = INTENT_OBJECT
 
   const params: ActionParams = {
     lang,
-    utterance,
-    actionArguments,
-    entities,
+    utterance: INTENT_OBJECT.utterance as ActionParams['utterance'],
+    action_arguments:
+      INTENT_OBJECT.action_arguments as ActionParams['action_arguments'],
+    entities: INTENT_OBJECT.entities as ActionParams['entities'],
     sentiment,
-    contextName,
-    skillName,
-    actionName,
-    context: {
-      ...context,
-      actionArguments: context.action_arguments
-    },
-    skillConfig: {
-      ...skillConfig,
-      bridge: skillConfig.bridge as SkillBridges,
-      flow: skillConfig.flow ?? []
-    },
-    skillConfigPath,
-    extraContext
+    context_name,
+    skill_name,
+    action_name,
+    context: INTENT_OBJECT.context as ActionParams['context'],
+    skill_config: INTENT_OBJECT.skill_config as ActionParams['skill_config'],
+    skill_config_path,
+    extra_context
   }
 
   try {
@@ -48,10 +36,10 @@ import { INTENT_OBJECT } from '@bridge/constants'
       path.join(
         process.cwd(),
         'skills',
-        skillName,
+        skill_name,
         'src',
         'actions',
-        `${actionName}.ts`
+        `${action_name}.ts`
       )
     )
     const actionFunction: ActionFunction = actionModule.run
@@ -59,7 +47,7 @@ import { INTENT_OBJECT } from '@bridge/constants'
     await actionFunction(params)
   } catch (e) {
     console.error(
-      `Error while running "${skillName}" skill "${actionName}" action:`,
+      `Error while running "${skill_name}" skill "${action_name}" action:`,
       e
     )
   }
