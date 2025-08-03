@@ -194,6 +194,12 @@ Analyze the last user message to find the following slot:
             status: SlotFillingStatus.Success,
             ...parsedResult
           }
+        } else if (typeof completionResult?.output === 'string') {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-expect-error
+          completionResult.output = {
+            status: SlotFillingStatus.NotFound
+          }
         }
       }
 

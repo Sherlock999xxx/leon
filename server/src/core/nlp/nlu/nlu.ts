@@ -8,9 +8,9 @@ import type {
 import {
   type ActionCallingMissingParamsOutput,
   type ActionCallingOutput,
+  ActionCallingStatus,
   type ActionCallingSuccessOutput,
   type SlotFillingOutput,
-  ActionCallingStatus,
   SlotFillingStatus
 } from '@/core/llm-manager/types'
 import { BRAIN, CONVERSATION_LOGGER, SOCKET_SERVER } from '@/core'
@@ -18,8 +18,8 @@ import { LogHelper } from '@/helpers/log-helper'
 import Conversation from '@/core/nlp/conversation'
 import { SkillDomainHelper } from '@/helpers/skill-domain-helper'
 import {
-  NLUProcessResultUpdater,
-  DEFAULT_NLU_PROCESS_RESULT
+  DEFAULT_NLU_PROCESS_RESULT,
+  NLUProcessResultUpdater
 } from '@/core/nlp/nlu/nlu-process-result-updater'
 import { SkillRouterLLMDuty } from '@/core/llm-manager/llm-duties/skill-router-llm-duty'
 import { ActionCallingLLMDuty } from '@/core/llm-manager/llm-duties/action-calling-llm-duty'
@@ -54,8 +54,10 @@ export const DEFAULT_NLU_RESULT = {
 
 export default class NLU {
   private static instance: NLU
+  // Used to store the current single-turn NLU process result
   private _nluProcessResult = DEFAULT_NLU_PROCESS_RESULT
   private _nluResult: NLUResult = DEFAULT_NLU_RESULT
+  // Used to store the conversation state (across multiple turns)
   public conversation = new Conversation('conv0')
 
   get nluProcessResult(): NLUProcessResult {
@@ -374,7 +376,7 @@ export default class NLU {
     this.conversation.cleanActiveState()
     await NLUProcessResultUpdater.update(DEFAULT_NLU_PROCESS_RESULT)
 
-    // TODO: chit-chat duty / or conversation skill?
+    // TODO: core rewrite chit-chat duty / or conversation skill?
   }
 
   private async handleActionSuccess(
@@ -396,18 +398,44 @@ export default class NLU {
 
     const processedData = await BRAIN.runSkillAction(this._nluProcessResult)
 
+    // TODO: core rewrite - refactor by creating a new method "handlePostBrainExecution"
+
     console.log('processedData', processedData)
+    console.log('this._nluProcessResult', this._nluProcessResult)
 
     // TODO: 2025-07-23
-    /*const { flow } = await SkillDomainHelper.getSkillConfig(
-      this._nluProcessResult.skillConfigPath,
-      BRAIN.lang
-    )
+    const { skillConfig } = this._nluProcessResult
+    const { flow } = skillConfig
     const hasFlow = flow && flow.length > 0
 
     if (hasFlow) {
+      const currentAction = this._nluProcessResult.actionName
+      const isLastActionInFlow = flow[flow.length - 1] === currentAction
 
-    }*/
+      if (!isLastActionInFlow) {
+        const nextActionName = flow[flow.indexOf(currentAction) + 1] as string
+
+        await NLUProcessResultUpdater.update({
+          actionName: nextActionName
+        })
+
+        this.conversation.setActiveState({
+          pendingAction: `${this._nluProcessResult.skillName}:${nextActionName}`,
+          missingParameters: Object.keys(
+            this._nluProcessResult.actionConfig?.parameters || []
+          ),
+          collectedParameters: this.conversation.activeState.collectedParameters
+        })
+
+        /*this.process()
+
+        await this.postProcessRoute({
+          status: ActionCallingStatus.Success,
+          name: nextActionName,
+          arguments: this._nluProcessResult.new.actionArguments as Record<string, unknown>
+        })*/
+      }
+    }
 
     // TODO: add if: clean up if the current action is the last one in the flow and it is not a loop
     // this.conversation.cleanActiveState()
@@ -491,6 +519,10 @@ export default class NLU {
           const actionName = newActiveState.pendingAction?.split(':')[1] || ''
 
           if (areAllSlotsFilled) {
+            console.log(
+              'newActiveState.collectedParameters',
+              newActiveState.collectedParameters
+            )
             await this.handleActionSuccess({
               status: ActionCallingStatus.Success,
               name: actionName,
@@ -546,6 +578,7 @@ export default class NLU {
   private async postProcessRoute(
     actionCallingOutput: ActionCallingOutput
   ): Promise<void> {
+    console.log('actionCallingOutput', JSON.stringify(actionCallingOutput))
     if ('name' in actionCallingOutput) {
       await NLUProcessResultUpdater.update({
         actionName: actionCallingOutput.name

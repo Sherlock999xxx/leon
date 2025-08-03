@@ -154,14 +154,11 @@ export class DialogActionSkillHandler {
     allAnswers: SkillAnswerConfigSchema[],
     data: Record<string, unknown>
   ): SkillAnswerConfigSchema {
-    console.log('currentAnswer', currentAnswer)
-    console.log('data', data)
     // If the answer has placeholders and no data to map, we need to find a fallback answer that does not have placeholders
     if (
       this.answerHasPlaceholders(currentAnswer) &&
       Object.keys(data).length === 0
     ) {
-      console.log('NEED FALLBACK ANSWER')
       const fallbackAnswers = allAnswers.filter(
         (ans) => !this.answerHasPlaceholders(ans)
       )

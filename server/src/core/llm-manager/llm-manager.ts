@@ -388,10 +388,13 @@ export default class LLMManager {
          *      [ok] Refactor brain with logic/dialog static class handlers + cf. Copilot chat for how to split static methods within the dialog action handler class
          *      [ok] Implement the locale to the timer skill. And verify all actions
          *      [ok] In bridges/nodejs/src/constants.ts and bridges/python/src/constants.py, change the SKILL_CONFIG by removing the config/{lang}.json and only use the locale config. Need to add "variables" and "widget_contents" to the local config too. When implementing variables, check for dialog skill answers if it has conflict
+         *      TODO NEXT 2025-08-03: when action calling, also need to provide non-missing action arguments or need to set the active state with collected params OR fix the slot filling, it needs to push the slots into the context, not only the active state
+         *      TODO NEXT 2025-08-03: maybe there is no need for a flow for the translator skill? A simple action should be enough with the 2 params (target_language and text_to_translate). Maybe I should just implement the loop concept for this case? Test the following cases: flow -> 1. "Can you please help me to translate some text into French?" > "The sky is blue"; 2. "Please help me to translate some text" > "Into French please" > "The sky is blue"; 3. "Please translate this text into French: the sky is blue"; 4. Please translate this text "the sky is blue" > "Into French"
          *      TODO NEXT 2025-07-30: continue to rebuild the translator-poc skill. Need to implement the flow and think carefully about the whole set_up answers system, etc.
          *      TODO NEXT 2025-07-23: rebuild the "good_bye", "partner_assistant", "color" and "translator-poc" skills
          *      TODO NEXT 2025-07-29: todo list skill does not work properly. E.g. "Please add a book to my shopping list". It does not do slot filling well anymore
          *      TODO NEXT 2025-07-18: copy translator-poc skill (do this later since it involves the loop concept), handle dialog action logic. Need to handle the "locales/{lang}.json" structure first since it's based on the answers
+         *      TODO NEXT 2025-08-03: fix bridge main.py with optional params (params and params_helper), e.g. with partner assistant action
          *      In fetch-widget/get.ts, need to execute new brain method; and replace "currentEntities", "classification" with the new structure
          *      Delete or refactor the chunks where there are "TODO: core rewrite" comments
          *      Rename all Python actions from "run.py" to actual action name, e.g. "greet.py", etc. Because with the LLM approach we need to provide better meaningful names for the actions

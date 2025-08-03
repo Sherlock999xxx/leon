@@ -3,7 +3,9 @@ import { leon } from '@sdk/leon'
 import { Network } from '@sdk/network'
 
 export const run: ActionFunction = async function (_params, paramsHelper) {
+  // const targetLanguage = paramsHelper.findActionArgumentFromContext('target_language')
   const targetLanguage = paramsHelper.getActionArgument('target_language')
+  // const textToTranslate = paramsHelper.findActionArgumentFromContext('text_to_translate')
   const textToTranslate = paramsHelper.getActionArgument('text_to_translate')
   const network = new Network({
     baseURL: `${process.env['LEON_HOST']}:${process.env['LEON_PORT']}/api/v1`

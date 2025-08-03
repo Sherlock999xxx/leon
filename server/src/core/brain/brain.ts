@@ -409,7 +409,6 @@ export default class Brain {
         nluProcessResult: NLUProcessResult
       ): Promise<Partial<BrainProcessResult>> => {
         return LogicActionSkillHandler.handle(nluProcessResult, utteranceId)
-        // return this.handleLogicActionSkill(nluProcessResult, utteranceId)
       },
       [SkillActionTypes.Dialog]: (
         nluProcessResult: NLUProcessResult

@@ -89,7 +89,11 @@ export default class Conversation {
   public setActiveState(state: Partial<ConversationState>): void {
     this._activeState = {
       ...this._activeState,
-      ...state
+      ...state,
+      collectedParameters: {
+        ...this._activeState.collectedParameters,
+        ...state.collectedParameters
+      }
     }
 
     LogHelper.title('Conversation')
