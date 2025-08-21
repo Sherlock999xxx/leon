@@ -1,6 +1,6 @@
 from bridges.python.src.sdk.leon import leon
 from bridges.python.src.sdk.types import ActionParams
-from bridges.python.src.params_helper import ParamsHelper
+from bridges.python.src.sdk.params_helper import ParamsHelper
 
 
 def run(_params: ActionParams, params_helper: ParamsHelper) -> None:

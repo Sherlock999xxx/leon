@@ -15,31 +15,36 @@ import { StringHelper } from '@/helpers/string-helper'
 
 type SkillRouterLLMDutyParams = LLMDutyParams
 
-export const SYSTEM_PROMPT = `SYSTEM: Analyze the User Query and the list of Available Skills below. Your task is to determine which single skill is the most appropriate for fulfilling the user's request.
+export const SYSTEM_PROMPT = `You are a skill routing AI. Your task is to analyze the User Query and select the single most appropriate skill from the list below based on the user's intent.
+
+Respond using these rules:
+- Output ONLY the exact skill name as listed below (e.g., "timer_skill", "greeting_skill").
+- If no skill matches the user's intent, output ONLY: "None"
+- Do not include any explanations, punctuation, markdown, or extra text.
 
 Available Skills:
-%SKILL_LIST%
+{{ SKILL_LIST }}
+
+Carefully evaluate the user's true intent. Prioritize:
+- Direct functional match (e.g., translation → translator_poc_skill)
+- Actionability (can this skill fulfill the request?)
+- Avoid keyword traps (e.g., "add" could be timer, todo, calendar — but only todo_list_skill handles lists)
 
 --- Examples ---
 
 User Query: "Translate 'Hello, how are you?' to Spanish."
-Chosen Skill Name: translate_text_skill
+Response: translator_skill
 
 User Query: "Generate a logo for my startup 'Blue Widgets'"
-Chosen Skill Name: image_generation_skill
+Response: image_generation_skill
 
 User Query: "Add 'Dentist Appointment' to my calendar for Tuesday at 3 PM."
-Chosen Skill Name: create_calendar_event_skill
+Response: create_calendar_event_skill
 
---- End Examples ---
+User Query: "Just a test message, nothing to do."
+Response: None
 
-Instructions:
-- /no_think
-- Carefully consider the User Query and the description of each skill.
-- Select the single best skill from the list provided.
-- Respond ONLY with the exact skill name (e.g., WeatherSkill, VideoTranslationSkill).
-- If NONE of the provided skills are a good match for the User Query, respond ONLY with the exact word "None".
-- Do not add any explanation or introductory text to your response.`
+--- End Examples ---`
 
 export class SkillRouterLLMDuty extends LLMDuty {
   private static instance: SkillRouterLLMDuty
@@ -61,7 +66,7 @@ export class SkillRouterLLMDuty extends LLMDuty {
     this.input = params.input
 
     this.systemPrompt = StringHelper.findAndMap(SYSTEM_PROMPT, {
-      '%SKILL_LIST%': LLM_MANAGER.skillListContent || ''
+      '{{ SKILL_LIST }}': LLM_MANAGER.skillListContent || ''
     })
   }
 
@@ -109,7 +114,8 @@ export class SkillRouterLLMDuty extends LLMDuty {
         dutyType: LLMDuties.SkillRouter,
         systemPrompt: this.systemPrompt as string,
         temperature: config.temperature,
-        maxTokens: config.maxTokens
+        maxTokens: config.maxTokens,
+        thoughtTokensBudget: config.thoughtTokensBudget
       }
       let completionResult
 

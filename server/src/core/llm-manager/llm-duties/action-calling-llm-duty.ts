@@ -47,22 +47,36 @@ export class ActionCallingLLMDuty extends LLMDuty {
    * However, if the owner already mentioned the list name in the conversation, it will resolve it correctly.
    * But if the list name is "device" it will be smart enough to not resolve it as "list_name: device" because
    * "apple juice" is not a "device". So it can resolve parameters according to the named entity meaning
+   *
+   * E.g. "Tonight I want to cook salmon. Please think of the ingredients and add them to the shopping list"
+   * "I bought pepper, complete it from the shopping list"
+   * // Should understand that it is the "shopping" list, and "rice" is "1kg of rice"
+   * "Complete rice, garlic and salt from the list too"
+   *
+   * Can understand the context data + execute multiple action calls from one single utterance
+   * E.g. "Please create a work list, think of all the materials a Software Engineer must have, then and add it to the list"
+   * "Do the same for a Butcher but with a new list you must create first"
+   *
+   * "Create a device list"
+   * "Think of the daily common devices we use today and add them to this list"
    */
-  protected readonly systemPrompt: LLMDutyParams['systemPrompt'] = `You are a specialized AI assistant that exclusively performs function calling. Your sole purpose is to analyze a user's query and translate it into a structured function call based on a provided list of functions.
+  protected readonly systemPrompt: LLMDutyParams['systemPrompt'] = `You are a function-calling AI that strictly translates user queries into function call requests. You do not respond conversationally. You do not make assumptions. You do not invent or infer any information.
 
-You must adhere to the following rules without exception:
+Follow these rules exactly:
 
-1. If parameters are missing, you must return a JSON object indicating which parameters are required:
+1. NEVER assume or infer a value for any parameter, even if it seems obvious or trivial.
+2. If any required parameter is not explicitly provided by the user in their query, DO NOT fill it with a default, guess, or context-based value.
+3. Instead, return a JSON object in the following format when parameters are missing:
   \`\`\`json
-  {"status": "${ActionCallingStatus.MissingParams}", "required_params": ["<param_name_1>", "<param_name_2>"], "name": "<function_name>"}
+  {"status": "${ActionCallingStatus.MissingParams}", "required_params": ["param_1", "param_2"], "name": "function_name", "arguments": {"already_provided_param": "value"}}
   \`\`\`
-  Replace "<param_name>" with the name of the missing required parameter.
-2. If the function is not found, you must return the JSON object:
+  - \`required_params\`: List all required parameter names that are missing.
+  - \`arguments\`: Include only the parameters the user actually provided — do not include missing ones.
+4. If the intended function cannot be determined, return:
   \`\`\`json
   {"status": "${ActionCallingStatus.NotFound}"}
   \`\`\`
-3. You must not invent, assume, create, or infer any value for a parameter that is not explicitly provided by the user.
-4. You must only return JSON format. Do not provide any explanations, apologies, greetings, or any other conversational text.`
+5. You must ONLY output valid JSON. Never add explanations, greetings, markdown, or any extra text.`
   protected readonly name = 'Action Calling LLM Duty'
   private readonly skillName: string | null = null
   protected input: LLMDutyParams['input'] = null
@@ -301,10 +315,11 @@ You must adhere to the following rules without exception:
         dutyType: LLMDuties.ActionCalling,
         systemPrompt: this.systemPrompt as string,
         temperature: config.temperature,
-        maxTokens: config.maxTokens
+        maxTokens: config.maxTokens,
+        thoughtTokensBudget: config.thoughtTokensBudget
       }
+      const dutyOutput: ActionCallingOutput[] = []
       let completionResult
-      let dutyOutput = null
 
       if (LLM_PROVIDER_NAME === LLMProviders.Local) {
         completionResult = await LLM_PROVIDER.prompt(
@@ -323,39 +338,52 @@ You must adhere to the following rules without exception:
           response.lastEvaluation.cleanHistory.slice(-CHAT_HISTORY_SIZE)
 
         /**
-         * The model decided to call a function
+         * The model decided to call a function/several functions
          */
         if (response.functionCalls && response.functionCalls.length > 0) {
-          const call = response.functionCalls[0]
-          const functionName = call.functionName
-          const params = call.params
-          const functionDefinition = functionsSchema[functionName]
+          for (const call of response.functionCalls) {
+            const functionName = call.functionName
+            const params = call.params
+            const functionDefinition = functionsSchema[functionName]
+            let actionOutput: ActionCallingOutput | null = null
 
-          if (!functionDefinition) {
-            dutyOutput = {
-              status: ActionCallingStatus.NotFound
-            }
-          } else {
-            /**
-             * Check if the parameters are provided
-             */
-            const requiredParams = functionDefinition?.params?.required || []
-            const missingParams = requiredParams.filter(
-              (required: string) => params[required] == null
-            )
-
-            if (missingParams.length > 0) {
-              dutyOutput = {
-                status: ActionCallingStatus.MissingParams,
-                required_params: missingParams,
-                name: functionName
+            if (!functionDefinition) {
+              actionOutput = {
+                status: ActionCallingStatus.NotFound
               }
             } else {
-              dutyOutput = {
-                status: ActionCallingStatus.Success,
-                name: functionName,
-                arguments: params
+              /**
+               * Check if the parameters are provided
+               */
+
+              const requiredParams = functionDefinition?.params?.required || []
+              const missingParams = requiredParams.filter(
+                (required: string) => params[required] == null
+              )
+
+              if (missingParams.length > 0) {
+                actionOutput = {
+                  status: ActionCallingStatus.MissingParams,
+                  required_params: missingParams,
+                  name: functionName,
+                  arguments: params
+                }
+              } else {
+                actionOutput = {
+                  status: ActionCallingStatus.Success,
+                  name: functionName,
+                  arguments: params
+                }
               }
+            }
+
+            if (actionOutput) {
+              const finalActionOutput = this.parseOptionalParameters(
+                skillConfig as SkillSchema,
+                actionOutput
+              )
+
+              dutyOutput.push(finalActionOutput)
             }
           }
         } else {
@@ -370,44 +398,54 @@ You must adhere to the following rules without exception:
           try {
             // In case it returned a JSON object
             const tmpResponse = JSON.parse(response.response)
+            let parsedOutput: ActionCallingOutput | null = null
 
             if (tmpResponse.status) {
               if (tmpResponse.status === ActionCallingStatus.MissingParams) {
-                dutyOutput = {
+                parsedOutput = {
                   status: ActionCallingStatus.MissingParams,
                   required_params: tmpResponse.required_params || [],
-                  name: tmpResponse.name || ''
+                  name: tmpResponse.name || '',
+                  arguments: tmpResponse.arguments || {}
                 }
               } else if (tmpResponse.status === ActionCallingStatus.NotFound) {
-                dutyOutput = {
+                parsedOutput = {
                   status: ActionCallingStatus.NotFound
                 }
               }
             } else if (tmpResponse.name) {
-              dutyOutput = {
+              parsedOutput = {
                 status: ActionCallingStatus.Success,
                 name: tmpResponse.name,
                 arguments: tmpResponse.arguments || {}
               }
             } else {
-              dutyOutput = {
+              parsedOutput = {
                 status: ActionCallingStatus.NotFound
               }
             }
-          } catch {
-            dutyOutput = {
-              status: ActionCallingStatus.NotFound
+
+            if (parsedOutput) {
+              dutyOutput.push(
+                this.parseOptionalParameters(
+                  skillConfig as SkillSchema,
+                  parsedOutput
+                )
+              )
             }
+          } catch {
+            dutyOutput.push({
+              status: ActionCallingStatus.NotFound
+            })
           }
         }
       } else {
         completionResult = await LLM_PROVIDER.prompt(prompt, completionParams)
       }
 
-      dutyOutput = this.parseOptionalParameters(
-        skillConfig as SkillSchema,
-        dutyOutput as ActionCallingOutput
-      )
+      if (dutyOutput.length === 0) {
+        dutyOutput.push({ status: ActionCallingStatus.NotFound })
+      }
 
       if (completionResult) {
         completionResult.output = JSON.stringify(dutyOutput)

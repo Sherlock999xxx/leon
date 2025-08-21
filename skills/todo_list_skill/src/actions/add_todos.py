@@ -1,28 +1,20 @@
 from bridges.python.src.sdk.leon import leon
 from bridges.python.src.sdk.types import ActionParams
+from bridges.python.src.sdk.params_helper import ParamsHelper
 from bridges.python.src.sdk.widget import WidgetOptions
 from ..widgets.todos_list_widget import TodosListWidget, TodosListWidgetParams
 from ..lib import memory
 
 from typing import Union
 
-def run(params: ActionParams) -> None:
+def run(params: ActionParams, params_helper: ParamsHelper) -> None:
     """Add todos to a to-do list"""
 
     list_name: Union[str, None] = None
     todos: list[str] = []
 
-    for item in params['entities']:
-        if item['entity'] == 'list':
-            list_name = item['sourceText'].lower()
-        elif item['entity'] == 'todos':
-            todos = [chunk.strip() for chunk in item['sourceText'].lower().split(',')]
-
-    if list_name is None:
-        return leon.answer({'key': 'list_not_provided'})
-
-    if len(todos) == 0:
-        return leon.answer({'key': 'todos_not_provided'})
+    list_name = params_helper.get_action_argument('list_name').lower()
+    todos = params_helper.get_action_argument('items')
 
     widget_id = None
     if not memory.has_todo_list(list_name):
@@ -41,6 +33,7 @@ def run(params: ActionParams) -> None:
         memory.create_todo_item(widget_id, list_name, todo)
         result += str(leon.set_answer_data('list_todo_element', {'todo': todo}))
 
+
     # Get the updated list of todos
     list_todos = memory.get_todo_items(None, list_name)
 
@@ -49,7 +42,7 @@ def run(params: ActionParams) -> None:
         params={'list_name': list_name, 'todos': list_todos},
         on_fetch={
             'widget_id': list_todos[0]['widget_id'],
-            'action_name': 'view_list'
+            'action_name': 'get_list_items'
         }
     )
     todos_list_widget = TodosListWidget(todos_list_options)

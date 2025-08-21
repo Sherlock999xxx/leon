@@ -343,7 +343,7 @@ export default class NLU {
   private async chooseSkillAction(
     utterance: NLPUtterance,
     skillName: NLPSkill
-  ): Promise<ActionCallingOutput | null> {
+  ): Promise<ActionCallingOutput[] | null> {
     LogHelper.title('NLU')
     LogHelper.info(`Choosing action for skill: ${skillName}...`)
 
@@ -358,10 +358,10 @@ export default class NLU {
       const actionCallingResult = await actionCallingDuty.execute()
       const actionCallingOutput =
         actionCallingResult?.output as unknown as string
-      const parsedActionCallingOutput: ActionCallingOutput =
+      const parsedActionCallingOutputs: ActionCallingOutput[] =
         JSON.parse(actionCallingOutput)
 
-      return parsedActionCallingOutput
+      return parsedActionCallingOutputs
     } catch (e) {
       LogHelper.error(`Failed to choose skill action: ${e}`)
     }
@@ -459,7 +459,10 @@ export default class NLU {
     this.conversation.setActiveState({
       pendingAction: `${this._nluProcessResult.skillName}:${actionCallingOutput.name}`,
       missingParameters: actionCallingOutput.required_params,
-      collectedParameters: this.conversation.activeState.collectedParameters
+      collectedParameters: {
+        ...this.conversation.activeState.collectedParameters,
+        ...actionCallingOutput.arguments
+      }
     })
 
     const [firstParam] = actionCallingOutput.required_params
@@ -519,10 +522,6 @@ export default class NLU {
           const actionName = newActiveState.pendingAction?.split(':')[1] || ''
 
           if (areAllSlotsFilled) {
-            console.log(
-              'newActiveState.collectedParameters',
-              newActiveState.collectedParameters
-            )
             await this.handleActionSuccess({
               status: ActionCallingStatus.Success,
               name: actionName,
@@ -546,7 +545,8 @@ export default class NLU {
           await this.handleActionMissingParams({
             status: ActionCallingStatus.MissingParams,
             required_params: newActiveState.missingParameters,
-            name: actionName
+            name: actionName,
+            arguments: newActiveState.collectedParameters
           })
 
           return false
@@ -578,7 +578,6 @@ export default class NLU {
   private async postProcessRoute(
     actionCallingOutput: ActionCallingOutput
   ): Promise<void> {
-    console.log('actionCallingOutput', JSON.stringify(actionCallingOutput))
     if ('name' in actionCallingOutput) {
       await NLUProcessResultUpdater.update({
         actionName: actionCallingOutput.name
@@ -655,16 +654,21 @@ export default class NLU {
             skillName: chosenSkill
           })
 
-          const parsedActionCallingOutput = await this.chooseSkillAction(
+          const parsedActionCallingOutputs = await this.chooseSkillAction(
             utterance,
             chosenSkill
           )
 
           if (
-            parsedActionCallingOutput &&
-            'status' in parsedActionCallingOutput
+            parsedActionCallingOutputs &&
+            Array.isArray(parsedActionCallingOutputs) &&
+            parsedActionCallingOutputs.length > 0
           ) {
-            await this.postProcessRoute(parsedActionCallingOutput)
+            for (const actionCallingOutput of parsedActionCallingOutputs) {
+              if ('status' in actionCallingOutput) {
+                await this.postProcessRoute(actionCallingOutput)
+              }
+            }
 
             return
           }

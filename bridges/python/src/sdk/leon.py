@@ -81,7 +81,7 @@ class Leon:
             if widget is not None:
                 wrapper_props = widget.wrapper_props if widget.wrapper_props else {}
                 output['output']['widget'] = {
-                    'actionName': f"{INTENT_OBJECT['skill_name']}:{INTENT_OBJECT['action_action']}",
+                    'actionName': f"{INTENT_OBJECT['skill_name']}:{INTENT_OBJECT['action_name']}",
                     'widget': widget.widget,
                     'id': widget.id,
                     'onFetch': widget.on_fetch if hasattr(widget, 'on_fetch') else None,
@@ -100,7 +100,8 @@ class Leon:
             # "Temporize" for the data buffer output on the core
             sleep(0.1)
 
-            sys.stdout.write(json.dumps(answer_object))
+            # Write the answer object to stdout as a JSON string with a newline for brain chunk-by-chunk parsing
+            sys.stdout.write(json.dumps(answer_object) + '\n')
             sys.stdout.flush()
 
         except Exception as e:

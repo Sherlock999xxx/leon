@@ -10,7 +10,7 @@ import type {
 import type { SkillAnswerConfigSchema } from '@/schemas/skill-schemas'
 
 import type { Widget } from '@sdk/widget'
-import { ParamsHelper } from '@bridge/params-helper'
+import { ParamsHelper } from '@sdk/params-helper'
 
 export type { ActionParams, IntentObject }
 

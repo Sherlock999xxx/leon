@@ -8,7 +8,6 @@ import type {
   SkillResult,
   IntentObject
 } from '@/core/brain/types'
-import type { AnswerOutput } from '@sdk/types'
 import { SkillBridges } from '@/core/brain/types'
 import {
   TMP_PATH,
@@ -38,9 +37,34 @@ export class LogicActionSkillHandler {
 
       BRAIN.skillFriendlyName = skillFriendlyName
 
+      let buffer = ''
+      let lastSkillResult: SkillResult | undefined = undefined
+
       // Read skill output
       BRAIN.skillProcess?.stdout.on('data', (data: Buffer) => {
-        this.handleLogicActionSkillProcessOutput(data)
+        SOCKET_SERVER.socket?.emit('is-typing', true)
+        buffer += data.toString()
+
+        let newlineIndex
+        // Process buffer line by line
+        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+          const chunk = buffer.substring(0, newlineIndex)
+
+          buffer = buffer.substring(newlineIndex + 1)
+
+          if (chunk) {
+            try {
+              const skillResult = JSON.parse(chunk) as SkillResult
+
+              // Store the latest result
+              lastSkillResult = skillResult
+              this.handleLogicActionSkillProcessOutput(skillResult)
+            } catch (e) {
+              LogHelper.title('Brain')
+              LogHelper.error(`Error parsing chunk: ${chunk}. Details: ${e}`)
+            }
+          }
+        }
       })
 
       // Handle error
@@ -51,19 +75,17 @@ export class LogicActionSkillHandler {
       // Catch the end of the skill execution
       BRAIN.skillProcess?.stdout.on('end', () => {
         LogHelper.title(`${BRAIN.skillFriendlyName} skill (on end)`)
-        LogHelper.info(BRAIN.skillOutput)
 
-        let skillResult: SkillResult | undefined = undefined
-
-        // Check if there is an output (no skill error)
-        if (BRAIN.skillOutput !== '') {
+        // Attempt to process any remaining data in the buffer
+        if (buffer.trim()) {
           try {
-            skillResult = JSON.parse(BRAIN.skillOutput)
+            const skillResult = JSON.parse(buffer) as SkillResult
+
+            lastSkillResult = skillResult
+            this.handleLogicActionSkillProcessOutput(skillResult)
           } catch (e) {
             LogHelper.title(`${BRAIN.skillFriendlyName} skill`)
-            LogHelper.error(
-              `There is an error on the final output: ${String(e)}`
-            )
+            LogHelper.error(`Error on the final output: ${String(e)}`)
 
             BRAIN.speakSkillError()
           }
@@ -71,29 +93,15 @@ export class LogicActionSkillHandler {
 
         this.deleteIntentObjFile(intentObjectPath)
 
-        // Send suggestions to the client
-        // TODO: core rewrite
-        /*if (
-          nextAction?.suggestions &&
-          skillResult?.output.core?.showNextActionSuggestions
-        ) {
-          SOCKET_SERVER.socket?.emit('suggest', nextAction.suggestions)
-        }
-        if (
-          action?.suggestions &&
-          skillResult?.output.core?.showSuggestions
-        ) {
-          SOCKET_SERVER.socket?.emit('suggest', action.suggestions)
-        }*/
-
         resolve({
           utteranceId,
           lang: BRAIN.lang,
           ...nluProcessResult,
-          core: skillResult?.output.core
-          // action,
-          // nextAction
+          core: lastSkillResult?.output.core,
+          lastOutputFromSkill: lastSkillResult?.output
         })
+
+        SOCKET_SERVER.socket?.emit('is-typing', false)
       })
 
       // Reset the child process
@@ -102,54 +110,43 @@ export class LogicActionSkillHandler {
   }
 
   /**
-   * Handle the skill process output
+   * Handle the skill process output for each complete chunk of data
    */
   private static handleLogicActionSkillProcessOutput(
-    data: Buffer
-  ): Promise<Error | null> | void {
-    SOCKET_SERVER.socket?.emit('is-typing', true)
+    skillAnswer: SkillResult
+  ): void {
+    if (typeof skillAnswer !== 'object' || !skillAnswer.output) {
+      LogHelper.error(
+        `The "${BRAIN.skillFriendlyName}" skill returned an invalid result.`
+      )
 
-    try {
-      const skillAnswer = JSON.parse(data.toString()) as AnswerOutput
+      return
+    }
 
-      if (typeof skillAnswer === 'object') {
-        LogHelper.title(`${BRAIN.skillFriendlyName} skill (on data)`)
-        LogHelper.info(data.toString())
+    LogHelper.title(`${BRAIN.skillFriendlyName} skill (on data)`)
+    LogHelper.info(JSON.stringify(skillAnswer))
 
-        if (skillAnswer.output.widget && !BRAIN.isMuted) {
-          try {
-            SOCKET_SERVER.socket?.emit(
-              'widget',
-              JSON.stringify(skillAnswer.output.widget)
-            )
-          } catch (e) {
-            LogHelper.title('Brain')
-            LogHelper.error(
-              `Failed to send widget. Widget output is not well formatted: ${e}`
-            )
-          } finally {
-            // Stop typing when the widget is sent
-            SOCKET_SERVER.socket?.emit('is-typing', false)
-          }
-        }
-
-        const { answer } = skillAnswer.output
-        if (!BRAIN.isMuted) {
-          BRAIN.talk(answer, true)
-        }
-        BRAIN.skillOutput = data.toString()
-
-        return Promise.resolve(null)
-      } else {
-        return Promise.reject(
-          new Error(
-            `The "${BRAIN.skillFriendlyName}" skill is not well configured. Check the configuration file.`
-          )
+    /**
+     * Verify the brain is not muted since when we fetch widgets we should
+     * not speak the answers
+     */
+    if (skillAnswer.output.widget && !BRAIN.isMuted) {
+      try {
+        SOCKET_SERVER.socket?.emit(
+          'widget',
+          JSON.stringify(skillAnswer.output.widget)
+        )
+      } catch (e) {
+        LogHelper.title('Brain')
+        LogHelper.error(
+          `Failed to send widget. Widget output is not well formatted: ${e}`
         )
       }
-    } catch (e) {
-      LogHelper.title('Brain')
-      LogHelper.debug(`process.stdout: ${String(data)}. Details: ${e}`)
+    }
+
+    const { answer } = skillAnswer.output
+    if (answer && !BRAIN.isMuted) {
+      BRAIN.talk(answer, true)
     }
   }
 
@@ -226,34 +223,9 @@ export class LogicActionSkillHandler {
     const date = DateHelper.getDateTime()
     const dateObject = new Date(date)
 
-    // TODO: core rewrite remove
-    /*return {
-      id: utteranceId,
-      lang: this._lang, // TODO: remove once the Python bridge will be updated to use extra_context_data.lang instead
-      domain: nluResult.classification.domain,
-      skill: nluResult.classification.skill,
-      action: nluResult.classification.action,
-      utterance: nluResult.utterance,
-      new_utterance: nluResult.newUtterance,
-      current_entities: nluResult.currentEntities,
-      entities: nluResult.entities,
-      current_resolvers: nluResult.currentResolvers,
-      resolvers: nluResult.resolvers,
-      slots,
-      extra_context_data: {
-        lang: this._lang,
-        sentiment: nluResult.sentiment,
-        date: date.slice(0, 10),
-        time: date.slice(11, 19),
-        timestamp: dateObject.getTime(),
-        date_time: date,
-        week_day: dateObject.toLocaleString('default', { weekday: 'long' })
-      }
-    }*/
-
     return {
       id: utteranceId,
-      lang: BRAIN.lang, // TODO: remove once the Python bridge will be updated to use extra_context_data.lang instead
+      lang: BRAIN.lang,
       context_name: nluProcessResult.contextName,
       skill_name: nluProcessResult.skillName,
       action_name: nluProcessResult.actionName,

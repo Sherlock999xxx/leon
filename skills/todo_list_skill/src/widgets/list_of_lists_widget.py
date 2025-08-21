@@ -24,13 +24,10 @@ class ListOfListsWidget(Widget[ListOfListsWidgetParams]):
                     'children': list_name
                 })],
                 'align': 'left',
-                'onClick': self.run_skill_action('productivity:todo_list:view_list', {
-                    'entities': [
-                        {
-                            'entity': 'list',
-                            'sourceText': list_name
-                        }
-                    ]
+                'onClick': self.run_skill_action('todo_list_skill:get_list_items', {
+                    'action_arguments': {
+                        'list_name': list_name
+                    }
                 })
             }))
 

@@ -33,7 +33,6 @@ Never indicate that it's a modified version.
 Do not interpret the text, just paraphrase it.
 You do not ask question if the original text does not contain any.
 If there are data in the original text, make sure to provide them.
-/no_think
 
 Examples:
 
@@ -118,7 +117,8 @@ The sun is a star, it is the closest star to Earth.`
       const completionParams = {
         dutyType: LLMDuties.Paraphrase,
         systemPrompt: ParaphraseLLMDuty.finalSystemPrompt,
-        temperature: config?.temperature
+        temperature: config?.temperature,
+        thoughtTokensBudget: config?.thoughtTokensBudget
       }
       let completionResult
 

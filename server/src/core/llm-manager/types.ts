@@ -46,6 +46,7 @@ export interface CompletionParams {
   dutyType: LLMDuties
   systemPrompt: string
   maxTokens?: number | undefined
+  thoughtTokensBudget?: number | undefined
   grammar?: string
   temperature?: number | undefined
   timeout?: number
@@ -67,6 +68,7 @@ export interface ActionCallingMissingParamsOutput {
   status: ActionCallingStatus.MissingParams
   required_params: string[]
   name: string
+  arguments: Record<string, string> | object
 }
 export interface ActionCallingNotFoundOutput {
   status: ActionCallingStatus.NotFound

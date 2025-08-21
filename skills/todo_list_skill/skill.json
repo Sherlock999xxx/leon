@@ -111,6 +111,6 @@
     }
   },
   "action_notes": [
-    "A list name should never contain the \"list\" suffix. E.g. device list, \"device\" is the list name."
+    "Always consider to not use \"list\" as a suffix in a list_name. E.g. \"device list\" = \"device\", \"shopping list\" = \"shopping\"."
   ]
 }

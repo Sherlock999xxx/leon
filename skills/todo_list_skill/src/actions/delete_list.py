@@ -1,21 +1,17 @@
 from bridges.python.src.sdk.leon import leon
 from bridges.python.src.sdk.types import ActionParams
+from bridges.python.src.sdk.params_helper import ParamsHelper
 from ..lib import memory
 
 from typing import Union
 
 
-def run(params: ActionParams) -> None:
+def run(params: ActionParams, params_helper: ParamsHelper) -> None:
     """Delete a to-do list"""
 
     list_name: Union[str, None] = None
 
-    for item in params['entities']:
-        if item['entity'] == 'list':
-            list_name = item['sourceText'].lower()
-
-    if list_name is None:
-        return leon.answer({'key': 'list_not_provided'})
+    list_name = params_helper.get_action_argument('list_name').lower()
 
     if not memory.has_todo_list(list_name):
         return leon.answer({

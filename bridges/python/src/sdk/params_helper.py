@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional
 
+from constants import INTENT_OBJECT
+
 NEREntity = Dict[str, Any]
 ActionParams = Dict[str, Any]
 
@@ -11,6 +13,16 @@ class ParamsHelper:
 
     def __init__(self, params: ActionParams):
         self._params = params
+
+    def get_widget_id(self) -> Optional[str]:
+        """
+        Get the widget ID if any
+        """
+        for entity in INTENT_OBJECT['entities']:
+            if entity['entity'] == 'widgetid':
+                return entity['sourceText']
+
+        return None
 
     def get_action_argument(self, name: str) -> Optional[Any]:
         """

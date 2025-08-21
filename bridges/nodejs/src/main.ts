@@ -4,7 +4,7 @@ import { FileHelper } from '@/helpers/file-helper'
 
 import type { ActionFunction, ActionParams } from '@sdk/types'
 import { INTENT_OBJECT } from '@bridge/constants'
-import { ParamsHelper } from '@bridge/params-helper'
+import { ParamsHelper } from '@sdk/params-helper'
 ;(async (): Promise<void> => {
   const {
     lang,

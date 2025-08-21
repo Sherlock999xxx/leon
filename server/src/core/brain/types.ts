@@ -166,6 +166,7 @@ export interface BrainProcessResult extends NLUProcessResult {
   utteranceId?: string
   lang?: ShortLanguageCode
   core?: SkillCoreData | undefined
+  lastOutputFromSkill?: SkillResult['output'] | undefined
   action?: SkillConfigSchema['actions'][string]
   nextAction?: SkillConfigSchema['actions'][string] | null | undefined
 }

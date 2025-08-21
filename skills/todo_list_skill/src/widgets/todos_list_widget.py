@@ -26,22 +26,16 @@ class TodosListWidget(Widget[TodosListWidgetParams]):
     def render(self) -> WidgetComponent:
         list_items = []
         for todo in self.params['todos']:
-            action_name = 'uncheck_todos' if todo['is_completed'] else 'complete_todos'
+            action_name = 'uncomplete_items' if todo['is_completed'] else 'complete_items'
             list_items.append(ListItem({
                 'children': [Checkbox({
                     'label': todo['name'],
                     'checked': todo['is_completed'],
-                    'onChange': self.run_skill_action(f'productivity:todo_list:{action_name}', {
-                        'entities': [
-                            {
-                                'entity': 'list',
-                                'sourceText': self.params['list_name']
-                            },
-                            {
-                                'entity': 'todos',
-                                'sourceText': todo['name']
-                            }
-                        ]
+                    'onChange': self.run_skill_action(f'todo_list_skill:{action_name}', {
+                        'action_arguments': {
+                            'list_name': self.params['list_name'],
+                            'items': [todo['name']]
+                        }
                     })
                 })],
                 'align': 'left'

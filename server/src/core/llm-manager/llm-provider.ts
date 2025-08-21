@@ -13,6 +13,7 @@ import { LogHelper } from '@/helpers/log-helper'
 import { FileHelper } from '@/helpers/file-helper'
 import LocalLLMProvider from '@/core/llm-manager/llm-providers/local-llm-provider'
 import GroqLLMProvider from '@/core/llm-manager/llm-providers/groq-llm-provider'
+import { LLM_MANAGER } from '@/core'
 
 interface CompletionResult {
   dutyType: LLMDuties
@@ -22,6 +23,7 @@ interface CompletionResult {
   data: Record<string, unknown> | null
   functions?: Record<string, unknown> | undefined
   maxTokens: number
+  thoughtTokensBudget: number
   usedInputTokens: number
   usedOutputTokens: number
   temperature: number
@@ -41,6 +43,7 @@ const DEFAULT_MAX_EXECUTION_TIMOUT = 32_000
 const DEFAULT_MAX_EXECUTION_RETRIES = 2
 const DEFAULT_TEMPERATURE = 0 // Disabled
 const DEFAULT_MAX_TOKENS = 8_192
+const DEFAULT_THOUGHT_TOKENS_BUDGET = Infinity
 
 export default class LLMProvider {
   private static instance: LLMProvider
@@ -107,6 +110,13 @@ export default class LLMProvider {
     const { usedInputTokens, usedOutputTokens } =
       completionParams.session.sequence.tokenMeter.getState()
 
+    LogHelper.title('LLM Provider')
+    LogHelper.debug(
+      `Raw context tokens:\n${LLM_MANAGER.model.detokenize(
+        completionParams.session.sequence.contextTokens
+      )}`
+    )
+
     return {
       rawResult,
       usedInputTokens,
@@ -160,17 +170,20 @@ export default class LLMProvider {
       return null
     }
 
-    completionParams.dutyType = completionParams.dutyType || null
+    completionParams.dutyType = completionParams.dutyType ?? null
     completionParams.timeout =
-      completionParams.timeout || DEFAULT_MAX_EXECUTION_TIMOUT
+      completionParams.timeout ?? DEFAULT_MAX_EXECUTION_TIMOUT
     completionParams.maxRetries =
-      completionParams.maxRetries || DEFAULT_MAX_EXECUTION_RETRIES
-    completionParams.data = completionParams.data || null
-    completionParams.functions = completionParams.functions || undefined
+      completionParams.maxRetries ?? DEFAULT_MAX_EXECUTION_RETRIES
+    completionParams.data = completionParams.data ?? null
+    completionParams.functions = completionParams.functions ?? undefined
     completionParams.temperature =
-      completionParams.temperature || DEFAULT_TEMPERATURE
+      completionParams.temperature ?? DEFAULT_TEMPERATURE
     completionParams.maxTokens =
-      completionParams.maxTokens || DEFAULT_MAX_TOKENS
+      completionParams.maxTokens ?? DEFAULT_MAX_TOKENS
+    completionParams.thoughtTokensBudget =
+      completionParams.thoughtTokensBudget ?? DEFAULT_THOUGHT_TOKENS_BUDGET
+
     /**
      * TODO: support onToken (stream) for Groq provider too
      */
@@ -286,6 +299,7 @@ export default class LLMProvider {
       data: completionParams.data,
       functions: completionParams.functions,
       maxTokens: completionParams.maxTokens,
+      thoughtTokensBudget: completionParams.thoughtTokensBudget,
       // Current used context size
       usedInputTokens,
       usedOutputTokens

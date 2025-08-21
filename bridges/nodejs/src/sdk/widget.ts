@@ -92,7 +92,7 @@ export abstract class Widget<T = unknown> {
    * Indicate the core to run a given skill action
    * @param actionName The name of the action
    * @param params The parameters of the action
-   * @example runSkillAction('music_audio:player:next', { provider: 'Spotify' })
+   * @example runSkillAction('music_player_skill:next', { provider: 'Spotify' })
    */
   protected runSkillAction(
     actionName: string,

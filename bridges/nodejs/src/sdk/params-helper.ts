@@ -1,10 +1,22 @@
 import type { ActionParams, NEREntity } from '@sdk/types'
+import { INTENT_OBJECT } from '@bridge/constants'
 
 export class ParamsHelper {
   private readonly params: ActionParams
 
   constructor(params: ActionParams) {
     this.params = params
+  }
+
+  /**
+   * Get the widget id if any
+   * @example getWidgetId() // 'timerwidget-5q1xlzeh
+   */
+  getWidgetId(): string | null {
+    return (
+      INTENT_OBJECT.entities?.find((entity) => entity.entity === 'widgetid')
+        ?.sourceText ?? null
+    )
   }
 
   /**

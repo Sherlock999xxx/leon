@@ -34,6 +34,7 @@ interface CoreLLMDutyConfig {
   contextSize: number
   maxTokens?: number
   temperature?: number
+  thoughtTokensBudget?: number
 }
 interface CoreLLMDuties {
   [LLMDuties.SkillRouter]: CoreLLMDutyConfig
@@ -67,6 +68,7 @@ const CORE_LLM_DUTIES: CoreLLMDuties = {
     // Dynamic context size according to the skill list
     contextSize: 0,
     maxTokens: 12,
+    thoughtTokensBudget: 0,
     temperature: 0
   },
   [LLMDuties.ActionCalling]: {
@@ -77,6 +79,7 @@ const CORE_LLM_DUTIES: CoreLLMDuties = {
      */
     contextSize: 2_048,
     maxTokens: 512,
+    thoughtTokensBudget: 64,
     /**
      * Allow creative thinking. E.g. "Think of 3 snacks I can buy for Max, and add them to the list of your choice"
      */
@@ -95,6 +98,7 @@ const CORE_LLM_DUTIES: CoreLLMDuties = {
   },
   [LLMDuties.Paraphrase]: {
     contextSize: DEFAULT_CORE_LLM_DUTIES_CONTEXT_SIZE,
+    thoughtTokensBudget: 0,
     temperature: 0.8
   }
 }
@@ -388,7 +392,21 @@ export default class LLMManager {
          *      [ok] Refactor brain with logic/dialog static class handlers + cf. Copilot chat for how to split static methods within the dialog action handler class
          *      [ok] Implement the locale to the timer skill. And verify all actions
          *      [ok] In bridges/nodejs/src/constants.ts and bridges/python/src/constants.py, change the SKILL_CONFIG by removing the config/{lang}.json and only use the locale config. Need to add "variables" and "widget_contents" to the local config too. When implementing variables, check for dialog skill answers if it has conflict
-         *      TODO NEXT 2025-08-03: when action calling, also need to provide non-missing action arguments or need to set the active state with collected params OR fix the slot filling, it needs to push the slots into the context, not only the active state
+         *      [ok] When action calling, also need to provide non-missing action arguments or need to set the active state with collected params OR fix the slot filling, it needs to push the slots into the context, not only the active state
+         *      [ok] Fix skill output chunk parsing. Add new line and read line by line in the brain. skillOutput is empty on data end, need to check; long stdout output because now we send much more data? leon.py, fix widgets (test with todo list skill, etc.) "Add 1l of water, a pillow and a pair of socks to my shopping list please"
+         *      [ok] Verify to_do list widget onChange (entities -> action argument) when click checkbox
+         *      [ok] Reimplement HTTP APIs for watch (fetch [to do now] + run action [ok]) as per core rewrite changes
+         *      [ok] Related to the issue below. For the action calling duty, it tries to run multiple tools: "Create a computer list, think of the main components of a computer and add them to the list". Need to create an action call queue that will run the actions one by one, and wait for the previous action to finish before running the next one. This will allow to run multiple actions in a single utterance, e.g. "Create a computer list, think of the main components of a computer and add them to the list" -> should run 2 actions:
+         *      (only allow sequential actions calling within the same skill; for other skills we need to work on the autonomous mode later)
+         *      <tool_call>
+         * {"name": "create_list", "arguments": {"list_name": "computer"}}
+         * </tool_call>
+         * <tool_call>
+         * {"name": "add_todos", "arguments": {"list_name": "computer", "items": ["CPU", "RAM", "Hard Drive", "Motherboard", "Power Supply"]}}
+         * </tool_call>
+         *      [ok] (related to below issue 2025-08-19) when "clean active state", should we also clean action router duty and skill router duty? The action router duty seems to be overloaded after a while, cf. usedInputTokens
+         *      [ok] "Add tomatoes, potatoes, 1kg of rice to the shopping list" -> issue, it will grab previous list. "Check potatoes from the shopping list" -> does not check because does not go through end data, only on data
+         *      TODO NEXT 2025-08-11: add "common_answers" to locale config for reusable answers across actions (leon.ts + leon.py); test it with the todo list skill (list_does_not_exist, list_already_exists, etc.)
          *      TODO NEXT 2025-08-03: maybe there is no need for a flow for the translator skill? A simple action should be enough with the 2 params (target_language and text_to_translate). Maybe I should just implement the loop concept for this case? Test the following cases: flow -> 1. "Can you please help me to translate some text into French?" > "The sky is blue"; 2. "Please help me to translate some text" > "Into French please" > "The sky is blue"; 3. "Please translate this text into French: the sky is blue"; 4. Please translate this text "the sky is blue" > "Into French"
          *      TODO NEXT 2025-07-30: continue to rebuild the translator-poc skill. Need to implement the flow and think carefully about the whole set_up answers system, etc.
          *      TODO NEXT 2025-07-23: rebuild the "good_bye", "partner_assistant", "color" and "translator-poc" skills

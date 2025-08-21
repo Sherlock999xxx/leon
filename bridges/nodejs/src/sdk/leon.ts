@@ -29,10 +29,10 @@ class Leon {
   ): AnswerConfig {
     try {
       // In case the answer key is a raw answer
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-expect-error
       if (
         SKILL_LOCALE_CONFIG.answers == null ||
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
         !SKILL_LOCALE_CONFIG.answers[answerKey]
       ) {
         return answerKey
@@ -155,7 +155,8 @@ class Leon {
       // "Temporize" for the data buffer output on the core
       await new Promise((r) => setTimeout(r, 100))
 
-      process.stdout.write(JSON.stringify(answerObject))
+      // Write the answer object to stdout as a JSON string with a newline for brain chunk-by-chunk parsing
+      process.stdout.write(JSON.stringify(answerObject) + '\n')
     } catch (e) {
       console.error('Error while creating answer:', e)
     }

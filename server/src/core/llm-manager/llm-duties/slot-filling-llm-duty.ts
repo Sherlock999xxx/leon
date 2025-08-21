@@ -142,7 +142,8 @@ Analyze the last user message to find the following slot:
         dutyType: LLMDuties.SlotFilling,
         systemPrompt: this.systemPrompt as string,
         temperature: config.temperature,
-        maxTokens: config.maxTokens
+        maxTokens: config.maxTokens,
+        thoughtTokensBudget: config.thoughtTokensBudget
       }
       let completionResult
 

@@ -1,24 +1,19 @@
 from bridges.python.src.sdk.leon import leon
 from bridges.python.src.sdk.types import ActionParams
+from bridges.python.src.sdk.params_helper import ParamsHelper
 from ..lib import memory
 
 from typing import Union
 
 
-def run(params: ActionParams) -> None:
+def run(params: ActionParams, params_helper: ParamsHelper) -> None:
     """Rename a to-do list"""
 
     old_list_name: Union[str, None] = None
     new_list_name: Union[str, None] = None
 
-    for item in params['entities']:
-        if item['entity'] == 'old_list':
-            old_list_name = item['sourceText'].lower()
-        elif item['entity'] == 'new_list':
-            new_list_name = item['sourceText'].lower()
-
-    if old_list_name is None or new_list_name is None:
-        return leon.answer({'key': 'new_or_old_list_not_provided'})
+    old_list_name = params_helper.get_action_argument('old_list_name').lower()
+    new_list_name = params_helper.get_action_argument('new_list_name').lower()
 
     if not memory.has_todo_list(old_list_name):
         return leon.answer({

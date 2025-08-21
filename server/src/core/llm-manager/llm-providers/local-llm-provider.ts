@@ -36,7 +36,10 @@ export default class LocalLLMProvider {
           functions: completionParams.functions,
           maxTokens: completionParams.maxTokens as number,
           temperature: completionParams.temperature as number,
-          onToken: completionParams.onToken as (tokens: unknown) => void
+          onToken: completionParams.onToken as (tokens: unknown) => void,
+          budgets: {
+            thoughtTokens: completionParams.thoughtTokensBudget
+          }
         }
 
         if (isJSONMode) {
@@ -63,12 +66,6 @@ export default class LocalLLMProvider {
           completionParams.session instanceof LlamaChat &&
           Array.isArray(promptOrChatHistory)
         ) {
-          promptParams = {
-            budgets: {
-              thoughtTokens: 64
-            },
-            ...promptParams
-          }
           promise = completionParams.session.generateResponse(
             promptOrChatHistory,
             promptParams
