@@ -102,7 +102,7 @@ class Leon {
    * @param answerInput The answer input
    * @example answer({ key: 'greet' }) // 'Hello world'
    * @example answer({ key: 'welcome', data: { name: 'Louis' } }) // 'Welcome Louis'
-   * @example answer({ key: 'confirm', core: { restart: true } }) // 'Would you like to retry?'
+   * @example answer({ key: 'confirm', core: { next_action: 'guess_the_number_skill:set_up' } }) // 'Would you like to retry?'
    */
   public async answer(answerInput: AnswerInput): Promise<void> {
     try {

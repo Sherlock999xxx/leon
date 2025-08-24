@@ -18,7 +18,7 @@ def run(params: ActionParams) -> None:
 
     # Return no speech if no number has been found
     if given_number == -1:
-        leon.answer({'core': {'isInActionLoop': False}})
+        leon.answer({'core': {'is_in_action_loop': False}})
         return
 
     counter = memory.get_new_game()['counter'] + 1
@@ -32,7 +32,7 @@ def run(params: ActionParams) -> None:
                 'counter': counter
             },
             'core': {
-                'isInActionLoop': False,
+                'is_in_action_loop': False,
                 'showNextActionSuggestions': True
             }
         })

@@ -15,13 +15,6 @@ import type { ShortLanguageCode } from '@/types'
 import type { WidgetWrapper } from '@sdk/aurora'
 import type { SUPPORTED_WIDGET_EVENTS } from '@sdk/widget-component'
 
-interface SkillCoreData {
-  restart?: boolean
-  isInActionLoop?: boolean
-  showNextActionSuggestions?: boolean
-  showSuggestions?: boolean
-}
-
 export interface SkillResult {
   domain: NLPDomain
   skill: NLPSkill
@@ -33,7 +26,7 @@ export interface SkillResult {
   output: {
     codes: string[]
     answer: string
-    core: SkillCoreData | undefined
+    core: SkillAnswerCoreData | undefined
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     options: Record<string, any>
     widget?: {
@@ -136,8 +129,11 @@ export interface IntentObject {
 }
 
 export interface SkillAnswerCoreData {
-  restart?: boolean
-  isInActionLoop?: boolean
+  // TODO: core rewrite - remove unused properties
+  // restart?: boolean
+  is_in_action_loop?: boolean
+  next_action?: string
+  // TODO: core rewrite - remove or transform to snake_case
   showNextActionSuggestions?: boolean
   showSuggestions?: boolean
 }
@@ -165,7 +161,7 @@ export interface BrainProcessResult extends NLUProcessResult {
   executionTime: number
   utteranceId?: string
   lang?: ShortLanguageCode
-  core?: SkillCoreData | undefined
+  core?: SkillAnswerCoreData | undefined
   lastOutputFromSkill?: SkillResult['output'] | undefined
   action?: SkillConfigSchema['actions'][string]
   nextAction?: SkillConfigSchema['actions'][string] | null | undefined

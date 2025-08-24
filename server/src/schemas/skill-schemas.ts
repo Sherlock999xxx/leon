@@ -290,6 +290,12 @@ export const skillSchemaObject = Type.Strict(
             description:
               'This helps to understand what your action does. Also used by the LLM (Large Language Model) to match the action.'
           }),
+          is_loop: Type.Optional(
+            Type.Boolean({
+              description:
+                'An action loop is a concept to keep Leon triggering the same skill action until the logic of the skill breaks the loop.'
+            })
+          ),
           parameters: Type.Optional(
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-expect-error

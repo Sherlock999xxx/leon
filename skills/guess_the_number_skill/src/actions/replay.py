@@ -1,26 +1,23 @@
 from bridges.python.src.sdk.leon import leon
 from bridges.python.src.sdk.types import ActionParams
+from bridges.python.src.sdk.params_helper import ParamsHelper
 
 from ..lib import memory
 
 
-def run(params: ActionParams) -> None:
+def run(_params: ActionParams, params_helper: ParamsHelper) -> None:
     """Take decision about whether to replay"""
 
     memory.game_memory.clear()
-    resolvers = params['resolvers']
-    decision = False
 
-    for resolver in resolvers:
-        if resolver['name'] == 'affirmation_denial':
-            decision = resolver['value']
+    confirmation = params_helper.get_action_argument('confirmation')
 
-    if decision:
+    if confirmation is not None and confirmation.lower() == 'true':
         leon.answer({
             'key': 'replay',
             'core': {
-                'isInActionLoop': False,
-                'restart': True
+                'is_in_action_loop': False,
+                'next_action': 'guess_the_number_skill:set_up'
             }
         })
         return
@@ -28,6 +25,6 @@ def run(params: ActionParams) -> None:
     leon.answer({
         'key': 'stop',
         'core': {
-            'isInActionLoop': False
+            'is_in_action_loop': False
         }
     })

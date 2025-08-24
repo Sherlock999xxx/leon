@@ -5,6 +5,8 @@ import type {
   NLUProcessResult,
   NLUResult
 } from '@/core/nlp/types'
+import type { SkillSchema } from '@/schemas/skill-schemas'
+import type { SkillAnswerCoreData } from '@/core/brain/types'
 import {
   type ActionCallingMissingParamsOutput,
   type ActionCallingOutput,
@@ -369,6 +371,105 @@ export default class NLU {
     return null
   }
 
+  private async jumpToNextAction(
+    nextAction: SkillAnswerCoreData['next_action']
+  ): Promise<void> {
+    if (nextAction) {
+      try {
+        // eslint-disable-next-line prefer-const
+        let [skillName, actionName] = nextAction.split(':')
+
+        // Allow skill developers to omit the "_skill" suffix when specifying the skill name
+        if (skillName && !skillName.endsWith('_skill')) {
+          skillName = `${skillName}_skill`
+        }
+
+        LogHelper.title('NLU')
+        LogHelper.info(
+          `Skill requested a jump to the "${actionName}" action from the "${skillName}" skill`
+        )
+
+        if (skillName && actionName) {
+          // Update the NLU context to the new skill and action
+          await NLUProcessResultUpdater.update({ skillName })
+          await NLUProcessResultUpdater.update({ actionName })
+
+          // Immediately trigger the new action
+          await this.handleActionSuccess({
+            status: ActionCallingStatus.Success,
+            name: actionName,
+            // TODO: allow skill developers to pass arguments when jumping to another action
+            arguments: {} // Start with empty arguments for the new action
+          })
+
+          return
+        }
+
+        LogHelper.title('NLU')
+        LogHelper.error(
+          `Could not jump to action. Malformed value: "${nextAction}". Please use the format "skill_name:action_name", e.g., "music_skill:play_song"`
+        )
+      } catch (e) {
+        LogHelper.title('NLU')
+        LogHelper.error(`Failed to jump to next action: ${e}`)
+      }
+    }
+  }
+
+  private async handleSkillFlow(flow: SkillSchema['flow']): Promise<boolean> {
+    if (flow) {
+      LogHelper.title('NLU')
+      LogHelper.info('Handling skill flow...')
+
+      try {
+        const currentAction = this._nluProcessResult.actionName
+        const currentActionIndex = flow.indexOf(currentAction)
+        const isLastActionInFlow = currentActionIndex === flow.length - 1
+
+        /**
+         * If the current action is not the last one in the flow,
+         * prepare the next action
+         */
+        if (!isLastActionInFlow) {
+          const nextActionName = flow[currentActionIndex + 1] as string
+
+          await NLUProcessResultUpdater.update({
+            actionName: nextActionName
+          })
+
+          const nextActionConfig = this._nluProcessResult.actionConfig
+
+          this.conversation.setActiveState({
+            pendingAction: `${this._nluProcessResult.skillName}:${nextActionName}`,
+            missingParameters: Object.keys(nextActionConfig?.parameters || []),
+            collectedParameters: {}
+          })
+
+          /**
+           * If the next action in the flow has no parameters, execute it immediately
+           * without waiting for another user input. E.g., the "set_up" action
+           */
+          if (Object.keys(nextActionConfig?.parameters || {}).length === 0) {
+            await this.handleActionSuccess({
+              status: ActionCallingStatus.Success,
+              name: nextActionName,
+              arguments: {}
+            })
+          }
+
+          return true
+        }
+
+        return false
+      } catch (e) {
+        LogHelper.title('NLU')
+        LogHelper.error(`Failed to handle skill flow: ${e}`)
+      }
+    }
+
+    return false
+  }
+
   private async handleSkillOrActionNotFound(): Promise<void> {
     LogHelper.title('NLU')
     LogHelper.warning('Skill or action not found')
@@ -379,6 +480,26 @@ export default class NLU {
     // TODO: core rewrite chit-chat duty / or conversation skill?
   }
 
+  /**
+   * Ready to execute skill action, then once executed, prioritize:
+   *
+   * 1. Handle explicit jump to another action.
+   * This allows a skill to override any loop or flow logic.
+   * E.g., a "replay" action telling the core to jump back to the "set_up" action.
+   *
+   * 2. Handle action loop logic.
+   * An action with "is_loop" will repeat by default.
+   * It will only break if the skill's code returns { "core": { "isInActionLoop": false } }.
+   *
+   * 3. Handle standard flow logic.
+   * This runs if there's no jump and the loop has been broken (or was never a loop).
+   *
+   * 4. Clean up.
+   * This is the default case when an interaction is complete:
+   * - No jump was requested.
+   * - A loop was successfully broken.
+   * - The end of a flow was reached (or there was no flow).
+   */
   private async handleActionSuccess(
     actionCallingOutput: ActionCallingSuccessOutput
   ): Promise<void> {
@@ -398,77 +519,58 @@ export default class NLU {
 
     const processedData = await BRAIN.runSkillAction(this._nluProcessResult)
 
-    // TODO: core rewrite - refactor by creating a new method "handlePostBrainExecution"
-
     console.log('processedData', processedData)
     console.log('this._nluProcessResult', this._nluProcessResult)
 
-    // TODO: 2025-07-23
-    const { skillConfig } = this._nluProcessResult
-    const { flow } = skillConfig
-    const hasFlow = flow && flow.length > 0
+    if (processedData.core?.next_action) {
+      await this.jumpToNextAction(processedData.core.next_action)
 
-    if (hasFlow) {
-      const currentAction = this._nluProcessResult.actionName
-      const currentActionIndex = flow.indexOf(currentAction)
-      const isLastActionInFlow = currentActionIndex === flow.length - 1
-
-      /**
-       * If the current action is not the last one in the flow,
-       * prepare the next action
-       */
-      if (!isLastActionInFlow) {
-        const nextActionName = flow[currentActionIndex + 1] as string
-
-        await NLUProcessResultUpdater.update({
-          actionName: nextActionName
-        })
-
-        const nextActionConfig = this._nluProcessResult.actionConfig
-
-        this.conversation.setActiveState({
-          pendingAction: `${this._nluProcessResult.skillName}:${nextActionName}`,
-          missingParameters: Object.keys(nextActionConfig?.parameters || []),
-          collectedParameters: this.conversation.activeState.collectedParameters
-        })
-
-        console.log('nextActionName', nextActionName)
-
-        /**
-         * If the next action in the flow has no parameters, execute it immediately
-         * without waiting for another user input. E.g., the "set_up" action
-         */
-        if (Object.keys(nextActionConfig?.parameters || {}).length === 0) {
-          await this.handleActionSuccess({
-            status: ActionCallingStatus.Success,
-            name: nextActionName,
-            arguments: {}
-          })
-        }
-
-        return
-
-        /*this.process()
-
-        await this.postProcessRoute({
-          status: ActionCallingStatus.Success,
-          name: nextActionName,
-          arguments: this._nluProcessResult.new.actionArguments as Record<string, unknown>
-        })*/
-      }
-
-      /**
-       * If there is no flow or the flow has ended, clean the state for the next utterance
-       */
-      this.conversation.cleanActiveState()
-      await NLUProcessResultUpdater.update(DEFAULT_NLU_PROCESS_RESULT)
+      return
     }
 
-    // TODO: add if: clean up if the current action is the last one in the flow and it is not a loop
-    // this.conversation.cleanActiveState()
-    // await NLUProcessResultUpdater.update(DEFAULT_NLU_PROCESS_RESULT)
+    const { skillConfig, actionName: currentActionName } =
+      this._nluProcessResult
+    const currentActionConfig = this._nluProcessResult.actionConfig
+    const isLoop = currentActionConfig?.is_loop === true
+    const shouldBreakLoop = processedData.core?.is_in_action_loop === false
+    if (isLoop && !shouldBreakLoop) {
+      LogHelper.title('NLU')
+      LogHelper.info(
+        `Action "${currentActionName}" is in a loop. Waiting for next owner input...`
+      )
 
-    // TODO
+      this.conversation.setActiveState({
+        ...this.conversation.activeState,
+        pendingAction: `${this._nluProcessResult.skillName}:${currentActionName}`,
+        // Repopulate missingParameters with ALL parameters for this action
+        missingParameters: Object.keys(currentActionConfig?.parameters || {}),
+        // Clear collected parameters for the new loop iteration
+        collectedParameters: {}
+      })
+
+      /**
+       * By returning here, we do not advance the flow.
+       * The current action remains and ready for the next user input
+       */
+      return
+    }
+
+    const { flow } = skillConfig
+    const hasFlow = flow && flow.length > 0
+    if (hasFlow) {
+      const shouldContinueFlow = await this.handleSkillFlow(flow)
+
+      if (shouldContinueFlow) {
+        return
+      }
+    }
+
+    /**
+     * If there is no flow or the flow has ended,
+     * clean the state for the next utterance
+     */
+    this.conversation.cleanActiveState()
+    await NLUProcessResultUpdater.update(DEFAULT_NLU_PROCESS_RESULT)
   }
 
   private async handleActionMissingParams(
