@@ -6,7 +6,7 @@ import axios from 'axios'
 
 import { TOOLKITS_PATH } from '@bridge/constants'
 import { ToolkitConfig } from '@sdk/toolkit-config'
-import { PlatformUtils } from '@sdk/platform-utils'
+import { isWindows, isMacOS } from '@sdk/utils'
 
 // Progress callback type for reporting tool progress
 export type ProgressCallback = (progress: {
@@ -50,7 +50,7 @@ export abstract class Tool {
     const urlPath = new URL(binaryUrl).pathname
     const actualFilename = path.basename(urlPath)
     const executable =
-      PlatformUtils.isWindows() && !actualFilename.endsWith('.exe')
+      isWindows() && !actualFilename.endsWith('.exe')
         ? `${actualFilename}.exe`
         : actualFilename
 
@@ -72,7 +72,7 @@ export abstract class Tool {
      * Force chmod again in case it has been downloaded but somehow failed
      * so it could not chmod correctly earlier
      */
-    if (!PlatformUtils.isWindows()) {
+    if (!isWindows()) {
       fs.chmodSync(binaryPath, 0o755)
     }
 
@@ -96,12 +96,12 @@ export abstract class Tool {
       console.log(`${binaryName} binary downloaded successfully`)
 
       // Make binary executable (Unix systems)
-      if (!PlatformUtils.isWindows()) {
+      if (!isWindows()) {
         fs.chmodSync(binaryPath, 0o755)
       }
 
       // Remove quarantine attribute on macOS to prevent Gatekeeper blocking
-      if (PlatformUtils.isMacOS()) {
+      if (isMacOS()) {
         await this.removeQuarantineAttribute(binaryPath)
       }
     } catch (error) {

@@ -493,3 +493,14 @@ textarea::-webkit-scrollbar-thumb {
     transform: scale(1);
   }
 }
+
+/* Clickable URL styles */
+.clickable-url {
+  text-decoration: underline;
+}
+
+/* Clickable file path styles */
+.clickable-path {
+  cursor: pointer;
+  text-decoration: underline;
+}

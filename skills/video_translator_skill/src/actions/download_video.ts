@@ -6,6 +6,7 @@ import type { ActionFunction, ActionParams } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
 import YtdlpTool from '@sdk/tools/ytdlp-tool'
+import { formatFilePath } from '@sdk/utils'
 
 import { DownloadProgressWidget } from '../widgets/download-progress-widget'
 
@@ -143,13 +144,14 @@ export const run: ActionFunction = async function (
 
     // Get file size for user feedback
     const stats = await fs.promises.stat(downloadedVideoPath)
-    const fileSizeMB = Math.round(stats.size / (1024 * 1024))
+    const fileSizeMB = Math.round(stats.size / (1_024 * 1_024))
+    const targetFolder = path.dirname(downloadedVideoPath)
 
     leon.answer({
       key: 'download_completed',
       data: {
         video_url: videoUrl,
-        file_path: downloadedVideoPath,
+        file_path: formatFilePath(targetFolder),
         file_size: `${fileSizeMB} MB`,
         target_language: targetLanguage,
         quality: quality

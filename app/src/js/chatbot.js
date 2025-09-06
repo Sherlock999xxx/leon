@@ -8,6 +8,7 @@ import renderAuroraComponent from './render-aurora-component'
 
 const WIDGETS_TO_FETCH = []
 const WIDGETS_FETCH_CACHE = new Map()
+const REPLACED_MESSAGES = new Set()
 
 export default class Chatbot {
   constructor(socket, serverURL) {
@@ -37,6 +38,16 @@ export default class Chatbot {
         who: 'leon',
         string: event.detail
       })
+    })
+
+    // Add event delegation for clickable paths
+    this.feed.addEventListener('click', (event) => {
+      if (event.target.classList.contains('clickable-path')) {
+        const path = event.target.getAttribute('data-path')
+        if (path) {
+          this.openPath(path)
+        }
+      }
     })
   }
 
@@ -91,7 +102,9 @@ export default class Chatbot {
 
           this.createBubble({
             who: bubble.who,
-            string: bubble.string,
+            string: bubble.originalString
+              ? bubble.originalString
+              : bubble.string,
             save: false,
             isCreatingFromLoadingFeed: true
           })
@@ -181,6 +194,8 @@ export default class Chatbot {
       container.setAttribute('data-message-id', messageId)
     }
 
+    // Store original string before formatting
+    const originalString = string
     const formattedString = this.formatMessage(string)
 
     bubble.innerHTML = formattedString
@@ -247,13 +262,13 @@ export default class Chatbot {
     }
 
     if (save) {
-      this.saveBubble(who, formattedString, messageId)
+      this.saveBubble(who, originalString, formattedString, messageId)
     }
 
     return container
   }
 
-  saveBubble(who, string, messageId) {
+  saveBubble(who, originalString, string, messageId) {
     if (!this.noBubbleMessage.classList.contains('hide')) {
       this.noBubbleMessage.classList.add('hide')
     }
@@ -262,7 +277,13 @@ export default class Chatbot {
       this.parsedBubbles.shift()
     }
 
-    this.parsedBubbles.push({ who, string, messageId })
+    // Store both original and formatted strings
+    this.parsedBubbles.push({
+      who,
+      string,
+      originalString,
+      messageId
+    })
     localStorage.setItem('bubbles', JSON.stringify(this.parsedBubbles))
     this.scrollDown()
   }
@@ -270,6 +291,19 @@ export default class Chatbot {
   formatMessage(message) {
     if (typeof message === 'string') {
       message = message.replace(/\n/g, '<br />')
+
+      // Handle HTTP/HTTPS URLs with simple regex
+      message = message.replace(/https?:\/\/[^\s<>"{}|\\^`[\]]+/gi, (match) => {
+        return `<a href="${match}" target="_blank" rel="noopener noreferrer" class="clickable-url" title="Open URL in browser">${match}</a>`
+      })
+
+      // Handle file paths with delimiters for exact matching
+      message = message.replace(
+        /\[FILE_PATH\](.*?)\[\/FILE_PATH\]/g,
+        (match, filePath) => {
+          return `<span class="clickable-path" data-path="${filePath}" title="Open in file explorer">${filePath}</span>`
+        }
+      )
     }
 
     return message
@@ -300,5 +334,34 @@ export default class Chatbot {
       save: false,
       messageId: replaceMessageId
     })
+
+    /**
+     * Only scroll down on the first replacement of this message
+     * to avoid repeating scrolling for every message replacement
+     */
+    if (!REPLACED_MESSAGES.has(replaceMessageId)) {
+      REPLACED_MESSAGES.add(replaceMessageId)
+      this.scrollDown()
+    }
+  }
+
+  openPath(filePath) {
+    // Send request to server to open the file path in system file explorer
+    fetch(`${this.serverURL}/api/v1/open-path`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ path: filePath })
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (!data.success) {
+          console.error('Failed to open path:', data.error)
+        }
+      })
+      .catch((error) => {
+        console.error('Error opening path:', error)
+      })
   }
 }

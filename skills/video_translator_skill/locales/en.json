@@ -22,8 +22,8 @@
           "⬇️ Download progress: {{ percentage }}%{{ size ? ' of ' + size : '' }}{{ speed ? ' at ' + speed : '' }}"
         ],
         "download_completed": [
-          "✅ Video downloaded successfully! File size: {{ file_size }}. Ready to process for {{ target_language }} translation.",
-          "Download complete! The video ({{ file_size }}) is ready for {{ target_language }} translation processing."
+          "✅ Video downloaded successfully! File size: {{ file_size }}. Ready to process for {{ target_language }} translation. Saved folder path: {{ file_path }}.",
+          "Download complete! The video ({{ file_size }}) is ready for {{ target_language }} translation processing. Saved folder path: {{ file_path }}."
         ],
         "download_failed": [
           "❌ Failed to download the video from {{ video_url }}. Error: {{ error }}",

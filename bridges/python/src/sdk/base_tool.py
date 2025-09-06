@@ -1,9 +1,13 @@
 import os
 import urllib.request
 from abc import ABC, abstractmethod
-from .platform_utils import PlatformUtils
+from typing import Callable, Dict, Optional, Union
+from .utils import is_windows, is_macos
 from ..constants import TOOLKITS_PATH
 import subprocess
+
+# Progress callback type for reporting tool progress
+ProgressCallback = Callable[[Dict[str, Optional[Union[str, int, float]]]], None]
 
 
 class BaseTool(ABC):
@@ -43,7 +47,7 @@ class BaseTool(ABC):
         # Extract the actual filename from the URL
         parsed_url = urlparse(binary_url)
         actual_filename = os.path.basename(parsed_url.path)
-        executable = f"{actual_filename}.exe" if PlatformUtils.is_windows() and not actual_filename.endswith(
+        executable = f"{actual_filename}.exe" if is_windows() and not actual_filename.endswith(
             '.exe') else actual_filename
 
         bins_path = os.path.join(TOOLKITS_PATH, self.toolkit, 'bins')
@@ -58,11 +62,9 @@ class BaseTool(ABC):
         if not os.path.exists(binary_path):
             self._download_binary_on_demand(binary_name, binary_url, executable)
 
-        """
-        Force chmod again in case it has been downloaded but somehow failed
-        so it could not chmod correctly earlier
-        """
-        if not PlatformUtils.is_windows():
+        # Force chmod again in case it has been downloaded but somehow failed
+        # so it could not chmod correctly earlier
+        if not is_windows():
             os.chmod(binary_path, 0o755)
 
         return binary_path
@@ -78,11 +80,11 @@ class BaseTool(ABC):
             print(f"{binary_name} binary downloaded successfully")
 
             # Make binary executable (Unix systems)
-            if not PlatformUtils.is_windows():
+            if not is_windows():
                 os.chmod(binary_path, 0o755)
 
             # Remove quarantine attribute on macOS to prevent Gatekeeper blocking
-            if PlatformUtils.is_macos():
+            if is_macos():
                 self._remove_quarantine_attribute(binary_path)
 
         except Exception as e:
@@ -100,7 +102,7 @@ class BaseTool(ABC):
             print(f"Warning: Could not remove quarantine attribute from {os.path.basename(file_path)}: {str(e)}")
 
     def _download_binary(self, url: str, output_path: str) -> None:
-        """Download binary from URL using urllib (no external dependencies)"""
+        """Download binary from URL using urllib (matches Python urllib pattern)"""
         try:
             with urllib.request.urlopen(url) as response:
                 with open(output_path, 'wb') as f:

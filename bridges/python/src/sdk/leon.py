@@ -1,8 +1,9 @@
 import random
 import sys
-from typing import Union, Dict, Any
+from typing import Union, Dict, Any, Optional
 from time import sleep
 import json
+import time
 
 from .aurora.widget_wrapper import WidgetWrapper
 from .types import AnswerInput, AnswerData, AnswerConfig
@@ -61,10 +62,11 @@ class Leon:
             print(f'Error while setting answer data. Please verify that the answer key "{answer_key}" exists in the locale configuration. Details:', e)
             raise e
 
-    def answer(self, answer_input: AnswerInput) -> None:
+    def answer(self, answer_input: AnswerInput) -> Optional[str]:
         """
         Send an answer to the core
         :param answer_input: The answer input
+        :return: Message ID for potential future replacement
         """
         try:
             key = answer_input.get('key')
@@ -72,7 +74,8 @@ class Leon:
                 'output': {
                     'codes': 'widget' if answer_input.get('widget') and not answer_input.get('key') else answer_input.get('key'),
                     'answer': self.set_answer_data(key, answer_input.get('data')) if key is not None else '',
-                    'core': answer_input.get('core')
+                    'core': answer_input.get('core'),
+                    'replaceMessageId': answer_input.get('replaceMessageId')
                 }
             }
 
@@ -103,11 +106,18 @@ class Leon:
             sys.stdout.write(json.dumps(answer_object) + '\n')
             sys.stdout.flush()
 
+            # Return the message ID for future replacement (matches Node.js SDK)
+            return (
+                widget.id if widget else
+                f"msg-{int(time.time() * 1000)}-{hex(random.randint(0, 0xffffff))[2:]}"
+            )
+
         except Exception as e:
             print('Error while creating answer:', e)
             if 'not JSON serializable' in str(e):
-                return print("Hint: make sure that widget children components are a list. "
-                             "E.g. { 'children': [Text({ 'children': 'Hello' })] }")
+                print("Hint: make sure that widget children components are a list. "
+                      "E.g. { 'children': [Text({ 'children': 'Hello' })] }")
+            return None
 
 
 leon = Leon()

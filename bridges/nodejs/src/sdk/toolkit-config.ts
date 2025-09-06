@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { PlatformUtils } from '@sdk/platform-utils'
+import { getPlatformName } from '@sdk/utils'
 
 interface ToolConfig {
   description: string
@@ -56,7 +56,7 @@ export class ToolkitConfig {
    * Get binary download URL for current platform with architecture granularity
    */
   static getBinaryUrl(config: ToolConfig): string | undefined {
-    const platformName = PlatformUtils.getPlatformName()
+    const platformName = getPlatformName()
 
     return config.binaries?.[platformName]
   }

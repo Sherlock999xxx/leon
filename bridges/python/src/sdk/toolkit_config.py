@@ -2,7 +2,7 @@ import json
 import os
 from typing import Dict, Any, Optional
 
-from .platform_utils import PlatformUtils
+from .utils import get_platform_name
 
 
 class ToolkitConfig:
@@ -25,8 +25,11 @@ class ToolkitConfig:
         if cache_key not in cls._config_cache:
             config_path = os.path.join(os.getcwd(), 'bridges', 'toolkits', toolkit_name, 'toolkit.json')
 
-            with open(config_path, 'r', encoding='utf-8') as f:
-                toolkit_config = json.load(f)
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    toolkit_config = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                raise Exception(f"Failed to load toolkit config from '{config_path}': {str(e)}")
 
             cls._config_cache[cache_key] = toolkit_config
 
@@ -43,7 +46,7 @@ class ToolkitConfig:
     @classmethod
     def get_binary_url(cls, config: Dict[str, Any]) -> Optional[str]:
         """Get binary download URL for current platform with architecture granularity"""
-        platform_name = PlatformUtils.get_platform_name()
+        platform_name = get_platform_name()
         binaries = config.get('binaries', {})
 
         return binaries.get(platform_name)

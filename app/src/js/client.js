@@ -145,7 +145,6 @@ export default class Client {
        */
       if (data.replaceMessageId) {
         this.chatbot.replaceMessage(data.replaceMessageId, data)
-
         return
       }
 

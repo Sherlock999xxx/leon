@@ -373,7 +373,9 @@ export default class LLMManager {
          *    - [ok] No need for HTTP service for tools because it adds too much complexity
          *    - [ok] Create ffmpeg tool -> extract_audio
          *    - [ok] Create yt-dlp tool -> download_video
+         *    - 2025-09-06: fix logic-action-skill-handler, send message sync replaceMessageId
          *    - 2025-09-04: find a way to make tools report progress to actions without they become error messages for the brain child process
+         *    - With leon.answer, when path are given in the answer, then we should be able to open the file explorer on the given path when we click on the path from the web app
          *      - Also, implement built-in functions, such as when executing child process: also automatically report which command is being executed (leon.answer())
          *      - Since we spawn new processes, we need to make sure to kill them properly once done, otherwise we'll have zombie processes
          *      - Instead of console.log() in base-tool, make use of leon.answer()

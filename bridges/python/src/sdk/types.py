@@ -49,20 +49,31 @@ class ActionParams(TypedDict):
 AnswerData = Optional[Union[Dict[str, Union[str, int]], None]]
 
 
-class Answer(TypedDict):
+class Answer(TypedDict, total=False):
     key: Optional[str]
-    widget: Optional[Any]
+    widget: Optional[Widget]
     data: Optional[AnswerData]
     core: Optional[Dict[str, Any]]
+    replaceMessageId: Optional[str]
+
+
+class TextAnswer(Answer):
+    key: str
+
+
+class WidgetAnswer(Answer):
+    widget: Widget
+    key: Optional[str]
 
 
 class AnswerInput(TypedDict, total=False):
     key: Optional[str]
     widget: Optional[Widget]
     data: Optional[AnswerData]
-    core: Dict[str, Any]
+    core: Optional[Dict[str, Any]]
+    replaceMessageId: Optional[str]
 
 
-class AnswerConfig(TypedDict):
-    text: str
-    speech: str
+class AnswerConfig(TypedDict, total=False):
+    text: Optional[str]
+    speech: Optional[str]
