@@ -149,6 +149,14 @@ export default class Client {
       }
 
       /**
+       * Handle tool output messages
+       */
+      if (data.isToolOutput) {
+        this.chatbot.handleToolOutput(data)
+        return
+      }
+
+      /**
        * Handle widget data directly
        */
       if (data.widget || data.componentTree) {

@@ -67,11 +67,20 @@ export abstract class Tool {
     const binaryPath = await this.getBinaryPath(binaryName)
     const commandString = `"${binaryPath}" ${args.join(' ')}`
 
+    // Generate a unique group ID for this command execution
+    const toolGroupId = `${this.toolkit}_${this.toolName}_${Date.now()}`
+
     await leon.answer({
       key: 'bridges.tools.executing_command',
       data: {
         binary_name: binaryName,
         command: commandString
+      },
+      core: {
+        isToolOutput: true,
+        toolkitName: this.toolkit,
+        toolName: this.toolName,
+        toolGroupId: toolGroupId
       }
     })
 
@@ -80,7 +89,8 @@ export abstract class Tool {
         binaryPath,
         args,
         commandString,
-        execOptions
+        execOptions,
+        toolGroupId
       )
     } else {
       return this.executeAsyncCommand(
@@ -88,6 +98,7 @@ export abstract class Tool {
         args,
         commandString,
         execOptions,
+        toolGroupId,
         onProgress,
         onOutput
       )
@@ -101,7 +112,8 @@ export abstract class Tool {
     binaryPath: string,
     args: string[],
     commandString: string,
-    execOptions: ExecuteCommandOptions['options'] = {}
+    execOptions: ExecuteCommandOptions['options'] = {},
+    toolGroupId: string
   ): string {
     try {
       const startTime = Date.now()
@@ -119,6 +131,12 @@ export abstract class Tool {
         data: {
           command: commandString,
           execution_time: `${executionTime}ms`
+        },
+        core: {
+          isToolOutput: true,
+          toolkitName: this.toolkit,
+          toolName: this.toolName,
+          toolGroupId: toolGroupId
         }
       })
 
@@ -129,6 +147,12 @@ export abstract class Tool {
         data: {
           command: commandString,
           error: (error as Error).message
+        },
+        core: {
+          isToolOutput: true,
+          toolkitName: this.toolkit,
+          toolName: this.toolName,
+          toolGroupId: toolGroupId
         }
       })
       throw error
@@ -143,6 +167,7 @@ export abstract class Tool {
     args: string[],
     commandString: string,
     execOptions: ExecuteCommandOptions['options'] = {},
+    toolGroupId: string,
     onProgress?: ProgressCallback,
     onOutput?: (data: string, isError?: boolean) => void
   ): Promise<string> {
@@ -189,6 +214,12 @@ export abstract class Tool {
             data: {
               command: commandString,
               execution_time: `${executionTime}ms`
+            },
+            core: {
+              isToolOutput: true,
+              toolkitName: this.toolkit,
+              toolName: this.toolName,
+              toolGroupId: toolGroupId
             }
           })
 
@@ -204,6 +235,12 @@ export abstract class Tool {
               command: commandString,
               exit_code: code?.toString() || 'unknown',
               execution_time: `${executionTime}ms`
+            },
+            core: {
+              isToolOutput: true,
+              toolkitName: this.toolkit,
+              toolName: this.toolName,
+              toolGroupId: toolGroupId
             }
           })
           reject(
@@ -219,6 +256,12 @@ export abstract class Tool {
           data: {
             command: commandString,
             error: error.message
+          },
+          core: {
+            isToolOutput: true,
+            toolkitName: this.toolkit,
+            toolName: this.toolName,
+            toolGroupId: toolGroupId
           }
         })
         reject(error)
@@ -233,6 +276,12 @@ export abstract class Tool {
             data: {
               command: commandString,
               timeout: `${execOptions.timeout}ms`
+            },
+            core: {
+              isToolOutput: true,
+              toolkitName: this.toolkit,
+              toolName: this.toolName,
+              toolGroupId: toolGroupId
             }
           })
           reject(new Error(`Command timed out after ${execOptions.timeout}ms`))
@@ -254,6 +303,11 @@ export abstract class Tool {
       key: 'bridges.tools.checking_binary',
       data: {
         binary_name: binaryName
+      },
+      core: {
+        isToolOutput: true,
+        toolkitName: this.toolkit,
+        toolName: this.toolName
       }
     })
 
@@ -262,6 +316,11 @@ export abstract class Tool {
         key: 'bridges.tools.no_binary_url',
         data: {
           binary_name: binaryName
+        },
+        core: {
+          isToolOutput: true,
+          toolkitName: this.toolkit,
+          toolName: this.toolName
         }
       })
       throw new Error(`No download URL found for binary '${binaryName}'`)
@@ -283,6 +342,11 @@ export abstract class Tool {
         key: 'bridges.tools.creating_bins_directory',
         data: {
           toolkit: this.toolkit
+        },
+        core: {
+          isToolOutput: true,
+          toolkitName: this.toolkit,
+          toolName: this.toolName
         }
       })
       fs.mkdirSync(binsPath, { recursive: true })
@@ -293,13 +357,6 @@ export abstract class Tool {
     // Ensure binary is available before returning path
     if (!fs.existsSync(binaryPath)) {
       await this.downloadBinaryOnDemand(binaryName, binaryUrl, executable)
-    } else {
-      await leon.answer({
-        key: 'bridges.tools.binary_found',
-        data: {
-          binary_name: binaryName
-        }
-      })
     }
 
     /**
@@ -311,6 +368,11 @@ export abstract class Tool {
         key: 'bridges.tools.applying_permissions',
         data: {
           binary_name: binaryName
+        },
+        core: {
+          isToolOutput: true,
+          toolkitName: this.toolkit,
+          toolName: this.toolName
         }
       })
       fs.chmodSync(binaryPath, 0o755)
@@ -320,6 +382,11 @@ export abstract class Tool {
       key: 'bridges.tools.binary_ready',
       data: {
         binary_name: binaryName
+      },
+      core: {
+        isToolOutput: true,
+        toolkitName: this.toolkit,
+        toolName: this.toolName
       }
     })
 
@@ -342,6 +409,11 @@ export abstract class Tool {
         key: 'bridges.tools.binary_not_found',
         data: {
           binary_name: binaryName
+        },
+        core: {
+          isToolOutput: true,
+          toolkitName: this.toolkit,
+          toolName: this.toolName
         }
       })
 
@@ -351,6 +423,11 @@ export abstract class Tool {
         key: 'bridges.tools.binary_downloaded',
         data: {
           binary_name: binaryName
+        },
+        core: {
+          isToolOutput: true,
+          toolkitName: this.toolkit,
+          toolName: this.toolName
         }
       })
 
@@ -360,6 +437,11 @@ export abstract class Tool {
           key: 'bridges.tools.making_executable',
           data: {
             binary_name: binaryName
+          },
+          core: {
+            isToolOutput: true,
+            toolkitName: this.toolkit,
+            toolName: this.toolName
           }
         })
         fs.chmodSync(binaryPath, 0o755)
@@ -375,6 +457,11 @@ export abstract class Tool {
         data: {
           binary_name: binaryName,
           error: (error as Error).message
+        },
+        core: {
+          isToolOutput: true,
+          toolkitName: this.toolkit,
+          toolName: this.toolName
         }
       })
       throw new Error(
@@ -389,7 +476,12 @@ export abstract class Tool {
   private async downloadBinary(url: string, outputPath: string): Promise<void> {
     try {
       await leon.answer({
-        key: 'bridges.tools.downloading_from_url'
+        key: 'bridges.tools.downloading_from_url',
+        core: {
+          isToolOutput: true,
+          toolkitName: this.toolkit,
+          toolName: this.toolName
+        }
       })
 
       const response = await axios.get(url, { responseType: 'arraybuffer' })
@@ -400,6 +492,11 @@ export abstract class Tool {
         key: 'bridges.tools.download_url_failed',
         data: {
           error: (error as Error).message
+        },
+        core: {
+          isToolOutput: true,
+          toolkitName: this.toolkit,
+          toolName: this.toolName
         }
       })
       throw new Error(`Failed to download binary: ${(error as Error).message}`)
@@ -418,6 +515,11 @@ export abstract class Tool {
           key: 'bridges.tools.removing_quarantine',
           data: {
             command
+          },
+          core: {
+            isToolOutput: true,
+            toolkitName: this.toolkit,
+            toolName: this.toolName
           }
         })
         // Use xattr to remove the com.apple.quarantine extended attribute
@@ -429,6 +531,11 @@ export abstract class Tool {
               key: 'bridges.tools.quarantine_removed',
               data: {
                 file_name: path.basename(filePath)
+              },
+              core: {
+                isToolOutput: true,
+                toolkitName: this.toolkit,
+                toolName: this.toolName
               }
             })
           } else {
@@ -438,6 +545,11 @@ export abstract class Tool {
               data: {
                 file_name: path.basename(filePath),
                 exit_code: code?.toString() ?? 'unknown'
+              },
+              core: {
+                isToolOutput: true,
+                toolkitName: this.toolkit,
+                toolName: this.toolName
               }
             })
           }
@@ -452,6 +564,11 @@ export abstract class Tool {
             data: {
               file_name: path.basename(filePath),
               error: error.message
+            },
+            core: {
+              isToolOutput: true,
+              toolkitName: this.toolkit,
+              toolName: this.toolName
             }
           })
 
@@ -465,6 +582,11 @@ export abstract class Tool {
             data: {
               file_name: path.basename(filePath),
               error: (error as Error).message
+            },
+            core: {
+              isToolOutput: true,
+              toolkitName: this.toolkit,
+              toolName: this.toolName
             }
           })
           .then(() => resolve())

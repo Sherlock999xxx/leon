@@ -5,6 +5,7 @@ import axios from 'axios'
 import { WidgetWrapper, Flexbox, Loader, Text } from '@leon-ai/aurora'
 
 import renderAuroraComponent from './render-aurora-component'
+import ToolUIHandler from './tool-ui-handler'
 
 const WIDGETS_TO_FETCH = []
 const WIDGETS_FETCH_CACHE = new Map()
@@ -20,6 +21,13 @@ export default class Chatbot {
     this.noBubbleMessage = document.querySelector('#no-bubble')
     this.bubbles = localStorage.getItem('bubbles')
     this.parsedBubbles = JSON.parse(this.bubbles)
+
+    // Initialize tool UI handler
+    this.toolUIHandler = new ToolUIHandler(
+      this.feed,
+      this.scrollDown.bind(this),
+      this.formatMessage.bind(this)
+    )
   }
 
   async init() {
@@ -99,6 +107,14 @@ export default class Chatbot {
       } else {
         for (let i = 0; i < this.parsedBubbles.length; i += 1) {
           const bubble = this.parsedBubbles[i]
+
+          // Skip tool output markers when recreating bubbles
+          if (
+            bubble.originalString &&
+            ToolUIHandler.isToolOutputMarker(bubble.originalString)
+          ) {
+            continue
+          }
 
           this.createBubble({
             who: bubble.who,
@@ -266,6 +282,28 @@ export default class Chatbot {
     }
 
     return container
+  }
+
+  handleToolOutput(data) {
+    const result = this.toolUIHandler.handleToolOutput(data)
+
+    // Save to localStorage if it's a new group
+    if (result && result.isNewGroup) {
+      const { toolkitName, toolName, answer } = data
+      const toolInfo = this.toolUIHandler.getToolGroupInfo(
+        result.groupId,
+        toolkitName,
+        toolName,
+        answer
+      )
+
+      this.saveBubble(
+        'leon',
+        toolInfo.originalString,
+        toolInfo.formattedMessage,
+        toolInfo.messageId
+      )
+    }
   }
 
   saveBubble(who, originalString, string, messageId) {

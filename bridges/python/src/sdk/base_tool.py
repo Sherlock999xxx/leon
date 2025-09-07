@@ -67,25 +67,36 @@ class BaseTool(ABC):
         binary_path = self.get_binary_path(binary_name)
         command_string = f'"{binary_path}" {" ".join(args)}'
 
+        # Generate a unique group ID for this command execution
+        tool_group_id = f"{self.toolkit}_{self.tool_name}_{int(time.time() * 1000)}"
+
         leon.answer({
             'key': 'bridges.tools.executing_command',
             'data': {
                 'binary_name': binary_name,
                 'command': command_string
+            },
+            'core': {
+                'isToolOutput': True,
+                'toolkitName': self.toolkit,
+                'toolName': self.tool_name,
+                'toolGroupId': tool_group_id
             }
         })
 
         if sync:
-            return self._execute_sync_command(binary_path, args, command_string, exec_options)
+            return self._execute_sync_command(binary_path, args, command_string, exec_options, tool_group_id)
         else:
-            return self._execute_async_command(binary_path, args, command_string, exec_options, on_progress, on_output)
+            return self._execute_async_command(binary_path, args, command_string, exec_options, tool_group_id,
+                                               on_progress, on_output)
 
     def _execute_sync_command(
         self,
         binary_path: str,
         args: List[str],
         command_string: str,
-        exec_options: Optional[Dict[str, Any]] = None
+        exec_options: Optional[Dict[str, Any]] = None,
+        tool_group_id: Optional[str] = None
     ) -> str:
         """Execute command synchronously"""
 
@@ -108,6 +119,12 @@ class BaseTool(ABC):
                     'data': {
                         'command': command_string,
                         'execution_time': f'{execution_time}ms'
+                    },
+                    'core': {
+                        'isToolOutput': True,
+                        'toolkitName': self.toolkit,
+                        'toolName': self.tool_name,
+                        'toolGroupId': tool_group_id
                     }
                 })
                 return result.stdout
@@ -119,6 +136,12 @@ class BaseTool(ABC):
                         'error': result.stderr or 'Unknown error',
                         'exit_code': str(result.returncode),
                         'execution_time': f'{execution_time}ms'
+                    },
+                    'core': {
+                        'isToolOutput': True,
+                        'toolkitName': self.toolkit,
+                        'toolName': self.tool_name,
+                        'toolGroupId': tool_group_id
                     }
                 })
                 raise Exception(f"Command failed with exit code {result.returncode}: {result.stderr}")
@@ -129,6 +152,12 @@ class BaseTool(ABC):
                 'data': {
                     'command': command_string,
                     'timeout': f'{e.timeout}s' if e.timeout else 'unknown'
+                },
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name,
+                    'toolGroupId': tool_group_id
                 }
             })
             raise Exception(f"Command timed out after {e.timeout}s")
@@ -138,6 +167,12 @@ class BaseTool(ABC):
                 'data': {
                     'command': command_string,
                     'error': str(e)
+                },
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name,
+                    'toolGroupId': tool_group_id
                 }
             })
             raise
@@ -148,6 +183,7 @@ class BaseTool(ABC):
         args: List[str],
         command_string: str,
         exec_options: Optional[Dict[str, Any]] = None,
+        tool_group_id: Optional[str] = None,
         on_progress: Optional[ProgressCallback] = None,
         on_output: Optional[Callable[[str, bool], None]] = None
     ) -> str:
@@ -193,6 +229,12 @@ class BaseTool(ABC):
                     'data': {
                         'command': command_string,
                         'execution_time': f'{execution_time}ms'
+                    },
+                    'core': {
+                        'isToolOutput': True,
+                        'toolkitName': self.toolkit,
+                        'toolName': self.tool_name,
+                        'toolGroupId': tool_group_id
                     }
                 })
 
@@ -207,6 +249,12 @@ class BaseTool(ABC):
                         'command': command_string,
                         'exit_code': str(process.returncode),
                         'execution_time': f'{execution_time}ms'
+                    },
+                    'core': {
+                        'isToolOutput': True,
+                        'toolkitName': self.toolkit,
+                        'toolName': self.tool_name,
+                        'toolGroupId': tool_group_id
                     }
                 })
                 raise Exception(f"Command failed with exit code {process.returncode}: {output_buffer}")
@@ -217,6 +265,12 @@ class BaseTool(ABC):
                 'data': {
                     'command': command_string,
                     'error': str(e)
+                },
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name,
+                    'toolGroupId': tool_group_id
                 }
             })
             raise
@@ -234,6 +288,11 @@ class BaseTool(ABC):
             'key': 'bridges.tools.checking_binary',
             'data': {
                 'binary_name': binary_name
+            },
+            'core': {
+                'isToolOutput': True,
+                'toolkitName': self.toolkit,
+                'toolName': self.tool_name
             }
         })
 
@@ -242,6 +301,11 @@ class BaseTool(ABC):
                 'key': 'bridges.tools.no_binary_url',
                 'data': {
                     'binary_name': binary_name
+                },
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name
                 }
             })
             raise Exception(f"No download URL found for binary '{binary_name}'")
@@ -260,6 +324,11 @@ class BaseTool(ABC):
                 'key': 'bridges.tools.creating_bins_directory',
                 'data': {
                     'toolkit': self.toolkit
+                },
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name
                 }
             })
             os.makedirs(bins_path, exist_ok=True)
@@ -269,13 +338,6 @@ class BaseTool(ABC):
         # Ensure binary is available before returning path
         if not os.path.exists(binary_path):
             self._download_binary_on_demand(binary_name, binary_url, executable)
-        else:
-            leon.answer({
-                'key': 'bridges.tools.binary_found',
-                'data': {
-                    'binary_name': binary_name
-                }
-            })
 
         # Force chmod again in case it has been downloaded but somehow failed
         # so it could not chmod correctly earlier
@@ -284,6 +346,11 @@ class BaseTool(ABC):
                 'key': 'bridges.tools.applying_permissions',
                 'data': {
                     'binary_name': binary_name
+                },
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name
                 }
             })
             os.chmod(binary_path, 0o755)
@@ -292,6 +359,11 @@ class BaseTool(ABC):
             'key': 'bridges.tools.binary_ready',
             'data': {
                 'binary_name': binary_name
+            },
+            'core': {
+                'isToolOutput': True,
+                'toolkitName': self.toolkit,
+                'toolName': self.tool_name
             }
         })
 
@@ -308,6 +380,11 @@ class BaseTool(ABC):
                 'key': 'bridges.tools.binary_not_found',
                 'data': {
                     'binary_name': binary_name
+                },
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name
                 }
             })
 
@@ -317,6 +394,11 @@ class BaseTool(ABC):
                 'key': 'bridges.tools.binary_downloaded',
                 'data': {
                     'binary_name': binary_name
+                },
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name
                 }
             })
 
@@ -326,6 +408,11 @@ class BaseTool(ABC):
                     'key': 'bridges.tools.making_executable',
                     'data': {
                         'binary_name': binary_name
+                    },
+                    'core': {
+                        'isToolOutput': True,
+                        'toolkitName': self.toolkit,
+                        'toolName': self.tool_name
                     }
                 })
                 os.chmod(binary_path, 0o755)
@@ -336,6 +423,11 @@ class BaseTool(ABC):
                     'key': 'bridges.tools.removing_quarantine',
                     'data': {
                         'binary_name': binary_name
+                    },
+                    'core': {
+                        'isToolOutput': True,
+                        'toolkitName': self.toolkit,
+                        'toolName': self.tool_name
                     }
                 })
                 self._remove_quarantine_attribute(binary_path)
@@ -346,6 +438,11 @@ class BaseTool(ABC):
                 'data': {
                     'binary_name': binary_name,
                     'error': str(e)
+                },
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name
                 }
             })
             raise Exception(f"Failed to download binary '{binary_name}': {str(e)}")
@@ -362,6 +459,11 @@ class BaseTool(ABC):
                     'key': 'bridges.tools.quarantine_removed',
                     'data': {
                         'file_name': os.path.basename(file_path)
+                    },
+                    'core': {
+                        'isToolOutput': True,
+                        'toolkitName': self.toolkit,
+                        'toolName': self.tool_name
                     }
                 })
             else:
@@ -370,6 +472,11 @@ class BaseTool(ABC):
                     'data': {
                         'file_name': os.path.basename(file_path),
                         'exit_code': str(result.returncode)
+                    },
+                    'core': {
+                        'isToolOutput': True,
+                        'toolkitName': self.toolkit,
+                        'toolName': self.tool_name
                     }
                 })
         except Exception as e:
@@ -379,6 +486,11 @@ class BaseTool(ABC):
                 'data': {
                     'file_name': os.path.basename(file_path),
                     'error': str(e)
+                },
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name
                 }
             })
 
@@ -387,7 +499,12 @@ class BaseTool(ABC):
 
         try:
             leon.answer({
-                'key': 'bridges.tools.downloading_from_url'
+                'key': 'bridges.tools.downloading_from_url',
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name
+                }
             })
 
             with urllib.request.urlopen(url) as response:
@@ -398,6 +515,11 @@ class BaseTool(ABC):
                 'key': 'bridges.tools.download_url_failed',
                 'data': {
                     'error': str(e)
+                },
+                'core': {
+                    'isToolOutput': True,
+                    'toolkitName': self.toolkit,
+                    'toolName': self.tool_name
                 }
             })
             raise Exception(f"Failed to download binary: {str(e)}")

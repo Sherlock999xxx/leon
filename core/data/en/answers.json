@@ -114,10 +114,10 @@
     ],
     "bridges.tools.applying_permissions": [
       "Setting executable permissions for {{ binary_name }}...",
-      "Applying proper permissions to {{ binary_name }} binary.",
-      "Making {{ binary_name }} binary executable.",
-      "Configuring {{ binary_name }} binary permissions.",
-      "Setting up executable permissions for {{ binary_name }}."
+      "Applying proper permissions to {{ binary_name }} binary...",
+      "Making {{ binary_name }} binary executable...",
+      "Configuring {{ binary_name }} binary permissions...",
+      "Setting up executable permissions for {{ binary_name }}..."
     ],
     "bridges.tools.binary_ready": [
       "{{ binary_name }} binary is ready for use.",

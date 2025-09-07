@@ -156,17 +156,35 @@ export class LogicActionSkillHandler {
        */
       const { answer } = skillAnswer.output
       if (answer && !BRAIN.isMuted) {
-        // If we have a replaceMessageId, send via socket with replacement support
-        if (skillAnswer.output.replaceMessageId) {
-          const answerData = {
+        // Check if this is a tool output
+        const isToolOutput = skillAnswer.output.core?.isToolOutput === true
+
+        if (isToolOutput) {
+          // Handle tool outputs with special formatting
+          const toolData = {
             answer,
-            replaceMessageId: skillAnswer.output.replaceMessageId
+            isToolOutput: true,
+            toolkitName: skillAnswer.output.core?.toolkitName,
+            toolName: skillAnswer.output.core?.toolName,
+            toolGroupId: skillAnswer.output.core?.toolGroupId,
+            key: skillAnswer.output.codes,
+            replaceMessageId: skillAnswer.output.replaceMessageId || null
           }
 
-          SOCKET_SERVER.socket?.emit('answer', answerData)
+          SOCKET_SERVER.socket?.emit('answer', toolData)
         } else {
-          // For regular answers without replacement, use BRAIN.talk which handles the answer event
-          BRAIN.talk(answer, true)
+          // Handle regular skill answers
+          if (skillAnswer.output.replaceMessageId) {
+            const answerData = {
+              answer,
+              replaceMessageId: skillAnswer.output.replaceMessageId
+            }
+
+            SOCKET_SERVER.socket?.emit('answer', answerData)
+          } else {
+            // For regular answers without replacement, use BRAIN.talk which handles the answer event
+            BRAIN.talk(answer, true)
+          }
         }
       }
     }
