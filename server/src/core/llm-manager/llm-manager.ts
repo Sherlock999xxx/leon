@@ -380,8 +380,9 @@ export default class LLMManager {
          *      - [ok] Since we spawn new processes, we need to make sure to kill them properly once done, otherwise we'll have zombie processes
          *      - [ok] Instead of console.log() in base-tool, make use of leon.answer()
          *      - [ok] Once done for TypeScript, rewrite it for the Python SDK (base-tool.ts, leon.ts (for replaceMessageId)
-         *    - Implement special UI for tools report (command outputs, etc.)
-         *    - Create bash tool -> execute_command (+ shell skill that can run commands on the host based on remote LLM)
+         *    - [ok] Implement special UI for tools report (command outputs, etc.)
+         *    - In the report UI, be able to display output in real-time (e.g. ffmpeg command output)
+         *    - [ok] Create bash tool -> execute_command (+ shell skill that can run commands on the host based on remote LLM)
          *    - Create whisper_faster -> transcribe
          *    - Create pyannote tool -> diarize
          *    - Create gladia tool -> transcribe; diarize

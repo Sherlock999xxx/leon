@@ -30,6 +30,7 @@ export interface ExecuteCommandOptions {
   }
   onProgress?: ProgressCallback
   onOutput?: (data: string, isError?: boolean) => void
+  skipBinaryDownload?: boolean
 }
 
 export abstract class Tool {
@@ -49,6 +50,31 @@ export abstract class Tool {
   abstract get description(): string
 
   /**
+   * Report tool status or information using leon.answer with automatic toolkit/tool context
+   */
+  protected async report(
+    key: string,
+    data?: Record<string, string | number>,
+    toolGroupId?: string
+  ): Promise<void> {
+    const coreData: Record<string, unknown> = {
+      isToolOutput: true,
+      toolkitName: this.toolkit,
+      toolName: this.toolName
+    }
+
+    if (toolGroupId) {
+      coreData['toolGroupId'] = toolGroupId
+    }
+
+    await leon.answer({
+      key,
+      data: data || {},
+      core: coreData
+    })
+  }
+
+  /**
    * Execute a command with proper Leon messaging and progress tracking
    */
   protected async executeCommand(
@@ -59,30 +85,26 @@ export abstract class Tool {
       args,
       options: execOptions = {},
       onProgress,
-      onOutput
+      onOutput,
+      skipBinaryDownload
     } = options
     const { sync = false } = execOptions
 
     // Get binary path (auto-downloads if needed)
-    const binaryPath = await this.getBinaryPath(binaryName)
+    const binaryPath = await this.getBinaryPath(binaryName, skipBinaryDownload)
     const commandString = `"${binaryPath}" ${args.join(' ')}`
 
     // Generate a unique group ID for this command execution
     const toolGroupId = `${this.toolkit}_${this.toolName}_${Date.now()}`
 
-    await leon.answer({
-      key: 'bridges.tools.executing_command',
-      data: {
+    await this.report(
+      'bridges.tools.executing_command',
+      {
         binary_name: binaryName,
         command: commandString
       },
-      core: {
-        isToolOutput: true,
-        toolkitName: this.toolkit,
-        toolName: this.toolName,
-        toolGroupId: toolGroupId
-      }
-    })
+      toolGroupId
+    )
 
     if (sync) {
       return this.executeSyncCommand(
@@ -126,35 +148,25 @@ export abstract class Tool {
 
       const executionTime = Date.now() - startTime
 
-      leon.answer({
-        key: 'bridges.tools.command_completed',
-        data: {
+      this.report(
+        'bridges.tools.command_completed',
+        {
           command: commandString,
           execution_time: `${executionTime}ms`
         },
-        core: {
-          isToolOutput: true,
-          toolkitName: this.toolkit,
-          toolName: this.toolName,
-          toolGroupId: toolGroupId
-        }
-      })
+        toolGroupId
+      )
 
       return result as string
     } catch (error: unknown) {
-      leon.answer({
-        key: 'bridges.tools.command_failed',
-        data: {
+      this.report(
+        'bridges.tools.command_failed',
+        {
           command: commandString,
           error: (error as Error).message
         },
-        core: {
-          isToolOutput: true,
-          toolkitName: this.toolkit,
-          toolName: this.toolName,
-          toolGroupId: toolGroupId
-        }
-      })
+        toolGroupId
+      )
       throw error
     }
   }
@@ -209,19 +221,14 @@ export abstract class Tool {
         const executionTime = Date.now() - startTime
 
         if (code === 0) {
-          await leon.answer({
-            key: 'bridges.tools.command_completed',
-            data: {
+          await this.report(
+            'bridges.tools.command_completed',
+            {
               command: commandString,
               execution_time: `${executionTime}ms`
             },
-            core: {
-              isToolOutput: true,
-              toolkitName: this.toolkit,
-              toolName: this.toolName,
-              toolGroupId: toolGroupId
-            }
-          })
+            toolGroupId
+          )
 
           if (onProgress) {
             onProgress({ status: 'completed', percentage: 100 })
@@ -229,20 +236,15 @@ export abstract class Tool {
 
           resolve(outputBuffer)
         } else {
-          await leon.answer({
-            key: 'bridges.tools.command_failed',
-            data: {
+          await this.report(
+            'bridges.tools.command_failed',
+            {
               command: commandString,
               exit_code: code?.toString() || 'unknown',
               execution_time: `${executionTime}ms`
             },
-            core: {
-              isToolOutput: true,
-              toolkitName: this.toolkit,
-              toolName: this.toolName,
-              toolGroupId: toolGroupId
-            }
-          })
+            toolGroupId
+          )
           reject(
             new Error(`Command failed with exit code ${code}: ${outputBuffer}`)
           )
@@ -251,19 +253,14 @@ export abstract class Tool {
 
       // Handle process errors
       childProcess.on('error', async (error) => {
-        await leon.answer({
-          key: 'bridges.tools.command_error',
-          data: {
+        await this.report(
+          'bridges.tools.command_error',
+          {
             command: commandString,
             error: error.message
           },
-          core: {
-            isToolOutput: true,
-            toolkitName: this.toolkit,
-            toolName: this.toolName,
-            toolGroupId: toolGroupId
-          }
-        })
+          toolGroupId
+        )
         reject(error)
       })
 
@@ -271,19 +268,14 @@ export abstract class Tool {
       if (execOptions.timeout) {
         setTimeout(() => {
           childProcess.kill('SIGTERM')
-          leon.answer({
-            key: 'bridges.tools.command_timeout',
-            data: {
+          this.report(
+            'bridges.tools.command_timeout',
+            {
               command: commandString,
               timeout: `${execOptions.timeout}ms`
             },
-            core: {
-              isToolOutput: true,
-              toolkitName: this.toolkit,
-              toolName: this.toolName,
-              toolGroupId: toolGroupId
-            }
-          })
+            toolGroupId
+          )
           reject(new Error(`Command timed out after ${execOptions.timeout}ms`))
         }, execOptions.timeout)
       }
@@ -293,35 +285,27 @@ export abstract class Tool {
   /**
    * Get binary path and ensure it's downloaded
    */
-  async getBinaryPath(binaryName: string): Promise<string> {
+  async getBinaryPath(
+    binaryName: string,
+    skipBinaryDownload?: boolean
+  ): Promise<string> {
+    // For built-in commands like bash, just return the binary name
+    if (skipBinaryDownload) {
+      return binaryName
+    }
+
     // Get tool name without "Tool" suffix for config lookup
     const toolConfigName = this.toolName.toLowerCase().replace('tool', '')
     const config = ToolkitConfig.load(this.toolkit, toolConfigName)
     const binaryUrl = ToolkitConfig.getBinaryUrl(config)
 
-    await leon.answer({
-      key: 'bridges.tools.checking_binary',
-      data: {
-        binary_name: binaryName
-      },
-      core: {
-        isToolOutput: true,
-        toolkitName: this.toolkit,
-        toolName: this.toolName
-      }
+    await this.report('bridges.tools.checking_binary', {
+      binary_name: binaryName
     })
 
     if (!binaryUrl) {
-      await leon.answer({
-        key: 'bridges.tools.no_binary_url',
-        data: {
-          binary_name: binaryName
-        },
-        core: {
-          isToolOutput: true,
-          toolkitName: this.toolkit,
-          toolName: this.toolName
-        }
+      await this.report('bridges.tools.no_binary_url', {
+        binary_name: binaryName
       })
       throw new Error(`No download URL found for binary '${binaryName}'`)
     }
@@ -338,16 +322,8 @@ export abstract class Tool {
 
     // Ensure toolkit bins directory exists
     if (!fs.existsSync(binsPath)) {
-      await leon.answer({
-        key: 'bridges.tools.creating_bins_directory',
-        data: {
-          toolkit: this.toolkit
-        },
-        core: {
-          isToolOutput: true,
-          toolkitName: this.toolkit,
-          toolName: this.toolName
-        }
+      await this.report('bridges.tools.creating_bins_directory', {
+        toolkit: this.toolkit
       })
       fs.mkdirSync(binsPath, { recursive: true })
     }
@@ -364,30 +340,14 @@ export abstract class Tool {
      * so it could not chmod correctly earlier
      */
     if (!isWindows()) {
-      await leon.answer({
-        key: 'bridges.tools.applying_permissions',
-        data: {
-          binary_name: binaryName
-        },
-        core: {
-          isToolOutput: true,
-          toolkitName: this.toolkit,
-          toolName: this.toolName
-        }
+      await this.report('bridges.tools.applying_permissions', {
+        binary_name: binaryName
       })
       fs.chmodSync(binaryPath, 0o755)
     }
 
-    await leon.answer({
-      key: 'bridges.tools.binary_ready',
-      data: {
-        binary_name: binaryName
-      },
-      core: {
-        isToolOutput: true,
-        toolkitName: this.toolkit,
-        toolName: this.toolName
-      }
+    await this.report('bridges.tools.binary_ready', {
+      binary_name: binaryName
     })
 
     return binaryPath
@@ -405,44 +365,20 @@ export abstract class Tool {
       const binsPath = path.join(TOOLKITS_PATH, this.toolkit, 'bins')
       const binaryPath = path.join(binsPath, executable)
 
-      await leon.answer({
-        key: 'bridges.tools.binary_not_found',
-        data: {
-          binary_name: binaryName
-        },
-        core: {
-          isToolOutput: true,
-          toolkitName: this.toolkit,
-          toolName: this.toolName
-        }
+      await this.report('bridges.tools.binary_not_found', {
+        binary_name: binaryName
       })
 
       await this.downloadBinary(binaryUrl, binaryPath)
 
-      await leon.answer({
-        key: 'bridges.tools.binary_downloaded',
-        data: {
-          binary_name: binaryName
-        },
-        core: {
-          isToolOutput: true,
-          toolkitName: this.toolkit,
-          toolName: this.toolName
-        }
+      await this.report('bridges.tools.binary_downloaded', {
+        binary_name: binaryName
       })
 
       // Make binary executable (Unix systems)
       if (!isWindows()) {
-        await leon.answer({
-          key: 'bridges.tools.making_executable',
-          data: {
-            binary_name: binaryName
-          },
-          core: {
-            isToolOutput: true,
-            toolkitName: this.toolkit,
-            toolName: this.toolName
-          }
+        await this.report('bridges.tools.making_executable', {
+          binary_name: binaryName
         })
         fs.chmodSync(binaryPath, 0o755)
       }
@@ -452,17 +388,9 @@ export abstract class Tool {
         await this.removeQuarantineAttribute(binaryPath)
       }
     } catch (error) {
-      await leon.answer({
-        key: 'bridges.tools.download_failed',
-        data: {
-          binary_name: binaryName,
-          error: (error as Error).message
-        },
-        core: {
-          isToolOutput: true,
-          toolkitName: this.toolkit,
-          toolName: this.toolName
-        }
+      await this.report('bridges.tools.download_failed', {
+        binary_name: binaryName,
+        error: (error as Error).message
       })
       throw new Error(
         `Failed to download binary '${binaryName}': ${(error as Error).message}`
@@ -475,29 +403,13 @@ export abstract class Tool {
    */
   private async downloadBinary(url: string, outputPath: string): Promise<void> {
     try {
-      await leon.answer({
-        key: 'bridges.tools.downloading_from_url',
-        core: {
-          isToolOutput: true,
-          toolkitName: this.toolkit,
-          toolName: this.toolName
-        }
-      })
-
+      await this.report('bridges.tools.downloading_from_url')
       const response = await axios.get(url, { responseType: 'arraybuffer' })
 
       fs.writeFileSync(outputPath, response.data)
     } catch (error) {
-      await leon.answer({
-        key: 'bridges.tools.download_url_failed',
-        data: {
-          error: (error as Error).message
-        },
-        core: {
-          isToolOutput: true,
-          toolkitName: this.toolkit,
-          toolName: this.toolName
-        }
+      await this.report('bridges.tools.download_url_failed', {
+        error: (error as Error).message
       })
       throw new Error(`Failed to download binary: ${(error as Error).message}`)
     }
@@ -511,46 +423,22 @@ export abstract class Tool {
       try {
         const command = `xattr -d com.apple.quarantine "${filePath}"`
 
-        await leon.answer({
-          key: 'bridges.tools.removing_quarantine',
-          data: {
-            command
-          },
-          core: {
-            isToolOutput: true,
-            toolkitName: this.toolkit,
-            toolName: this.toolName
-          }
+        await this.report('bridges.tools.removing_quarantine', {
+          command
         })
         // Use xattr to remove the com.apple.quarantine extended attribute
         const xattr = spawn('xattr', ['-d', 'com.apple.quarantine', filePath])
 
         xattr.on('close', async (code) => {
           if (code === 0) {
-            await leon.answer({
-              key: 'bridges.tools.quarantine_removed',
-              data: {
-                file_name: path.basename(filePath)
-              },
-              core: {
-                isToolOutput: true,
-                toolkitName: this.toolkit,
-                toolName: this.toolName
-              }
+            await this.report('bridges.tools.quarantine_removed', {
+              file_name: path.basename(filePath)
             })
           } else {
             // Don't fail the entire process if quarantine removal fails
-            await leon.answer({
-              key: 'bridges.tools.quarantine_warning',
-              data: {
-                file_name: path.basename(filePath),
-                exit_code: code?.toString() ?? 'unknown'
-              },
-              core: {
-                isToolOutput: true,
-                toolkitName: this.toolkit,
-                toolName: this.toolName
-              }
+            await this.report('bridges.tools.quarantine_warning', {
+              file_name: path.basename(filePath),
+              exit_code: code?.toString() ?? 'unknown'
             })
           }
 
@@ -559,37 +447,20 @@ export abstract class Tool {
 
         xattr.on('error', async (error) => {
           // Don't fail the entire process if quarantine removal fails
-          await leon.answer({
-            key: 'bridges.tools.quarantine_error',
-            data: {
-              file_name: path.basename(filePath),
-              error: error.message
-            },
-            core: {
-              isToolOutput: true,
-              toolkitName: this.toolkit,
-              toolName: this.toolName
-            }
+          await this.report('bridges.tools.quarantine_error', {
+            file_name: path.basename(filePath),
+            error: error.message
           })
 
           resolve()
         })
       } catch (error) {
         // Don't fail the entire process if quarantine removal fails
-        leon
-          .answer({
-            key: 'bridges.tools.quarantine_exception',
-            data: {
-              file_name: path.basename(filePath),
-              error: (error as Error).message
-            },
-            core: {
-              isToolOutput: true,
-              toolkitName: this.toolkit,
-              toolName: this.toolName
-            }
-          })
-          .then(() => resolve())
+        await this.report('bridges.tools.quarantine_exception', {
+          file_name: path.basename(filePath),
+          error: (error as Error).message
+        })
+        resolve()
       }
     })
   }

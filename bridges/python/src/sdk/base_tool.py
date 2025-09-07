@@ -22,13 +22,15 @@ class ExecuteCommandOptions:
         args: List[str],
         options: Optional[Dict[str, Any]] = None,
         on_progress: Optional[ProgressCallback] = None,
-        on_output: Optional[Callable[[str, bool], None]] = None
+        on_output: Optional[Callable[[str, bool], None]] = None,
+        skip_binary_download: bool = False
     ):
         self.binary_name = binary_name
         self.args = args
         self.options = options or {}
         self.on_progress = on_progress
         self.on_output = on_output
+        self.skip_binary_download = skip_binary_download
 
 
 class BaseTool(ABC):
@@ -60,29 +62,21 @@ class BaseTool(ABC):
         exec_options = options.options
         on_progress = options.on_progress
         on_output = options.on_output
+        skip_binary_download = options.skip_binary_download
 
         sync = exec_options.get('sync', True) if exec_options else True
 
         # Get binary path (auto-downloads if needed)
-        binary_path = self.get_binary_path(binary_name)
+        binary_path = self.get_binary_path(binary_name, skip_binary_download)
         command_string = f'"{binary_path}" {" ".join(args)}'
 
         # Generate a unique group ID for this command execution
         tool_group_id = f"{self.toolkit}_{self.tool_name}_{int(time.time() * 1000)}"
 
-        leon.answer({
-            'key': 'bridges.tools.executing_command',
-            'data': {
-                'binary_name': binary_name,
-                'command': command_string
-            },
-            'core': {
-                'isToolOutput': True,
-                'toolkitName': self.toolkit,
-                'toolName': self.tool_name,
-                'toolGroupId': tool_group_id
-            }
-        })
+        self.report('bridges.tools.executing_command', {
+            'binary_name': binary_name,
+            'command': command_string
+        }, tool_group_id)
 
         if sync:
             return self._execute_sync_command(binary_path, args, command_string, exec_options, tool_group_id)
@@ -114,67 +108,31 @@ class BaseTool(ABC):
             execution_time = int((time.time() - start_time) * 1000)
 
             if result.returncode == 0:
-                leon.answer({
-                    'key': 'bridges.tools.command_completed',
-                    'data': {
-                        'command': command_string,
-                        'execution_time': f'{execution_time}ms'
-                    },
-                    'core': {
-                        'isToolOutput': True,
-                        'toolkitName': self.toolkit,
-                        'toolName': self.tool_name,
-                        'toolGroupId': tool_group_id
-                    }
-                })
+                self.report('bridges.tools.command_completed', {
+                    'command': command_string,
+                    'execution_time': f'{execution_time}ms'
+                }, tool_group_id)
                 return result.stdout
             else:
-                leon.answer({
-                    'key': 'bridges.tools.command_failed',
-                    'data': {
-                        'command': command_string,
-                        'error': result.stderr or 'Unknown error',
-                        'exit_code': str(result.returncode),
-                        'execution_time': f'{execution_time}ms'
-                    },
-                    'core': {
-                        'isToolOutput': True,
-                        'toolkitName': self.toolkit,
-                        'toolName': self.tool_name,
-                        'toolGroupId': tool_group_id
-                    }
-                })
+                self.report('bridges.tools.command_failed', {
+                    'command': command_string,
+                    'error': result.stderr or 'Unknown error',
+                    'exit_code': str(result.returncode),
+                    'execution_time': f'{execution_time}ms'
+                }, tool_group_id)
                 raise Exception(f"Command failed with exit code {result.returncode}: {result.stderr}")
 
         except subprocess.TimeoutExpired as e:
-            leon.answer({
-                'key': 'bridges.tools.command_timeout',
-                'data': {
-                    'command': command_string,
-                    'timeout': f'{e.timeout}s' if e.timeout else 'unknown'
-                },
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name,
-                    'toolGroupId': tool_group_id
-                }
-            })
+            self.report('bridges.tools.command_timeout', {
+                'command': command_string,
+                'timeout': f'{e.timeout}s' if e.timeout else 'unknown'
+            }, tool_group_id)
             raise Exception(f"Command timed out after {e.timeout}s")
         except Exception as e:
-            leon.answer({
-                'key': 'bridges.tools.command_error',
-                'data': {
-                    'command': command_string,
-                    'error': str(e)
-                },
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name,
-                    'toolGroupId': tool_group_id
-                }
-            })
+            self.report('bridges.tools.command_error', {
+                'command': command_string,
+                'error': str(e)
+            }, tool_group_id)
             raise
 
     def _execute_async_command(
@@ -224,89 +182,47 @@ class BaseTool(ABC):
             execution_time = int((time.time() - start_time) * 1000)
 
             if process.returncode == 0:
-                leon.answer({
-                    'key': 'bridges.tools.command_completed',
-                    'data': {
-                        'command': command_string,
-                        'execution_time': f'{execution_time}ms'
-                    },
-                    'core': {
-                        'isToolOutput': True,
-                        'toolkitName': self.toolkit,
-                        'toolName': self.tool_name,
-                        'toolGroupId': tool_group_id
-                    }
-                })
-
+                self.report('bridges.tools.command_completed', {
+                    'command': command_string,
+                    'execution_time': f'{execution_time}ms'
+                }, tool_group_id)
                 if on_progress:
                     on_progress({'status': 'completed', 'percentage': 100})
-
                 return output_buffer
             else:
-                leon.answer({
-                    'key': 'bridges.tools.command_failed',
-                    'data': {
-                        'command': command_string,
-                        'exit_code': str(process.returncode),
-                        'execution_time': f'{execution_time}ms'
-                    },
-                    'core': {
-                        'isToolOutput': True,
-                        'toolkitName': self.toolkit,
-                        'toolName': self.tool_name,
-                        'toolGroupId': tool_group_id
-                    }
-                })
+                self.report('bridges.tools.command_failed', {
+                    'command': command_string,
+                    'exit_code': str(process.returncode),
+                    'execution_time': f'{execution_time}ms'
+                }, tool_group_id)
                 raise Exception(f"Command failed with exit code {process.returncode}: {output_buffer}")
 
         except Exception as e:
-            leon.answer({
-                'key': 'bridges.tools.command_error',
-                'data': {
-                    'command': command_string,
-                    'error': str(e)
-                },
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name,
-                    'toolGroupId': tool_group_id
-                }
-            })
+            self.report('bridges.tools.command_error', {
+                'command': command_string,
+                'error': str(e)
+            }, tool_group_id)
             raise
 
-    def get_binary_path(self, binary_name: str) -> str:
+    def get_binary_path(self, binary_name: str, skip_binary_download: bool = False) -> str:
         """Get binary path and ensure it's downloaded"""
         from urllib.parse import urlparse
+
+        # For built-in commands like bash, just return the binary name
+        if skip_binary_download:
+            return binary_name
 
         # Get tool name without "Tool" suffix for config lookup
         tool_config_name = self.tool_name.lower().replace('tool', '')
         config = ToolkitConfig.load(self.toolkit, tool_config_name)
         binary_url = ToolkitConfig.get_binary_url(config)
 
-        leon.answer({
-            'key': 'bridges.tools.checking_binary',
-            'data': {
-                'binary_name': binary_name
-            },
-            'core': {
-                'isToolOutput': True,
-                'toolkitName': self.toolkit,
-                'toolName': self.tool_name
-            }
+        self.report('bridges.tools.checking_binary', {
+            'binary_name': binary_name
         })
-
         if not binary_url:
-            leon.answer({
-                'key': 'bridges.tools.no_binary_url',
-                'data': {
-                    'binary_name': binary_name
-                },
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name
-                }
+            self.report('bridges.tools.no_binary_url', {
+                'binary_name': binary_name
             })
             raise Exception(f"No download URL found for binary '{binary_name}'")
 
@@ -320,16 +236,8 @@ class BaseTool(ABC):
 
         # Ensure toolkit bins directory exists
         if not os.path.exists(bins_path):
-            leon.answer({
-                'key': 'bridges.tools.creating_bins_directory',
-                'data': {
-                    'toolkit': self.toolkit
-                },
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name
-                }
+            self.report('bridges.tools.creating_bins_directory', {
+                'toolkit': self.toolkit
             })
             os.makedirs(bins_path, exist_ok=True)
 
@@ -342,29 +250,13 @@ class BaseTool(ABC):
         # Force chmod again in case it has been downloaded but somehow failed
         # so it could not chmod correctly earlier
         if not is_windows():
-            leon.answer({
-                'key': 'bridges.tools.applying_permissions',
-                'data': {
-                    'binary_name': binary_name
-                },
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name
-                }
+            self.report('bridges.tools.applying_permissions', {
+                'binary_name': binary_name
             })
             os.chmod(binary_path, 0o755)
 
-        leon.answer({
-            'key': 'bridges.tools.binary_ready',
-            'data': {
-                'binary_name': binary_name
-            },
-            'core': {
-                'isToolOutput': True,
-                'toolkitName': self.toolkit,
-                'toolName': self.tool_name
-            }
+        self.report('bridges.tools.binary_ready', {
+            'binary_name': binary_name
         })
 
         return binary_path
@@ -376,74 +268,34 @@ class BaseTool(ABC):
             bins_path = os.path.join(TOOLKITS_PATH, self.toolkit, 'bins')
             binary_path = os.path.join(bins_path, executable)
 
-            leon.answer({
-                'key': 'bridges.tools.binary_not_found',
-                'data': {
-                    'binary_name': binary_name
-                },
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name
-                }
+            self.report('bridges.tools.binary_not_found', {
+                'binary_name': binary_name
             })
 
             self._download_binary(binary_url, binary_path)
 
-            leon.answer({
-                'key': 'bridges.tools.binary_downloaded',
-                'data': {
-                    'binary_name': binary_name
-                },
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name
-                }
+            self.report('bridges.tools.binary_downloaded', {
+                'binary_name': binary_name
             })
 
             # Make binary executable (Unix systems)
             if not is_windows():
-                leon.answer({
-                    'key': 'bridges.tools.making_executable',
-                    'data': {
-                        'binary_name': binary_name
-                    },
-                    'core': {
-                        'isToolOutput': True,
-                        'toolkitName': self.toolkit,
-                        'toolName': self.tool_name
-                    }
+                self.report('bridges.tools.making_executable', {
+                    'binary_name': binary_name
                 })
                 os.chmod(binary_path, 0o755)
 
             # Remove quarantine attribute on macOS to prevent Gatekeeper blocking
             if is_macos():
-                leon.answer({
-                    'key': 'bridges.tools.removing_quarantine',
-                    'data': {
-                        'binary_name': binary_name
-                    },
-                    'core': {
-                        'isToolOutput': True,
-                        'toolkitName': self.toolkit,
-                        'toolName': self.tool_name
-                    }
+                self.report('bridges.tools.removing_quarantine', {
+                    'binary_name': binary_name
                 })
                 self._remove_quarantine_attribute(binary_path)
 
         except Exception as e:
-            leon.answer({
-                'key': 'bridges.tools.download_failed',
-                'data': {
-                    'binary_name': binary_name,
-                    'error': str(e)
-                },
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name
-                }
+            self.report('bridges.tools.download_failed', {
+                'binary_name': binary_name,
+                'error': str(e)
             })
             raise Exception(f"Failed to download binary '{binary_name}': {str(e)}")
 
@@ -455,71 +307,55 @@ class BaseTool(ABC):
             result = subprocess.run(['xattr', '-d', 'com.apple.quarantine', file_path],
                                     capture_output=True, check=False)
             if result.returncode == 0:
-                leon.answer({
-                    'key': 'bridges.tools.quarantine_removed',
-                    'data': {
-                        'file_name': os.path.basename(file_path)
-                    },
-                    'core': {
-                        'isToolOutput': True,
-                        'toolkitName': self.toolkit,
-                        'toolName': self.tool_name
-                    }
+                self.report('bridges.tools.quarantine_removed', {
+                    'file_name': os.path.basename(file_path)
                 })
             else:
-                leon.answer({
-                    'key': 'bridges.tools.quarantine_warning',
-                    'data': {
-                        'file_name': os.path.basename(file_path),
-                        'exit_code': str(result.returncode)
-                    },
-                    'core': {
-                        'isToolOutput': True,
-                        'toolkitName': self.toolkit,
-                        'toolName': self.tool_name
-                    }
+                self.report('bridges.tools.quarantine_warning', {
+                    'file_name': os.path.basename(file_path),
+                    'exit_code': str(result.returncode)
                 })
         except Exception as e:
             # Don't fail the entire process if quarantine removal fails
-            leon.answer({
-                'key': 'bridges.tools.quarantine_exception',
-                'data': {
-                    'file_name': os.path.basename(file_path),
-                    'error': str(e)
-                },
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name
-                }
+            self.report('bridges.tools.quarantine_exception', {
+                'file_name': os.path.basename(file_path),
+                'error': str(e)
             })
 
     def _download_binary(self, url: str, output_path: str) -> None:
         """Download binary from URL using urllib (matches Python urllib pattern)"""
 
         try:
-            leon.answer({
-                'key': 'bridges.tools.downloading_from_url',
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name
-                }
-            })
-
+            self.report('bridges.tools.downloading_from_url', {})
             with urllib.request.urlopen(url) as response:
                 with open(output_path, 'wb') as f:
                     f.write(response.read())
         except Exception as e:
-            leon.answer({
-                'key': 'bridges.tools.download_url_failed',
-                'data': {
-                    'error': str(e)
-                },
-                'core': {
-                    'isToolOutput': True,
-                    'toolkitName': self.toolkit,
-                    'toolName': self.tool_name
-                }
+            self.report('bridges.tools.download_url_failed', {
+                'error': str(e)
             })
             raise Exception(f"Failed to download binary: {str(e)}")
+
+    def report(self, key: str, data: Optional[Dict[str, Any]] = None, tool_group_id: Optional[str] = None) -> None:
+        """
+        Report tool status or information using leon.answer with automatic toolkit/tool context
+        
+        Args:
+            key: The message key for leon.answer
+            data: Optional data dictionary
+            tool_group_id: Optional tool group ID for command grouping
+        """
+        core_data = {
+            'isToolOutput': True,
+            'toolkitName': self.toolkit,
+            'toolName': self.tool_name
+        }
+
+        if tool_group_id:
+            core_data['toolGroupId'] = tool_group_id
+
+        leon.answer({
+            'key': key,
+            'data': data or {},
+            'core': core_data
+        })

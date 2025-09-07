@@ -12,7 +12,8 @@ options = {
             'requests',
             'timeit',
             'dataclasses',
-            'abc'
+            'abc',
+            'platform'
         ],
         'include_files': [(requests.certs.where(), 'cacert.pem')]
     }
