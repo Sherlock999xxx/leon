@@ -223,6 +223,72 @@
       "Command {{ command }} exceeded timeout of {{ timeout }}.",
       "Process timed out after {{ timeout }}: {{ command }}.",
       "Command execution timeout ({{ timeout }}): {{ command }}."
+    ],
+    "bridges.tools.checking_resource": [
+      "Checking for {{ resource_name }} resource...",
+      "Looking for {{ resource_name }} resource files...",
+      "Verifying {{ resource_name }} resource exists...",
+      "Searching for {{ resource_name }} resource in toolkit...",
+      "Ensuring {{ resource_name }} resource is available...",
+      "Validating {{ resource_name }} resource presence..."
+    ],
+    "bridges.tools.no_resource_urls": [
+      "No download URLs found for {{ resource_name }} resource.",
+      "I couldn't find download links for the {{ resource_name }} resource.",
+      "The download URLs for {{ resource_name }} resource are missing.",
+      "I'm unable to locate the download URLs for {{ resource_name }} resource.",
+      "Download URLs not available for {{ resource_name }} resource.",
+      "Sorry, I don't have the download URLs for the {{ resource_name }} resource."
+    ],
+    "bridges.tools.creating_resource_directory": [
+      "Creating resource directory for {{ resource_name }} at {{ resource_path }}...",
+      "Setting up resource storage for {{ resource_name }}.",
+      "Initializing {{ resource_name }} resource directory.",
+      "Creating resource directory structure for {{ resource_name }}.",
+      "Preparing resource storage location at {{ resource_path }}."
+    ],
+    "bridges.tools.resource_already_exists": [
+      "{{ resource_name }} resource already exists at {{ resource_path }}.",
+      "The {{ resource_name }} resource is already available at {{ resource_path }}.",
+      "Resource {{ resource_name }} found at {{ resource_path }}.",
+      "{{ resource_name }} resource is already downloaded at {{ resource_path }}.",
+      "Using existing {{ resource_name }} resource from {{ resource_path }}."
+    ],
+    "bridges.tools.downloading_resource": [
+      "Downloading {{ resource_name }} resource...",
+      "Fetching {{ resource_name }} resource files...",
+      "Retrieving {{ resource_name }} resource data...",
+      "Getting {{ resource_name }} resource from server...",
+      "Downloading {{ resource_name }} resource, this may take a moment..."
+    ],
+    "bridges.tools.downloading_resource_file": [
+      "Downloading {{ file_name }} for {{ resource_name }} from {{ url }}...",
+      "Fetching {{ file_name }} file for {{ resource_name }}...",
+      "Getting {{ file_name }} from {{ url }}...",
+      "Downloading resource file {{ file_name }}...",
+      "Retrieving {{ file_name }} for {{ resource_name }} resource..."
+    ],
+    "bridges.tools.resource_file_downloaded": [
+      "Downloaded {{ file_name }} for {{ resource_name }} to {{ file_path }}.",
+      "Successfully downloaded {{ file_name }} for {{ resource_name }}.",
+      "{{ file_name }} downloaded for {{ resource_name }} resource.",
+      "Resource file {{ file_name }} saved to {{ file_path }}.",
+      "Completed download of {{ file_name }} for {{ resource_name }}."
+    ],
+    "bridges.tools.resource_file_download_failed": [
+      "Failed to download {{ file_name }} for {{ resource_name }} from {{ url }}: {{ error }}.",
+      "Download error for {{ file_name }} ({{ resource_name }}): {{ error }}.",
+      "Could not download {{ file_name }} for {{ resource_name }}: {{ error }}.",
+      "{{ file_name }} download failed for {{ resource_name }}: {{ error }}.",
+      "Error downloading {{ file_name }} from {{ url }}: {{ error }}."
+    ],
+    "bridges.tools.resource_downloaded": [
+      "{{ resource_name }} resource downloaded successfully to {{ resource_path }}.",
+      "The {{ resource_name }} resource has been downloaded and is ready at {{ resource_path }}.",
+      "Successfully downloaded {{ resource_name }} resource.",
+      "{{ resource_name }} resource is now available at {{ resource_path }}.",
+      "Download complete for {{ resource_name }} resource.",
+      "The {{ resource_name }} resource files have been successfully downloaded."
     ]
   }
 }

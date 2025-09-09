@@ -6,7 +6,7 @@ import axios from 'axios'
 
 import { TOOLKITS_PATH } from '@bridge/constants'
 import { ToolkitConfig } from '@sdk/toolkit-config'
-import { isWindows, isMacOS } from '@sdk/utils'
+import { isWindows, isMacOS, setHuggingFaceURL } from '@sdk/utils'
 import { leon } from '@sdk/leon'
 
 // Progress callback type for reporting tool progress
@@ -390,6 +390,134 @@ export abstract class Tool {
     })
 
     return binaryPath
+  }
+
+  /**
+   * Get resource path and ensure all resource files are downloaded
+   * @param resourceName The name of the resource as defined in toolkit.json
+   * @returns A promise that resolves to the path of the resource directory
+   */
+  async getResourcePath(resourceName: string): Promise<string> {
+    // Get tool name without "Tool" suffix for config lookup
+    const toolConfigName = this.toolName.toLowerCase().replace('tool', '')
+    const config = ToolkitConfig.load(this.toolkit, toolConfigName)
+    const resourceUrls = config.resources?.[resourceName]
+
+    await this.report('bridges.tools.checking_resource', {
+      resource_name: resourceName
+    })
+
+    if (
+      !resourceUrls ||
+      !Array.isArray(resourceUrls) ||
+      resourceUrls.length === 0
+    ) {
+      await this.report('bridges.tools.no_resource_urls', {
+        resource_name: resourceName
+      })
+      throw new Error(`No download URLs found for resource '${resourceName}'`)
+    }
+
+    const resourcePath = path.join(
+      TOOLKITS_PATH,
+      this.toolkit,
+      'bins',
+      resourceName
+    )
+
+    // Ensure toolkit bins directory exists
+    if (!fs.existsSync(resourcePath)) {
+      await this.report('bridges.tools.creating_resource_directory', {
+        resource_name: resourceName,
+        resource_path: resourcePath
+      })
+      fs.mkdirSync(resourcePath, { recursive: true })
+    }
+
+    // Check if all resource files exist and are complete
+    if (this.isResourceComplete(resourcePath, resourceUrls)) {
+      await this.report('bridges.tools.resource_already_exists', {
+        resource_name: resourceName,
+        resource_path: resourcePath
+      })
+      return resourcePath
+    }
+
+    await this.report('bridges.tools.downloading_resource', {
+      resource_name: resourceName
+    })
+
+    // Download each resource file
+    for (const resourceUrl of resourceUrls) {
+      const adjustedUrl = await setHuggingFaceURL(resourceUrl)
+
+      // Extract filename from URL
+      const urlPath = new URL(adjustedUrl).pathname
+      const fileName = path.basename(urlPath).split('?')[0] // Remove query parameters
+      const filePath = path.join(resourcePath, fileName)
+
+      await this.report('bridges.tools.downloading_resource_file', {
+        resource_name: resourceName,
+        file_name: fileName,
+        url: adjustedUrl
+      })
+
+      try {
+        const response = await axios.get(adjustedUrl, {
+          responseType: 'arraybuffer',
+          timeout: 30_000 // 30 second timeout per file
+        })
+
+        fs.writeFileSync(filePath, response.data)
+
+        await this.report('bridges.tools.resource_file_downloaded', {
+          resource_name: resourceName,
+          file_name: fileName,
+          file_path: filePath
+        })
+      } catch (error) {
+        await this.report('bridges.tools.resource_file_download_failed', {
+          resource_name: resourceName,
+          file_name: fileName,
+          url: adjustedUrl,
+          error: (error as Error).message
+        })
+        throw new Error(
+          `Failed to download resource file ${fileName}: ${
+            (error as Error).message
+          }`
+        )
+      }
+    }
+
+    await this.report('bridges.tools.resource_downloaded', {
+      resource_name: resourceName,
+      resource_path: resourcePath
+    })
+
+    return resourcePath
+  }
+
+  /**
+   * Check if all resource files exist and are not empty
+   * @param resourcePath Path to the resource directory
+   * @param resourceUrls Array of resource URLs to check against
+   * @returns True if all files exist and are not empty, false otherwise
+   */
+  private isResourceComplete(
+    resourcePath: string,
+    resourceUrls: string[]
+  ): boolean {
+    for (const resourceUrl of resourceUrls) {
+      const urlPath = new URL(resourceUrl).pathname
+      const fileName = path.basename(urlPath).split('?')[0] // Remove query parameters
+      const filePath = path.join(resourcePath, fileName)
+
+      if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+        return false
+      }
+    }
+    return true
   }
 
   /**

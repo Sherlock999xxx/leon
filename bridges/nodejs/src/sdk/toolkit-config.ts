@@ -6,6 +6,7 @@ import { getPlatformName } from '@sdk/utils'
 interface ToolConfig {
   description: string
   binaries?: Record<string, string>
+  resources?: Record<string, string[]>
 }
 
 interface ToolkitConfigData {

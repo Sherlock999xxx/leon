@@ -6,7 +6,7 @@ from typing import Callable, Dict, Optional, Union, List, Any
 from urllib.parse import urlparse
 from .toolkit_config import ToolkitConfig
 from .leon import leon
-from .utils import is_windows, is_macos
+from .utils import is_windows, is_macos, set_hugging_face_url
 from ..constants import TOOLKITS_PATH
 import subprocess
 import time
@@ -286,6 +286,116 @@ class BaseTool(ABC):
         })
 
         return binary_path
+
+    def get_resource_path(self, resource_name: str) -> str:
+        """
+        Get resource path and ensure all resource files are downloaded
+
+        Args:
+            resource_name: The name of the resource as defined in toolkit.json
+
+        Returns:
+            The path to the resource directory
+        """
+        from urllib.parse import urlparse
+
+        # Get tool name without "Tool" suffix for config lookup
+        tool_config_name = self.tool_name.lower().replace('tool', '')
+        config = ToolkitConfig.load(self.toolkit, tool_config_name)
+        resource_urls = config.get('resources', {}).get(resource_name)
+
+        self.report('bridges.tools.checking_resource', {
+            'resource_name': resource_name
+        })
+
+        if not resource_urls or not isinstance(resource_urls, list) or len(resource_urls) == 0:
+            self.report('bridges.tools.no_resource_urls', {
+                'resource_name': resource_name
+            })
+            raise Exception(f"No download URLs found for resource '{resource_name}'")
+
+        resource_path = os.path.join(TOOLKITS_PATH, self.toolkit, 'bins', resource_name)
+
+        # Ensure resource directory exists
+        if not os.path.exists(resource_path):
+            self.report('bridges.tools.creating_resource_directory', {
+                'resource_name': resource_name,
+                'resource_path': resource_path
+            })
+            os.makedirs(resource_path, exist_ok=True)
+
+        # Check if all resource files exist and are complete
+        if self._is_resource_complete(resource_path, resource_urls):
+            self.report('bridges.tools.resource_already_exists', {
+                'resource_name': resource_name,
+                'resource_path': resource_path
+            })
+            return resource_path
+
+        self.report('bridges.tools.downloading_resource', {
+            'resource_name': resource_name
+        })
+
+        # Download each resource file
+        for resource_url in resource_urls:
+            adjusted_url = set_hugging_face_url(resource_url)
+
+            # Extract filename from URL
+            parsed_url = urlparse(adjusted_url)
+            file_name = os.path.basename(parsed_url.path).split('?')[0]  # Remove query parameters
+            file_path = os.path.join(resource_path, file_name)
+
+            self.report('bridges.tools.downloading_resource_file', {
+                'resource_name': resource_name,
+                'file_name': file_name,
+                'url': adjusted_url
+            })
+
+            try:
+                urllib.request.urlretrieve(adjusted_url, file_path)
+
+                self.report('bridges.tools.resource_file_downloaded', {
+                    'resource_name': resource_name,
+                    'file_name': file_name,
+                    'file_path': file_path
+                })
+            except Exception as e:
+                self.report('bridges.tools.resource_file_download_failed', {
+                    'resource_name': resource_name,
+                    'file_name': file_name,
+                    'url': adjusted_url,
+                    'error': str(e)
+                })
+                raise Exception(f"Failed to download resource file {file_name}: {str(e)}")
+
+        self.report('bridges.tools.resource_downloaded', {
+            'resource_name': resource_name,
+            'resource_path': resource_path
+        })
+
+        return resource_path
+
+    def _is_resource_complete(self, resource_path: str, resource_urls: list) -> bool:
+        """
+        Check if all resource files exist and are not empty
+
+        Args:
+            resource_path: Path to the resource directory
+            resource_urls: List of resource URLs to check against
+
+        Returns:
+            True if all files exist and are not empty, False otherwise
+        """
+        from urllib.parse import urlparse
+
+        for resource_url in resource_urls:
+            parsed_url = urlparse(resource_url)
+            file_name = os.path.basename(parsed_url.path).split('?')[0]  # Remove query parameters
+            file_path = os.path.join(resource_path, file_name)
+
+            if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+                return False
+        return True
 
     def _download_binary_on_demand(self, binary_name: str, binary_url: str, executable: str) -> None:
         """Download binary on-demand if not found"""

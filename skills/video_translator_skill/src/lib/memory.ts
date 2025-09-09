@@ -6,6 +6,8 @@ export interface VideoTranslatorMemory {
   quality?: string
   audioPath?: string
   audioFormat?: string
+  transcriptionPath?: string
+  modelSize?: string
   createdAt: number
 }
 
@@ -49,6 +51,27 @@ export async function updateAudioInfo(
     ...currentMemory,
     audioPath,
     audioFormat
+  }
+
+  await VIDEO_TRANSLATOR_MEMORY.write(updatedMemory)
+
+  return updatedMemory
+}
+
+export async function updateTranscriptionInfo(
+  transcriptionPath: string,
+  modelSize: string
+): Promise<VideoTranslatorMemory | null> {
+  const currentMemory = await VIDEO_TRANSLATOR_MEMORY.read()
+
+  if (!currentMemory) {
+    return null
+  }
+
+  const updatedMemory: VideoTranslatorMemory = {
+    ...currentMemory,
+    transcriptionPath,
+    modelSize
   }
 
   await VIDEO_TRANSLATOR_MEMORY.write(updatedMemory)

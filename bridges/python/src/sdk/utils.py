@@ -1,5 +1,50 @@
 import platform
 from typing import List
+import urllib.request
+import urllib.error
+
+HUGGING_FACE_URL = 'https://huggingface.co'
+HUGGING_FACE_MIRROR_URL = 'https://hf-mirror.com'
+
+
+def can_access_hugging_face() -> bool:
+    """Check if the current network can access Hugging Face
+    
+    Returns:
+        True if Hugging Face is accessible, False otherwise
+        
+    Example:
+        can_access_hugging_face() # returns True if accessible
+    """
+    try:
+        req = urllib.request.Request(HUGGING_FACE_URL, method='HEAD')
+        with urllib.request.urlopen(req, timeout=5) as response:
+            return response.status == 200
+    except (urllib.error.URLError, urllib.error.HTTPError, Exception):
+        return False
+
+
+def set_hugging_face_url(url: str) -> str:
+    """Set the Hugging Face URL based on the network access
+    
+    Args:
+        url: The URL to set
+        
+    Returns:
+        The original URL if accessible, or the mirror URL if not accessible
+        
+    Example:
+        set_hugging_face_url('https://huggingface.co') # returns 'https://hf-mirror.com' if not accessible
+    """
+    if 'huggingface.co' not in url:
+        return url
+
+    can_access = can_access_hugging_face()
+
+    if not can_access:
+        return url.replace(HUGGING_FACE_URL, HUGGING_FACE_MIRROR_URL)
+
+    return url
 
 
 def format_file_path(file_path: str) -> str:

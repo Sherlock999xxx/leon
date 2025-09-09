@@ -1,3 +1,25 @@
 {
-  "name": "Music & Audio"
+  "name": "Music & Audio",
+  "description": "Tools for music and audio processing.",
+  "tools": {
+    "faster_whisper": {
+      "description": "",
+      "binaries": {
+        "linux-x86_64": "https://github.com/leon-ai/leon-binaries/releases/download/faster-whisper_1.0.0/faster-whisper_1.0.0-linux-x86_64",
+        "linux-aarch64": "https://github.com/leon-ai/leon-binaries/releases/download/faster-whisper_1.0.0/faster-whisper_1.0.0-linux-aarch64",
+        "macosx-x86_64": "https://github.com/leon-ai/leon-binaries/releases/download/faster-whisper_1.0.0/faster-whisper_1.0.0-macosx-x86_64",
+        "macosx-arm64": "https://github.com/leon-ai/leon-binaries/releases/download/faster-whisper_1.0.0/faster-whisper_1.0.0-macosx-arm64",
+        "win-amd64": "https://github.com/leon-ai/leon-binaries/releases/download/faster-whisper_1.0.0/faster-whisper_1.0.0-win-amd64.exe"
+      },
+      "resources": {
+        "faster-whisper-large-v3": [
+          "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/main/config.json?download=true",
+          "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/main/model.bin?download=true",
+          "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/main/preprocessor_config.json?download=true",
+          "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/main/tokenizer.json?download=true",
+          "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/main/vocabulary.json?download=true"
+        ]
+      }
+    }
+  }
 }

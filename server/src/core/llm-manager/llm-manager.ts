@@ -383,8 +383,17 @@ export default class LLMManager {
          *    - [ok] Implement special UI for tools report (command outputs, etc.)
          *    - [ok] Create bash tool -> execute_command (+ shell skill that can run commands on the host based on remote LLM)
          *    - Create whisper_faster -> transcribe
+         *      - [ok] Auto download Whisper model (into toolkits/music_audio/bins/faster-whisper-large-v3/) before executing binary
+         *        - Multilang: https://huggingface.co/Systran/faster-whisper-large-v3
+         *        - English only: https://huggingface.co/Systran/faster-distil-whisper-large-v3
+         *      - [ok] In base-tool, implement a function "getResources" similar to getBinaryPath() to download resources (e.g. Whisper model)
+         *      - [ok] Fix base-tool.ts TSLint errors
+         *      - [ok] Auto download whisper_faster binary from leon-binaries repo
+         *      - Create GitHub action to compile binaries cross platforms
          *    - Create pyannote tool -> diarize
+         *    - Create openai_audio (then openai_image, openai_video, etc.) tool (openai provides many APIs, hence, we can have a tool for each toolkit) -> transcribe; translate; synthesize, etc.
          *    - Create gladia tool -> transcribe; diarize
+         *    - Rename VideoTranslator by "VideoDubbing"?
          *    - Can create one skill per action we already use in previous skills (VideoDownloader, AudioExtractor, etc.) with only one action per skill. And reuse the widgets somehow from the VideoTranslator skill
          *    - E.g. Summarize the keypoints of this video... (yt-dlp download subtitles, llm gemini 2.5 pro summarize): Create openrouter, localllm tools (use HTTP to request core, hence need to implement openrouter in core) -> prompt (for general purpose)
          *    - Create elevenlabs tool -> synthesize; transcribe; clone; diarize

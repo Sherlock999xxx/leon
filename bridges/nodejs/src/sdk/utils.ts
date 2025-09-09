@@ -1,4 +1,9 @@
-import os from 'node:os'
+import { platform, arch, cpus } from 'node:os'
+
+import axios from 'axios'
+
+const HUGGING_FACE_URL = 'https://huggingface.co'
+const HUGGING_FACE_MIRROR_URL = 'https://hf-mirror.com'
 
 /**
  * Formats a file path as a clickable path with proper delimiters
@@ -30,10 +35,10 @@ export function formatFilePaths(filePaths: string[]): string {
  * Returns same format as BinaryFolderNames enum from system-helper.ts
  */
 export function getPlatformName(): string {
-  const platform = os.platform()
-  const cpuArchitecture = os.arch()
+  const platformName = platform()
+  const cpuArchitecture = arch()
 
-  if (platform === 'linux') {
+  if (platformName === 'linux') {
     if (cpuArchitecture === 'x64') {
       return 'linux-x86_64'
     }
@@ -41,8 +46,8 @@ export function getPlatformName(): string {
     return 'linux-aarch64'
   }
 
-  if (platform === 'darwin') {
-    const cpuCores = os.cpus()
+  if (platformName === 'darwin') {
+    const cpuCores = cpus()
     const isM1 = cpuCores[0]?.model.includes('Apple')
 
     if (isM1 || cpuArchitecture === 'arm64') {
@@ -52,7 +57,7 @@ export function getPlatformName(): string {
     return 'macosx-x86_64'
   }
 
-  if (platform === 'win32') {
+  if (platformName === 'win32') {
     return 'win-amd64'
   }
 
@@ -84,4 +89,37 @@ export function isMacOS(): boolean {
  */
 export function isLinux(): boolean {
   return getPlatformName().startsWith('linux')
+}
+
+/**
+ * Check if the current network can access Hugging Face
+ * @example canAccessHuggingFace() // true
+ */
+export async function canAccessHuggingFace(): Promise<boolean> {
+  try {
+    await axios.head(HUGGING_FACE_URL, { timeout: 5000 })
+    return true
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (e) {
+    return false
+  }
+}
+
+/**
+ * Set the Hugging Face URL based on the network access
+ * @param url The URL to set
+ * @example setHuggingFaceURL('https://huggingface.co') // https://hf-mirror.com
+ */
+export async function setHuggingFaceURL(url: string): Promise<string> {
+  if (!url.includes('huggingface.co')) {
+    return url
+  }
+
+  const canAccess = await canAccessHuggingFace()
+
+  if (!canAccess) {
+    return url.replace(HUGGING_FACE_URL, HUGGING_FACE_MIRROR_URL)
+  }
+
+  return url
 }

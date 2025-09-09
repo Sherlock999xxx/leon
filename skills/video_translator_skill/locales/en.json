@@ -72,6 +72,44 @@
           "There was a problem extracting audio from {{ video_path }}: {{ error }}"
         ]
       }
+    },
+    "transcribe_audio": {
+      "missing_param_follow_ups": {
+        "audio_path": [
+          "Please provide the path to the audio file you want to transcribe.",
+          "What audio file would you like me to transcribe?"
+        ],
+        "target_language": [
+          "What language are you transcribing for?",
+          "Please specify the target language for translation (e.g., Chinese, Spanish, French)."
+        ]
+      },
+      "answers": {
+        "no_audio_info": [
+          "❌ No audio information found in memory. Please extract audio first using the 'extract_audio' action.",
+          "I couldn't find any audio to process. Please extract audio first before transcription."
+        ],
+        "audio_file_not_found": [
+          "❌ I couldn't find the audio file at {{ audio_path }}. Please check the file path.",
+          "The specified audio file doesn't exist or is not accessible."
+        ],
+        "transcription_started": [
+          "🎤 Transcribing audio from {{ audio_path }} ({{ audio_size }}) using {{ model_size }} model for {{ target_language }} translation...",
+          "Starting audio transcription using {{ model_size }} model for {{ target_language }} translation processing..."
+        ],
+        "transcription_completed": [
+          "✅ Audio transcribed successfully into: {{ folder_path }}! Output: {{ transcription_size }} text file ready for {{ target_language }} translation.",
+          "Transcription complete and saved in {{ folder_path }}! The text file ({{ transcription_size }}) is ready for {{ target_language }}."
+        ],
+        "transcription_failed": [
+          "❌ Failed to transcribe audio from {{ audio_path }}. Error: {{ error }}",
+          "Sorry, I couldn't transcribe the audio. Please check if the audio file is valid."
+        ],
+        "transcription_error": [
+          "❌ An error occurred during audio transcription: {{ error }}.",
+          "There was a problem transcribing audio from {{ audio_path }}: {{ error }}."
+        ]
+      }
     }
   },
   "common_answers": {
