@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn, execSync } from 'node:child_process'
 
-import axios from 'axios'
+import { downloadFile } from 'ipull'
 
 import { TOOLKITS_PATH } from '@bridge/constants'
 import { ToolkitConfig } from '@sdk/toolkit-config'
@@ -279,7 +279,7 @@ export abstract class Tool {
             'bridges.tools.command_failed',
             {
               command: commandString,
-              exit_code: code?.toString() || 'unknown',
+              exit_code: code?.toString() ?? 'unknown',
               execution_time: `${executionTime}ms`
             },
             toolGroupId
@@ -431,6 +431,7 @@ export abstract class Tool {
         resource_name: resourceName,
         resource_path: resourcePath
       })
+
       fs.mkdirSync(resourcePath, { recursive: true })
     }
 
@@ -440,6 +441,7 @@ export abstract class Tool {
         resource_name: resourceName,
         resource_path: resourcePath
       })
+
       return resourcePath
     }
 
@@ -454,6 +456,12 @@ export abstract class Tool {
       // Extract filename from URL
       const urlPath = new URL(adjustedUrl).pathname
       const fileName = path.basename(urlPath).split('?')[0] // Remove query parameters
+
+      // Ensure fileName is not empty
+      if (!fileName) {
+        throw new Error(`Invalid filename extracted from URL: ${adjustedUrl}`)
+      }
+
       const filePath = path.join(resourcePath, fileName)
 
       await this.report('bridges.tools.downloading_resource_file', {
@@ -463,20 +471,15 @@ export abstract class Tool {
       })
 
       try {
-        const response = await axios.get(adjustedUrl, {
-          responseType: 'arraybuffer',
-          timeout: 30_000 // 30 second timeout per file
+        const engine = await downloadFile({
+          url: adjustedUrl,
+          savePath: filePath,
+          cliProgress: false,
+          parallelStreams: 3,
+          skipExisting: false
         })
 
-        // Ensure the directory exists before writing
-        const fileDir = path.dirname(filePath)
-        if (!fs.existsSync(fileDir)) {
-          fs.mkdirSync(fileDir, { recursive: true })
-        }
-
-        // Convert ArrayBuffer to Buffer for Node.js writeFileSync
-        const buffer = Buffer.from(response.data)
-        fs.writeFileSync(filePath, buffer)
+        await engine.download()
 
         await this.report('bridges.tools.resource_file_downloaded', {
           resource_name: resourceName,
@@ -519,6 +522,12 @@ export abstract class Tool {
     for (const resourceUrl of resourceUrls) {
       const urlPath = new URL(resourceUrl).pathname
       const fileName = path.basename(urlPath).split('?')[0] // Remove query parameters
+
+      // Skip if fileName is empty
+      if (!fileName) {
+        return false
+      }
+
       const filePath = path.join(resourcePath, fileName)
 
       if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
@@ -574,22 +583,20 @@ export abstract class Tool {
   }
 
   /**
-   * Download binary from URL using axios (matches Python urllib pattern)
+   * Download binary from URL using ipull (faster parallel downloader)
    */
   private async downloadBinary(url: string, outputPath: string): Promise<void> {
     try {
       await this.report('bridges.tools.downloading_from_url')
-      const response = await axios.get(url, { responseType: 'arraybuffer' })
 
-      // Ensure the directory exists before writing
-      const fileDir = path.dirname(outputPath)
-      if (!fs.existsSync(fileDir)) {
-        fs.mkdirSync(fileDir, { recursive: true })
-      }
+      // Download the file directly to the output path using ipull
+      const engine = await downloadFile({
+        url: url,
+        savePath: outputPath
+      })
 
-      // Convert ArrayBuffer to Buffer for Node.js writeFileSync
-      const buffer = Buffer.from(response.data)
-      fs.writeFileSync(outputPath, buffer)
+      // Actually start the download
+      await engine.download()
     } catch (error) {
       await this.report('bridges.tools.download_url_failed', {
         error: (error as Error).message
@@ -621,7 +628,7 @@ export abstract class Tool {
             // Don't fail the entire process if quarantine removal fails
             await this.report('bridges.tools.quarantine_warning', {
               file_name: path.basename(filePath),
-              exit_code: code?.toString() ?? 'unknown'
+              exit_code: (code ?? 'unknown').toString()
             })
           }
 

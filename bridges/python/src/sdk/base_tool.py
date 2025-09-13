@@ -1,8 +1,8 @@
 import os
-import urllib.request
 import re
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Optional, Union, List, Any
+from pypdl import Pypdl
 from urllib.parse import urlparse
 from .toolkit_config import ToolkitConfig
 from .leon import leon
@@ -357,8 +357,9 @@ class BaseTool(ABC):
                 if not os.path.exists(file_dir):
                     os.makedirs(file_dir, exist_ok=True)
 
-                # Use urllib to download the file properly
-                urllib.request.urlretrieve(adjusted_url, file_path)
+                # Use pypdl to download the file properly
+                dl = Pypdl()
+                dl.start(url=adjusted_url, file_path=file_path, display=False)
 
                 # Verify the file was downloaded correctly
                 if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
@@ -469,7 +470,7 @@ class BaseTool(ABC):
             })
 
     def _download_binary(self, url: str, output_path: str) -> None:
-        """Download binary from URL using urllib (matches Python urllib pattern)"""
+        """Download binary from URL using pypdl (faster parallel downloader)"""
 
         try:
             self.report('bridges.tools.downloading_from_url', {})
@@ -479,8 +480,9 @@ class BaseTool(ABC):
             if not os.path.exists(file_dir):
                 os.makedirs(file_dir, exist_ok=True)
 
-            # Use urllib to download the file
-            urllib.request.urlretrieve(url, output_path)
+            # Use pypdl to download the file
+            dl = Pypdl()
+            dl.start(url=url, file_path=output_path, display=True)
 
             # Verify the file was downloaded correctly
             if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:

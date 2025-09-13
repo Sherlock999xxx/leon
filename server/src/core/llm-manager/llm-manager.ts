@@ -390,13 +390,21 @@ export default class LLMManager {
          *      - [ok] Fix base-tool.ts TSLint errors
          *      - [ok] Auto download whisper_faster binary from leon-binaries repo
          *      - [ok] Run my GitHub workflow via the GitHub action UI. Create GitHub action to compile binaries cross platforms (see how to use GitHub Action CLI directly)
+         *      - [ok] Remove pipfile package from faster_whisper in leon-binaries
          *      - Try whisper_faster end to end -> see if when download model.bin it still returns error
-         *    - Create pyannote tool -> diarize
+         *      - [ok] Remove TODOs from run_faster_whisper.py in leon-binaries
+         *      - In base-tool.ts: should be able to add cliProgress: true without it reports errors. Hence, for log, I think we need to wrap logs so the brain will not think it is an error
+         *      - Same for base_tool.py with dl.start and display=True
+         *      - Clean up logs/report and overall skill flow to make it simpler and more understandable
+         *      - Add option to download subtitles instead of doing transcription (create youtube tool, etc.)
+         *    - Create pyannote tool -> diarize -> create action to merge diarization with transcription (already done in PoC)
+         *    - Create indextts2 tool for voice dubbing/cloning https://index-tts.github.io/index-tts2.github.io/
          *    - Create openai_audio (then openai_image, openai_video, etc.) tool (openai provides many APIs, hence, we can have a tool for each toolkit) -> transcribe; translate; synthesize, etc.
          *    - Create gladia tool -> transcribe; diarize
          *    - Rename VideoTranslator by "VideoDubbing"?
          *    - Can create one skill per action we already use in previous skills (VideoDownloader, AudioExtractor, etc.) with only one action per skill. And reuse the widgets somehow from the VideoTranslator skill
          *    - E.g. Summarize the keypoints of this video... (yt-dlp download subtitles, llm gemini 2.5 pro summarize): Create openrouter, localllm tools (use HTTP to request core, hence need to implement openrouter in core) -> prompt (for general purpose)
+         *    - Summarize video -> then auto trim/cut video based on the summary (use ffmpeg to cut the video); need to get the timestamps from the summary
          *    - Create elevenlabs tool -> synthesize; transcribe; clone; diarize
          *    - Rule: a tool cannot call another tool, otherwise this becomes a skill action
          *    - Create Transcriber skill (allow provider selection from settings (asr; diarization))
