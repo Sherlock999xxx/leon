@@ -18,10 +18,16 @@ interface NetworkRequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
   /** Data to be sent as the request body. */
-  data?: Record<string, unknown>
+  data?: unknown
 
   /** Custom headers to be sent. */
   headers?: Record<string, string>
+
+  /** Optional files for multipart/form-data requests (parity with Python SDK). */
+  files?: Record<string, unknown>
+
+  /** Whether to send JSON body (true by default). If false, send form data. */
+  useJson?: boolean
 }
 
 interface NetworkResponse<ResponseData> {
@@ -68,7 +74,8 @@ export class Network {
       const response = await this.axios.request<string>({
         url: options.url,
         method: options.method.toLowerCase(),
-        data: options.data,
+        // For parity, we accept any data type here (including FormData)
+        data: options.data as never,
         transformResponse: (data) => {
           return data
         },

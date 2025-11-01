@@ -10,9 +10,10 @@ class NLUResultSentiment(TypedDict):
 
 class Context(TypedDict):
     utterances: list[str]
-    action_arguments: Dict[str, Any]
+    action_arguments: list[Dict[str, Any]]
     entities: list[Any]
     sentiments: list[NLUResultSentiment]
+    data: Dict[str, Any]
 
 
 class SkillConfig(TypedDict):

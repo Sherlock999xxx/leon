@@ -149,7 +149,7 @@ Follow these rules exactly:
     }
 
     for (const actionName of flow) {
-      if (!actions[actionName]) {
+      if (!actionName.includes(':') && !actions[actionName]) {
         LogHelper.error(
           `Action "${actionName}" in the flow is not found. Please verify the skill configuration`
         )

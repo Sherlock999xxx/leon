@@ -59,45 +59,47 @@ export default class FfmpegTool extends Tool {
    */
   async extractAudio(videoPath: string, audioPath: string): Promise<string> {
     try {
-      // Determine output format and codec based on file extension
-      const audioExtension = audioPath.split('.').pop()?.toLowerCase()
-      let audioCodec = 'mp3'
-      let audioBitrate = '192k'
-
-      switch (audioExtension) {
-        case 'mp3':
-          audioCodec = 'mp3'
-          break
-        case 'aac':
-          audioCodec = 'aac'
-          break
-        case 'wav':
-          audioCodec = 'pcm_s16le'
-          audioBitrate = '' // WAV doesn't need bitrate
-          break
-        case 'flac':
-          audioCodec = 'flac'
-          audioBitrate = '' // FLAC is lossless
-          break
-        default:
-          audioCodec = 'mp3' // Default to MP3
-      }
-
-      // Build ffmpeg arguments
-      const args = ['-i', videoPath, '-vn', '-acodec', audioCodec]
-
-      // Add bitrate for lossy formats
-      if (audioBitrate) {
-        args.push('-ab', audioBitrate)
-      }
-
-      // Add output path
-      args.push(audioPath)
+      // Keep it simple: do not force codec/bitrate. Let ffmpeg choose defaults based on extension.
+      // Add -progress to emit periodic key=value lines we can log as progress.
+      const args = [
+        '-y',
+        '-i',
+        videoPath,
+        '-vn',
+        // Progress to stderr so we can parse without interfering with stdout JSON
+        '-progress',
+        'pipe:2',
+        audioPath
+      ]
 
       await this.executeCommand({
         binaryName: 'ffmpeg',
         args,
-        options: { sync: true }
+        options: { sync: false },
+        onOutput: (data: string, isError?: boolean) => {
+          // Parse ffmpeg -progress key=value lines from stderr
+          if (!isError) return
+          const lines = data.split('\n')
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed || !trimmed.includes('=')) continue
+            const [key, value] = trimmed.split('=')
+            if (!key || value === undefined) continue
+
+            // Log some useful progress keys
+            if (key === 'progress') {
+              this.log(`ffmpeg progress: ${value}`)
+            } else if (key === 'out_time_ms') {
+              const ms = parseInt(value, 10)
+              if (!Number.isNaN(ms)) {
+                const seconds = Math.floor(ms / 1_000_000)
+                this.log(`processed_time_seconds=${seconds}`)
+              }
+            } else if (key === 'speed') {
+              this.log(`speed=${value}`)
+            }
+          }
+        }
       })
 
       return audioPath

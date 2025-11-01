@@ -66,6 +66,7 @@ export interface ActionParams {
     action_arguments: Record<string, unknown>[]
     entities: NEREntity[]
     sentiments: NLUProcessResult['context']['sentiments']
+    data: Record<string, unknown>
   }
   skill_config: {
     name: string
@@ -118,6 +119,7 @@ export interface IntentObject {
     action_arguments: NLUProcessResult['context']['actionArguments']
     entities: NLUProcessResult['context']['entities']
     sentiments: NLUProcessResult['context']['sentiments']
+    data: NLUProcessResult['context']['data']
   }
   extra_context: {
     lang: ShortLanguageCode
@@ -137,6 +139,8 @@ export interface SkillAnswerCoreData {
   toolkitName?: string
   toolName?: string
   toolGroupId?: string
+  // Simple context data pushed by skills (merged into NLU context.data)
+  context_data?: Record<string, unknown>
 }
 export interface SkillAnswerOutput extends IntentObject {
   output: {

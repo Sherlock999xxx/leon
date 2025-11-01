@@ -20,6 +20,9 @@
           "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/main/vocabulary.json?download=true"
         ]
       }
+    },
+    "openai_audio": {
+      "description": "A tool for audio processing using OpenAI's API."
     }
   }
 }

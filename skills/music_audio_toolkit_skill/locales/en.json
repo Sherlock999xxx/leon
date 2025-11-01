@@ -1,0 +1,14 @@
+{
+  "actions": {
+    "transcribe_audio": {
+      "answers": {
+        "transcription_started": "Transcription started for {{ audio_path }} using {{ provider }}.",
+        "transcription_completed": "Transcription completed. File saved at {{ transcription_path }}.",
+        "audio_not_found": "I couldn't find the given audio file to transcribe.",
+        "provider_not_supported": "The configured transcription provider is not supported.",
+        "missing_api_key": "Your OpenAI API key is not set. Please add it in this skill's settings.",
+        "transcription_error": "An error occurred while transcribing the audio: {{ error }}"
+      }
+    }
+  }
+}

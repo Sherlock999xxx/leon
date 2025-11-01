@@ -7,37 +7,32 @@ import { ParamsHelper } from '@sdk/params-helper'
 import FfmpegTool from '@sdk/tools/ffmpeg-tool'
 import { formatFilePath } from '@sdk/utils'
 
-import { getVideoInfo, updateAudioInfo } from '../lib/memory'
-
 export const run: ActionFunction = async function (
   _params: ActionParams,
   paramsHelper: ParamsHelper
 ) {
-  let videoPath = paramsHelper.getActionArgument('video_path') as string
-  let targetLanguage = paramsHelper.getActionArgument(
-    'target_language'
-  ) as string
+  // Priority: explicit argument -> context_data
+  const videoPath =
+    (paramsHelper.getActionArgument('video_path') as string) ||
+    paramsHelper.getContextData<string>('video_path')
+  const targetLanguage =
+    (paramsHelper.getActionArgument('target_language') as string) ||
+    paramsHelper.getContextData<string>('target_language')
   const audioFormat =
     (paramsHelper.getActionArgument('audio_format') as string) || 'mp3'
 
   try {
     // If video_path is not provided as argument, try to get it from memory
+    // If still no video path, cannot proceed
     if (!videoPath) {
-      const videoInfo = await getVideoInfo()
-
-      if (!videoInfo) {
-        leon.answer({
-          key: 'no_video_info',
-          data: {
-            error:
-              'No video information found in memory. Please download a video first.'
-          }
-        })
-        return
-      }
-
-      videoPath = videoInfo.videoPath
-      targetLanguage = targetLanguage || videoInfo.targetLanguage
+      leon.answer({
+        key: 'no_video_info',
+        data: {
+          error:
+            'No video information found. Provide a video_path or run the download step first.'
+        }
+      })
+      return
     }
 
     // Initialize ffmpeg tool
@@ -59,14 +54,17 @@ export const run: ActionFunction = async function (
     const videoStats = await fs.promises.stat(videoPath)
     const videoSizeMB = Math.round(videoStats.size / (1024 * 1024))
 
+    const extractionStartedData: Record<string, string> = {
+      video_path: formatFilePath(path.basename(videoPath)),
+      audio_format: audioFormat,
+      video_size: `${videoSizeMB} MB`
+    }
+    if (targetLanguage) {
+      extractionStartedData.target_language = targetLanguage
+    }
     leon.answer({
       key: 'extraction_started',
-      data: {
-        video_path: formatFilePath(path.basename(videoPath)),
-        target_language: targetLanguage,
-        audio_format: audioFormat,
-        video_size: `${videoSizeMB} MB`
-      }
+      data: extractionStartedData
     })
 
     // Create output path for audio file
@@ -96,18 +94,24 @@ export const run: ActionFunction = async function (
     const audioStats = await fs.promises.stat(extractedAudioPath)
     const audioSizeMB = Math.round(audioStats.size / (1_024 * 1_024))
 
-    // Update memory with audio information
-    await updateAudioInfo(extractedAudioPath, audioFormat)
-
+    const extractionCompletedData: Record<string, string> = {
+      video_path: path.basename(videoPath),
+      audio_path: formatFilePath(extractedAudioPath),
+      folder_path: formatFilePath(path.dirname(extractedAudioPath)),
+      audio_size: `${audioSizeMB} MB`,
+      audio_format: audioFormat
+    }
+    if (targetLanguage) {
+      extractionCompletedData.target_language = targetLanguage
+    }
     leon.answer({
       key: 'extraction_completed',
-      data: {
-        video_path: path.basename(videoPath),
-        audio_path: formatFilePath(extractedAudioPath),
-        folder_path: formatFilePath(path.dirname(extractedAudioPath)),
-        audio_size: `${audioSizeMB} MB`,
-        target_language: targetLanguage,
-        audio_format: audioFormat
+      data: extractionCompletedData,
+      core: {
+        context_data: {
+          audio_path: extractedAudioPath,
+          audio_format: audioFormat
+        }
       }
     })
   } catch (error) {

@@ -111,4 +111,12 @@ export class ParamsHelper {
       (entity) => entity.entity === entityName
     )
   }
+
+  /**
+   * Get a value stored in the generic context data store
+   * @param key The key to retrieve
+   */
+  getContextData<T = unknown>(key: string): T | undefined {
+    return this.params.context.data?.[key] as T | undefined
+  }
 }

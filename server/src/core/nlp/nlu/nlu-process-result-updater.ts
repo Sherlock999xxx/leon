@@ -37,7 +37,8 @@ export const DEFAULT_NLU_PROCESS_RESULT: NLUProcessResult = {
     utterances: [],
     actionArguments: [],
     entities: [],
-    sentiments: []
+    sentiments: [],
+    data: {}
   }
 }
 
@@ -166,9 +167,10 @@ export class NLUProcessResultUpdater {
               utterances: [NLU.nluProcessResult.new.utterance],
               // Action arguments aren't processed yet at this stage, hence empty
               actionArguments: [],
-              // actionArguments: [NLU.nluProcessResult.new.actionArguments],
               entities: NLU.nluProcessResult.new.entities,
-              sentiments: [NLU.nluProcessResult.new.sentiment]
+              sentiments: [NLU.nluProcessResult.new.sentiment],
+              // Preserve context data when switching skills/contexts
+              data: NLU.nluProcessResult.context.data
             },
             ...skillNameDepProperties
           }

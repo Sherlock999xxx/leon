@@ -120,3 +120,12 @@ class ParamsHelper:
         context_entities = self._params.get('context', {}).get('entities', [])
 
         return [entity for entity in context_entities if entity.get('entity') == entity_name]
+
+    def get_context_data(self, key: str) -> Optional[Any]:
+        """
+        Get a value stored in the generic context data store
+
+        :param key: The key to retrieve
+        """
+
+        return self._params.get('context', {}).get('data', {}).get(key)

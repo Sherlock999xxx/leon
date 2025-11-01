@@ -9,7 +9,11 @@
     "email": "louis@getleon.ai",
     "url": "https://twitter.com/grenlouis"
   },
-  "flow": ["download_video", "extract_audio", "transcribe_audio"],
+  "flow": [
+    "download_video",
+    "extract_audio",
+    "music_audio_toolkit_skill:transcribe_audio"
+  ],
   "actions": {
     "download_video": {
       "type": "logic",
@@ -34,10 +38,6 @@
     "extract_audio": {
       "type": "logic",
       "description": "Extract audio from a downloaded video file for translation processing."
-    },
-    "transcribe_audio": {
-      "type": "logic",
-      "description": "Transcribe audio to text using faster-whisper for translation purposes."
     }
   }
 }

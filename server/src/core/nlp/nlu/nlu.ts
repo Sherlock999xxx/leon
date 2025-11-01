@@ -371,6 +371,18 @@ export default class NLU {
     return null
   }
 
+  /**
+   * Compute required parameters for an action by excluding optional_parameters
+   */
+  private getRequiredParamsForAction(
+    actionConfig: NLUProcessResult['actionConfig']
+  ): string[] {
+    const allParams = Object.keys(actionConfig?.parameters || {})
+    const optionalParams: string[] = (actionConfig?.optional_parameters ||
+      []) as string[]
+    return allParams.filter((p) => !optionalParams.includes(p))
+  }
+
   private async jumpToNextAction(
     nextAction: SkillAnswerCoreData['next_action']
   ): Promise<void> {
@@ -390,17 +402,45 @@ export default class NLU {
         )
 
         if (skillName && actionName) {
+          const previousSkillName = this._nluProcessResult.skillName
+
           // Update the NLU context to the new skill and action
           await NLUProcessResultUpdater.update({ skillName })
           await NLUProcessResultUpdater.update({ actionName })
 
-          // Immediately trigger the new action
-          await this.handleActionSuccess({
-            status: ActionCallingStatus.Success,
-            name: actionName,
-            // TODO: allow skill developers to pass arguments when jumping to another action
-            arguments: {} // Start with empty arguments for the new action
-          })
+          const nextActionConfig = this._nluProcessResult.actionConfig
+          const requiredParams =
+            this.getRequiredParamsForAction(nextActionConfig)
+          const hasRequiredParams = requiredParams.length > 0
+
+          // If we changed skills, clean active state to avoid leaking params across skills
+          if (previousSkillName && previousSkillName !== skillName) {
+            this.conversation.cleanActiveState()
+            // Preserve starting utterance for the new pending action context
+            this.conversation.setActiveState({
+              startingUtterance: this._nluProcessResult.new
+                .utterance as NLPUtterance
+            })
+          }
+
+          if (!hasRequiredParams) {
+            // Immediately trigger the new action if it has no parameters
+            await this.handleActionSuccess({
+              status: ActionCallingStatus.Success,
+              name: actionName,
+              // TODO: allow skill developers to pass arguments when jumping to another action
+              arguments: {}
+            })
+          } else {
+            // Prepare pending state and ask for missing parameters
+            this.conversation.setActiveState({
+              pendingAction: `${skillName}:${actionName}`,
+              missingParameters: requiredParams,
+              collectedParameters: {}
+            })
+
+            await this.sendSuggestions()
+          }
 
           return
         }
@@ -461,6 +501,12 @@ export default class NLU {
         if (!isLastActionInFlow) {
           const nextActionName = flow[currentActionIndex + 1] as string
 
+          if (nextActionName.includes(':')) {
+            await this.jumpToNextAction(nextActionName)
+
+            return true
+          }
+
           await NLUProcessResultUpdater.update({
             actionName: nextActionName
           })
@@ -469,7 +515,8 @@ export default class NLU {
 
           this.conversation.setActiveState({
             pendingAction: `${this._nluProcessResult.skillName}:${nextActionName}`,
-            missingParameters: Object.keys(nextActionConfig?.parameters || []),
+            missingParameters:
+              this.getRequiredParamsForAction(nextActionConfig),
             collectedParameters: {}
           })
 
@@ -477,7 +524,7 @@ export default class NLU {
            * If the next action in the flow has no parameters, execute it immediately
            * without waiting for another user input. E.g., the "set_up" action
            */
-          if (Object.keys(nextActionConfig?.parameters || {}).length === 0) {
+          if (this.getRequiredParamsForAction(nextActionConfig).length === 0) {
             await this.handleActionSuccess({
               status: ActionCallingStatus.Success,
               name: nextActionName,
@@ -573,7 +620,7 @@ export default class NLU {
         ...this.conversation.activeState,
         pendingAction: `${this._nluProcessResult.skillName}:${currentActionName}`,
         // Repopulate missingParameters with ALL parameters for this action
-        missingParameters: Object.keys(currentActionConfig?.parameters || {}),
+        missingParameters: this.getRequiredParamsForAction(currentActionConfig),
         // Clear collected parameters for the new loop iteration
         collectedParameters: {}
       })

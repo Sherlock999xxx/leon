@@ -120,6 +120,11 @@ export interface NLUProcessResult {
     actionArguments: ActionCallingSuccessOutput['arguments'][]
     entities: NEREntity[]
     sentiments: NLUProcessSentiment[]
+    /**
+     * Generic key/value store for simple memory pushed from skill actions (e.g. audio_path, last_download_path, etc.)
+     * Updated via leon.answer({ core: { context_data: { key: value } } })
+     */
+    data: Record<string, unknown>
   }
 }
 // TODO: core rewrite delete?

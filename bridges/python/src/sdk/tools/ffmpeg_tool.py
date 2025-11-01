@@ -59,38 +59,41 @@ class FfmpegTool(BaseTool):
             The path to the extracted audio file.
         """
         try:
-            # Determine output format and codec based on file extension
-            audio_extension = audio_path.split('.')[-1].lower() if '.' in audio_path else 'mp3'
-            audio_codec = 'mp3'
-            audio_bitrate = '192k'
+            # Keep it simple: don't force codec/bitrate, let ffmpeg decide from extension.
+            # Use -progress pipe:2 to stream progress to stderr and log it.
+            args = [
+                '-y',
+                '-i', video_path,
+                '-vn',
+                '-progress', 'pipe:2',
+                audio_path
+            ]
 
-            if audio_extension == 'mp3':
-                audio_codec = 'mp3'
-            elif audio_extension == 'aac':
-                audio_codec = 'aac'
-            elif audio_extension == 'wav':
-                audio_codec = 'pcm_s16le'
-                audio_bitrate = ''  # WAV doesn't need bitrate
-            elif audio_extension == 'flac':
-                audio_codec = 'flac'
-                audio_bitrate = ''  # FLAC is lossless
-            else:
-                audio_codec = 'mp3'  # Default to MP3
-
-            # Build ffmpeg arguments
-            args = ['-i', video_path, '-vn', '-acodec', audio_codec]
-
-            # Add bitrate for lossy formats
-            if audio_bitrate:
-                args.extend(['-ab', audio_bitrate])
-
-            # Add output path
-            args.append(audio_path)
+            def on_output(data: str, is_error: bool = False) -> None:
+                if not is_error:
+                    return
+                for line in data.split('\n'):
+                    line = line.strip()
+                    if not line or '=' not in line:
+                        continue
+                    key, value = line.split('=', 1)
+                    if key == 'progress':
+                        self.log(f"ffmpeg progress: {value}")
+                    elif key == 'out_time_ms':
+                        try:
+                            ms = int(value)
+                            seconds = ms // 1_000_000
+                            self.log(f"processed_time_seconds={seconds}")
+                        except Exception:
+                            pass
+                    elif key == 'speed':
+                        self.log(f"speed={value}")
 
             self.execute_command(ExecuteCommandOptions(
                 binary_name='ffmpeg',
                 args=args,
-                options={'sync': True}
+                options={'sync': False},
+                on_output=on_output
             ))
 
             return audio_path

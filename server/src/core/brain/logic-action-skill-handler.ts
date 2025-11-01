@@ -14,7 +14,7 @@ import {
   PYTHON_BRIDGE_BIN_PATH,
   NODEJS_BRIDGE_BIN_PATH
 } from '@/constants'
-import { BRAIN, SOCKET_SERVER } from '@/core'
+import { BRAIN, SOCKET_SERVER, NLU } from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
 import { DateHelper } from '@/helpers/date-helper'
 
@@ -132,6 +132,14 @@ export class LogicActionSkillHandler {
       )
 
       return
+    }
+
+    // Always merge simple context data if provided
+    if (skillAnswer.output.core?.context_data) {
+      NLU.nluProcessResult.context.data = {
+        ...NLU.nluProcessResult.context.data,
+        ...skillAnswer.output.core.context_data
+      }
     }
 
     LogHelper.title(`${BRAIN.skillFriendlyName} skill (on data)`)
@@ -295,7 +303,8 @@ export class LogicActionSkillHandler {
         utterances: nluProcessResult.context.utterances,
         action_arguments: nluProcessResult.context.actionArguments,
         entities: nluProcessResult.context.entities,
-        sentiments: nluProcessResult.context.sentiments
+        sentiments: nluProcessResult.context.sentiments,
+        data: nluProcessResult.context.data
       },
       extra_context: {
         lang: BRAIN.lang,

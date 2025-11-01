@@ -396,7 +396,24 @@ export default class LLMManager {
          *      - [ok] In base-tool.ts: should be able to add cliProgress: true without it reports errors. Hence, for log, I think we need to wrap logs so the brain will not think it is an error
          *      - [ok] Same for base_tool.py with dl.start and display=True
          *      - [ok] In yt-dlp tool, add tips from my personal notes
+         *    - [ok] Be able to push data/args to context from skill actions. No need to use memory library SDK for simple memory. E.g. audio_path. Remove from music_audio transcribe_audio memory video translator, and use context instead
+         *    - [ok] Try by using OpenAI tool to transcribe_audio (settings.json)
+         *    - diarize function with OpenAI + create diarize JSON format to unify output across all diarization tool functions
+         *    - Replace camelCase props in SkillAnswerCoreData to snake_case
+         *    - Create "video_streaming_skill" and "music_audio_toolkit_skill", such common skills contain actions that can be reused by other skills
+         *    - Settings priority: 1. caller action (video_translator:*); 2. called action (music_audio:*)
+         *    - Create openai_audio tool -> transcribe; translate; synthesize, etc.
+         *    - In video_translator skill, can add this in flow: "transcriber:transcribe_audio" to execute an action from another skill; but need to config transcribe_audio within this skill need to find a way
+         *      VideoTranslator settings
+                 *  - transcribe action {
+                 *    tool: whisper_faster, gladia, elevenlabs, openai_audio
+                 *  }
          *    - Create pyannote tool -> diarize -> create action to merge diarization with transcription (already done in PoC)
+         *    - Tool to detect gender for each voice -> https://huggingface.co/JaesungHuh/voice-gender-classifier ; Need to detect gender for each speaker
+         *    - In utils SDKs, create formatFilename function to replace whitespaces in filenames with underscores (if a path is given, then make sure to only replace the filename and not the path). Then use this new utility in tools/actions that save files
+         *    - If action not found, try to find it in other skills (default settings to 3 tries). E.g. "Transcribe the audio from this file xxx"
+         *    - Cf. Discord private message about reported XSS
+         *    - Use kokoro tool -> synthesize -> Use ONNX? https://github.com/thewh1teagle/kokoro-onnx ; https://huggingface.co/hexgrad/Kokoro-82M ; can decide to clone voice with 11Labs
          *    - Create indextts2 tool for voice dubbing/cloning https://index-tts.github.io/index-tts2.github.io/
          *    - Create openai_audio (then openai_image, openai_video, etc.) tool (openai provides many APIs, hence, we can have a tool for each toolkit) -> transcribe; translate; synthesize, etc.
          *    - Create gladia tool -> transcribe; diarize
@@ -420,7 +437,7 @@ export default class LLMManager {
          *    - Cf. https://chatgpt.com/c/68b5c2c6-ec88-832f-aa44-3b7ada3171a3 -> For projects that aren't already compiled (Pyannote, WhisperX, etc.), need to compile them ourselves via GitHub Actions + Pyinstaller or cx_freeze. Keep compile setup files in /tool_bins/ folder. E.g. /tool_bins/whisperx/setup.py, /tool_bins/whisperx/whisperx, etc.
          *    - Tool settings OR use skill settings? (OpenRouter API key, etc.)
          * TODO NEXT: B. Then create a Skill Writer skill where Leon can write a skill > actions by himself based on examples and given owner query (e.g. to_do list, video translator, etc.) and current architecture. Leon can also write tools by himself. If a skill is not found, then we can fallback so Leon can suggest to develop a skill for the owner
-         * TODO NEXT: C. Create the autonomous mode where we give the tools directly to Leon (ReAct).
+         * TODO NEXT: C. Create the autonomous mode where we give the tools directly to Leon (ReAct). E.g. "Can you download the audiobook for Hunger Games 2 and Hunger Games 3?"
          * TODO: main goal with A, B, C:
          *  - A: we have a clear breakdown of the atomic structure: skills > actions > toolkits > tools > functions
          *  - B: Leon can write skills and tools by himself (useful when it is a common scenario and that it just needs to be executed and needs to be reliable)

@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/skill-schemas/skill.json",
+  "name": "Music Audio Toolkit",
+  "bridge": "nodejs",
+  "version": "1.0.0",
+  "description": "Toolkit skill providing common audio utilities such as audio transcription that can be reused by other skills.",
+  "author": {
+    "name": "Louis Grenard",
+    "email": "louis@getleon.ai",
+    "url": "https://twitter.com/grenlouis"
+  },
+  "actions": {
+    "transcribe_audio": {
+      "type": "logic",
+      "description": "Transcribe audio to text using the configured provider (e.g., faster_whisper, openai_audio).",
+      "parameters": {
+        "audio_path": {
+          "type": "string",
+          "description": "Path to the audio file to transcribe (optional when called from other skills that manage audio context)."
+        }
+      },
+      "optional_parameters": ["audio_path"]
+    }
+  }
+}
