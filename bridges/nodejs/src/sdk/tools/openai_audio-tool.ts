@@ -67,6 +67,7 @@ export default class OpenAIAudioTool extends Tool {
     const form = new FormData()
     form.append('file', fs.createReadStream(inputPath))
     form.append('model', model)
+    form.append('chunking_strategy', 'auto')
     form.append('response_format', 'diarized_json')
 
     const network = new Network({ baseURL: 'https://api.openai.com' })

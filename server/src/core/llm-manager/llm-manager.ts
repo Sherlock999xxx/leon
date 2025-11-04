@@ -425,6 +425,7 @@ export default class LLMManager {
          *    - Create openai_audio (then openai_image, openai_video, etc.) tool (openai provides many APIs, hence, we can have a tool for each toolkit) -> transcribe; translate; synthesize, etc.
          *    - Create gladia tool -> transcribe; diarize
          *    - Rename VideoTranslator by "VideoDubbing"?
+         *    - Fix setup skill settings on install (cf. setup-skills.js)
          *    - Make VideoTranslator more appealing (download video widget must be prettier, etc.)
          *    - Can create one skill per action we already use in previous skills (VideoDownloader, AudioExtractor, etc.) with only one action per skill. And reuse the widgets somehow from the VideoTranslator skill
          *    - E.g. Summarize the keypoints of this video... (yt-dlp download subtitles, llm gemini 2.5 pro summarize): Create openrouter, localllm tools (use HTTP to request core, hence need to implement openrouter in core) -> prompt (for general purpose)

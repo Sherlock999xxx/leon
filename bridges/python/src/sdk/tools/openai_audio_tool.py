@@ -56,6 +56,7 @@ class OpenAIAudioTool(BaseTool):
             }
             data: dict = {
                 'model': model,
+                'chunking_strategy': 'auto',
                 'response_format': 'diarized_json'
             }
 
