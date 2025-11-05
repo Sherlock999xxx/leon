@@ -400,10 +400,10 @@ export default class LLMManager {
          *    - [ok] Try by using OpenAI tool to transcribe_audio (settings.json)
          *    - [ok] Create tool schemas to normalize tool function outputs across Leon
          *    - [ok] Create 11labs and openai tools for transcription
-         *    - Make use of the ElevenLabs dubbing API instead, much simpler!
+         *    - [ok] Make use of the ElevenLabs dubbing API instead, much simpler!
          *      - Dub API: https://elevenlabs.io/docs/api-reference/dubbing/create?explorer=true
          *      - Then get dubbed audio (progress + resource): https://elevenlabs.io/docs/api-reference/dubbing/audio/get?explorer=true
-         *    - Create new tool for LLM inference (openrouter?); use for new action in video translator skill to translate and merge segments before TTS
+         *    - Fix issue when doing cross skill execution. To debug: quickly return/mock video_translator_skill actions instead of going through the full flow
          *    - Download video > extract audio > transcribe + diarize > translate into target language > detect gender (later) > clone voice (later) > text to speech each segment > merge audio with video > upload video to target platform according to settings (later)
          *    - Replace camelCase props in SkillAnswerCoreData to snake_case
          *    - Create "video_streaming_toolkit_skill" (ffmpeg related stuff?) and "music_audio_toolkit_skill", such common skills contain actions that can be reused by other skills
