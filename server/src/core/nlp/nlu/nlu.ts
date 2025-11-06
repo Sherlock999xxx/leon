@@ -434,7 +434,7 @@ export default class NLU {
           } else {
             // Prepare pending state and ask for missing parameters
             this.conversation.setActiveState({
-              pendingAction: `${skillName}:${actionName}`,
+              pendingAction: `${this._nluProcessResult.skillName}:${actionName}`,
               missingParameters: requiredParams,
               collectedParameters: {}
             })
@@ -502,7 +502,35 @@ export default class NLU {
           const nextActionName = flow[currentActionIndex + 1] as string
 
           if (nextActionName.includes(':')) {
+            // This is a cross-skill action call
+            const [crossSkillName] = nextActionName.split(':')
+            const originalSkillName = this._nluProcessResult.skillName
+
             await this.jumpToNextAction(nextActionName)
+
+            // After cross-skill action completes, return to original skill and continue flow
+            if (crossSkillName !== originalSkillName) {
+              // Continue with the remaining actions in the flow (after the cross-skill call)
+              const remainingFlow = flow.slice(currentActionIndex + 2)
+              const isRemainingFlowNotDone = remainingFlow.length > 0
+
+              if (isRemainingFlowNotDone) {
+                const nextOriginalAction = remainingFlow[0] as string
+
+                await NLUProcessResultUpdater.update({
+                  skillName: originalSkillName,
+                  actionName: nextOriginalAction
+                })
+
+                return await this.handleSkillFlow(remainingFlow)
+              }
+
+              // No more actions in flow, clean up
+              this.conversation.cleanActiveState()
+              await NLUProcessResultUpdater.update(DEFAULT_NLU_PROCESS_RESULT)
+
+              return false
+            }
 
             return true
           }

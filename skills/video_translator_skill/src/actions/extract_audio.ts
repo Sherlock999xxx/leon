@@ -59,9 +59,11 @@ export const run: ActionFunction = async function (
       audio_format: audioFormat,
       video_size: videoSizeMB
     }
+
     if (targetLanguage) {
       extractionStartedData['target_language'] = targetLanguage
     }
+
     leon.answer({
       key: 'extraction_started',
       data: extractionStartedData
@@ -101,9 +103,11 @@ export const run: ActionFunction = async function (
       audio_size: `${audioSizeMB} MB`,
       audio_format: audioFormat
     }
+
     if (targetLanguage) {
       extractionCompletedData['target_language'] = targetLanguage
     }
+
     leon.answer({
       key: 'extraction_completed',
       data: extractionCompletedData,

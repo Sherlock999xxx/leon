@@ -27,10 +27,10 @@ export const run: ActionFunction = async function (
     (paramsHelper.getActionArgument('target_language') as string) ||
     paramsHelper.getContextData<string>('target_language')
   const targetLanguageISOCode =
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
     paramsHelper
       .findAllEntitiesFromContext('language')[0]
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
       ?.option.slice(0, 2) || null
 
   try {
