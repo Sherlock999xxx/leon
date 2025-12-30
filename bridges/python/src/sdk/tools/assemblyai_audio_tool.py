@@ -188,7 +188,7 @@ class AssemblyAIAudioTool(BaseTool):
             audio_duration = raw_output.get('audio_duration', 0)
             segments.append({
                 'from': 0.0,
-                'to': float(audio_duration) / 1000.0 if audio_duration else 0.0,
+                'to': audio_duration if audio_duration else 0.0,
                 'text': raw_output.get('text', ''),
                 'speaker': None
             })
