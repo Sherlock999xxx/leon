@@ -32,7 +32,7 @@ class YtdlpTool(BaseTool):
         return [
             '--retries', '3',
             '--sleep-interval', '0.5',
-            '--max-sleep-interval', '1'
+            '--max-sleep-interval', '2'
         ]
 
     def download_video(self, video_url: str, output_path: str) -> str:

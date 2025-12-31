@@ -118,36 +118,35 @@ export const run: ActionFunction = async function (
         continue
       }
 
-      // Try to extract references as before
+      // Try to find a 10+ second segment first
       let reference1Segment = findBestSegment(speakerSegments, 10, null)
-      let reference2Segment = findBestSegment(
-        speakerSegments,
-        10,
-        reference1Segment
-      )
 
-      // If couldn't find, and wasn't already fallback, try with any for fallback
-      if ((!reference1Segment || !reference2Segment) && !fallback) {
+      // If couldn't find 10+ seconds, try fallback (all segments)
+      if (!reference1Segment && !fallback) {
         speakerSegments = transcription.segments.filter(
           (segment) => segment.speaker === speaker
         )
         reference1Segment = findBestSegment(speakerSegments, 10, null)
-        reference2Segment = findBestSegment(
-          speakerSegments,
-          10,
-          reference1Segment
-        )
       }
 
-      if (!reference1Segment || !reference2Segment) {
+      // If still can't find 10+ seconds, find the longest single segment
+      if (!reference1Segment) {
+        reference1Segment = findLongestSegment(speakerSegments)
+      }
+
+      if (!reference1Segment) {
         leon.answer({
           key: 'insufficient_audio',
           data: {
             speaker
           }
         })
+
         continue
       }
+
+      // Reuse the same segment for reference 2
+      const reference2Segment = reference1Segment
 
       // Create output paths for speaker references
       const reference1Path = path.join(
@@ -159,9 +158,12 @@ export const run: ActionFunction = async function (
         `speaker_${speaker}_reference_2.mp3`
       )
 
-      // Extract first reference (10 seconds)
+      // Extract first reference
       const ref1StartTime = formatTime(reference1Segment.start)
       const ref1EndTime = formatTime(reference1Segment.end)
+      const ref1Duration = (
+        reference1Segment.end - reference1Segment.start
+      ).toFixed(1)
 
       leon.answer({
         key: 'extracting_reference',
@@ -169,7 +171,7 @@ export const run: ActionFunction = async function (
           speaker,
           reference_number: '1',
           start_time: ref1StartTime,
-          duration: '10'
+          duration: ref1Duration
         }
       })
 
@@ -180,9 +182,12 @@ export const run: ActionFunction = async function (
         ref1EndTime
       )
 
-      // Extract second reference (10 seconds)
+      // Extract second reference
       const ref2StartTime = formatTime(reference2Segment.start)
       const ref2EndTime = formatTime(reference2Segment.end)
+      const ref2Duration = (
+        reference2Segment.end - reference2Segment.start
+      ).toFixed(1)
 
       leon.answer({
         key: 'extracting_reference',
@@ -190,7 +195,7 @@ export const run: ActionFunction = async function (
           speaker,
           reference_number: '2',
           start_time: ref2StartTime,
-          duration: '10'
+          duration: ref2Duration
         }
       })
 
@@ -305,4 +310,35 @@ function findBestSegment(
   }
 
   return null
+}
+
+/**
+ * Find the longest single segment from the available segments
+ */
+function findLongestSegment(
+  segments: Array<{ from: number; to: number }>
+): { start: number; end: number } | null {
+  if (segments.length === 0) {
+    return null
+  }
+
+  let longestSegment = segments[0]
+  let maxDuration = longestSegment.to - longestSegment.from
+
+  for (let i = 1; i < segments.length; i += 1) {
+    const segment = segments[i]
+    if (!segment) {
+      continue
+    }
+
+    const duration = segment.to - segment.from
+    if (duration > maxDuration) {
+      maxDuration = duration
+      longestSegment = segment
+    }
+  }
+
+  return longestSegment
+    ? { start: longestSegment.from, end: longestSegment.to }
+    : null
 }

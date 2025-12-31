@@ -41,7 +41,7 @@ export default class YtdlpTool extends Tool {
       '--sleep-interval',
       '0.5',
       '--max-sleep-interval',
-      '1'
+      '2'
     ]
   }
 
