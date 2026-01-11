@@ -24,6 +24,14 @@
         "dubbing_completed": "✅ Dubbing completed successfully! Dubbed file ({{ file_size }}) saved at {{ dubbed_path }} for language {{ target_language }}. Project ID: {{ dubbing_id }}",
         "dubbing_error": "❌ An error occurred during dubbing: {{ error }}"
       }
+    },
+    "split_instrumental_vocal": {
+      "answers": {
+        "vocal_separation_started": "Vocal separation started for {{ audio_path }} using Ultimate Vocal Remover ONNX.",
+        "vocal_separation_completed": "Vocal separation completed. Vocal path: {{ vocal_path }}. Instrumental path: {{ instrumental_path }}.",
+        "audio_not_found": "I couldn't find the given audio file to split.",
+        "vocal_separation_error": "An error occurred while splitting the audio: {{ error }}"
+      }
     }
   }
 }

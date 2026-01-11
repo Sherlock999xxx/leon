@@ -35,6 +35,17 @@
         }
       },
       "optional_parameters": ["audio_path", "target_language"]
+    },
+    "split_instrumental_vocal": {
+      "type": "logic",
+      "description": "Split audio into instrumental and vocal tracks using Ultimate Vocal Remover ONNX.",
+      "parameters": {
+        "audio_path": {
+          "type": "string",
+          "description": "Path to the audio file to split."
+        }
+      },
+      "optional_parameters": ["audio_path"]
     }
   }
 }

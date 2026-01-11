@@ -18,6 +18,9 @@ export const run: ActionFunction = async function (
   const dubbedAudioPath =
     (paramsHelper.getActionArgument('dubbed_audio_path') as string) ||
     paramsHelper.getContextData<string>('dubbed_audio_path')
+  const instrumentalPath =
+    (paramsHelper.getActionArgument('instrumental_path') as string) ||
+    paramsHelper.getContextData<string>('instrumental_path')
 
   // Extract target language from entity 'language' and format it
   const languageEntity = paramsHelper.findLastEntityFromContext('language')
@@ -78,17 +81,43 @@ export const run: ActionFunction = async function (
     // Initialize ffmpeg tool
     const ffmpegTool = new FfmpegTool()
 
+    let finalAudioPath = dubbedAudioPath
+
+    // If instrumental path is available, merge it with the dubbed audio
+    if (instrumentalPath && fs.existsSync(instrumentalPath)) {
+      const audioDir = path.dirname(dubbedAudioPath)
+      const audioName = path.parse(dubbedAudioPath).name
+      const mergedAudioPath = path.join(
+        audioDir,
+        `${audioName}_with_instrumental.wav`
+      )
+
+      leon.answer({
+        key: 'merging_with_instrumental'
+      })
+
+      await ffmpegTool.mergeAudio(
+        dubbedAudioPath,
+        instrumentalPath,
+        mergedAudioPath
+      )
+
+      if (fs.existsSync(mergedAudioPath)) {
+        finalAudioPath = mergedAudioPath
+      }
+    }
+
     // Get file info for user feedback
     const videoStats = await fs.promises.stat(videoPath)
     const videoSizeMB = formatBytes(videoStats.size)
-    const dubbedAudioStats = await fs.promises.stat(dubbedAudioPath)
-    const dubbedAudioSizeMB = formatBytes(dubbedAudioStats.size)
+    const finalAudioStats = await fs.promises.stat(finalAudioPath)
+    const finalAudioSizeMB = formatBytes(finalAudioStats.size)
 
     const mergeStartedData: Record<string, string> = {
       video_path: formatFilePath(path.basename(videoPath)),
-      dubbed_audio_path: formatFilePath(path.basename(dubbedAudioPath)),
+      dubbed_audio_path: formatFilePath(path.basename(finalAudioPath)),
       video_size: videoSizeMB,
-      audio_size: dubbedAudioSizeMB
+      audio_size: finalAudioSizeMB
     }
     if (targetLanguage) {
       mergeStartedData['target_language'] = targetLanguage
@@ -109,10 +138,10 @@ export const run: ActionFunction = async function (
       `${videoName}${languageSuffix}${videoExt}`
     )
 
-    // Replace the original audio with the dubbed audio
+    // Replace the original audio with the final audio (dubbed + instrumental)
     const outputVideoPath = await ffmpegTool.replaceVideoAudio(
       videoPath,
-      dubbedAudioPath,
+      finalAudioPath,
       mergedVideoPath
     )
 
@@ -137,7 +166,7 @@ export const run: ActionFunction = async function (
       folder_path: formatFilePath(path.dirname(outputVideoPath)),
       merged_size: mergedSizeMB,
       original_video: path.basename(videoPath),
-      dubbed_audio: path.basename(dubbedAudioPath)
+      dubbed_audio: path.basename(finalAudioPath)
     }
     if (targetLanguage) {
       mergeCompletedData['target_language'] = targetLanguage

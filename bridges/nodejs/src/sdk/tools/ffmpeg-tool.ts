@@ -382,6 +382,40 @@ export default class FfmpegTool extends Tool {
   }
 
   /**
+   * Merges two audio files into one.
+   * @param firstAudioPath The path to the first audio file.
+   * @param secondAudioPath The path to the second audio file.
+   * @param outputPath The desired file path for the merged audio.
+   * @returns A promise that resolves with the path to the merged audio file.
+   */
+  async mergeAudio(
+    firstAudioPath: string,
+    secondAudioPath: string,
+    outputPath: string
+  ): Promise<string> {
+    try {
+      await this.executeCommand({
+        binaryName: 'ffmpeg',
+        args: [
+          '-y',
+          '-i',
+          firstAudioPath,
+          '-i',
+          secondAudioPath,
+          '-filter_complex',
+          'amix=inputs=2:duration=longest:dropout_transition=0',
+          outputPath
+        ],
+        options: { sync: true }
+      })
+
+      return outputPath
+    } catch (error: unknown) {
+      throw new Error(`Audio merging failed: ${(error as Error).message}`)
+    }
+  }
+
+  /**
    * Assembles multiple audio segments into a single audio file with precise timing.
    * Each segment is placed at its exact timestamp with silence padding where needed.
    * Similar to pydub's overlay functionality but using FFmpeg.

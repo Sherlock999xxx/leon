@@ -12,6 +12,7 @@
   "flow": [
     "download_video",
     "extract_audio",
+    "music_audio_toolkit_skill:split_instrumental_vocal",
     "music_audio_toolkit_skill:transcribe_audio",
     "translate_transcription",
     "get_speakers_references",

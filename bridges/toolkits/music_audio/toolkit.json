@@ -70,6 +70,21 @@
           "https://huggingface.co/onnx-community/chatterbox-multilingual-ONNX/resolve/main/onnx/speech_encoder.onnx_data?download=true"
         ]
       }
+    },
+    "ultimate_vocal_remover_onnx": {
+      "description": "A tool for vocal separation using the Ultimate Vocal Remover ONNX model.",
+      "binaries": {
+        "linux-x86_64": "https://github.com/leon-ai/leon-binaries/releases/download/ultimate_vocal_remover_onnx-v1.0.0/ultimate_vocal_remover_onnx_1.0.0-linux-x86_64",
+        "linux-aarch64": "https://github.com/leon-ai/leon-binaries/releases/download/ultimate_vocal_remover_onnx-v1.0.0/ultimate_vocal_remover_onnx_1.0.0-linux-aarch64",
+        "macosx-x86_64": "https://github.com/leon-ai/leon-binaries/releases/download/ultimate_vocal_remover_onnx-v1.0.0/ultimate_vocal_remover_onnx_1.0.0-macosx-x86_64",
+        "macosx-arm64": "https://github.com/leon-ai/leon-binaries/releases/download/ultimate_vocal_remover_onnx-v1.0.0/ultimate_vocal_remover_onnx_1.0.0-macosx-arm64",
+        "win-amd64": "https://github.com/leon-ai/leon-binaries/releases/download/ultimate_vocal_remover_onnx-v1.0.0/ultimate_vocal_remover_onnx_1.0.0-win-amd64.exe"
+      },
+      "resources": {
+        "ultimate-vocal-remover-onnx": [
+          "https://huggingface.co/seanghay/uvr_models/resolve/main/UVR-MDX-NET-Inst_HQ_3.onnx?download=true"
+        ]
+      }
     }
   }
 }
