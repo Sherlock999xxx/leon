@@ -601,15 +601,246 @@ class OpenCodeTool(BaseTool):
         
         context += "## Required Schema References\n\n"
         
-        context += "### skill.json\n"
-        context += "```json\n"
-        context += "{\n"
+        context += "### skill.json - COMPLETE STRUCTURE (Based on schemas/skill-schemas/skill.json)\n\n"
+        context += "**CRITICAL**: Understanding skill.json structure is essential for creating skills correctly.\n\n"
+        
+        context += "## When to Use Flow vs Direct Actions\n\n"
+        context += "### Use Direct Actions (No Flow) When:\n"
+        context += "- **Single-step tasks**: Skill has only one action (e.g., \"generate podcast\")\n"
+        context += "- **Independent actions**: Each action is standalone, not part of a sequence\n"
+        context += "- **Simple skills**: No multi-step workflows needed\n\n"
+        
+        context += "### Use Flow When:\n"
+        context += "- **Multi-step workflows**: Actions must be executed in a specific sequence\n"
+        context += "- **Data passing**: One action's output is needed by the next action\n"
+        context += "- **Complex processes**: Like video translation (download → transcribe → translate → synthesize → merge)\n\n"
+        
+        context += "## skill.json Structure Examples\n\n"
+        
+        context += "### Example 1: Simple Skill (No Flow) - Single Action\n"
+        context += "Use this when the skill has only one action or independent actions:\n\n"
+        context += "```json\n{\n"
         context += '  "$schema": "../../schemas/skill-schemas/skill.json",\n'
-        context += '  "name": "Skill Name",\n'
+        context += '  "name": "Podcast Generator",\n'
         context += '  "bridge": "nodejs",\n'
-        context += "  // ... rest of configuration\n"
-        context += "}\n"
-        context += "```\n\n"
+        context += '  "version": "1.0.0",\n'
+        context += '  "description": "Generate podcast conversations on any topic.",\n'
+        context += '  "author": {\n'
+        context += '    "name": "Your Name",\n'
+        context += '    "email": "your.email@example.com"\n'
+        context += "  },\n"
+        context += '  "actions": {\n'
+        context += '    "generate": {\n'
+        context += '      "type": "logic",\n'
+        context += '      "description": "Generate a podcast conversation on any topic with customizable duration.",\n'
+        context += '      "parameters": {\n'
+        context += '        "topic": {\n'
+        context += '          "type": "string",\n'
+        context += '          "description": "The topic to discuss in the podcast."\n'
+        context += "        },\n"
+        context += '        "duration": {\n'
+        context += '          "type": "number",\n'
+        context += '          "description": "Duration in minutes (1-5)."\n'
+        context += "        }\n"
+        context += "      },\n"
+        context += '      "optional_parameters": ["duration"]\n'
+        context += "    }\n"
+        context += "  }\n"
+        context += "}\n```\n\n"
+        
+        context += "### Example 2: Complex Skill with Flow - Multi-Step Workflow\n"
+        context += "Use this when actions must execute in sequence and share data:\n\n"
+        context += "```json\n{\n"
+        context += '  "$schema": "../../schemas/skill-schemas/skill.json",\n'
+        context += '  "name": "Video Translator",\n'
+        context += '  "bridge": "nodejs",\n'
+        context += '  "version": "1.0.0",\n'
+        context += '  "description": "Translate and dub videos into different languages.",\n'
+        context += '  "author": {\n'
+        context += '    "name": "Your Name",\n'
+        context += '    "email": "your.email@example.com"\n'
+        context += "  },\n"
+        context += '  "flow": [\n'
+        context += '    "download_video",\n'
+        context += '    "extract_audio",\n'
+        context += '    "transcribe",\n'
+        context += '    "translate_transcription",\n'
+        context += '    "create_new_audio",\n'
+        context += '    "merge_audio"\n'
+        context += "  ],\n"
+        context += '  "actions": {\n'
+        context += '    "download_video": {\n'
+        context += '      "type": "logic",\n'
+        context += '      "description": "Download a video from a URL for translation processing.",\n'
+        context += '      "parameters": {\n'
+        context += '        "video_url": {\n'
+        context += '          "type": "string",\n'
+        context += '          "description": "The URL of the video to download (YouTube, Twitch, etc.)."\n'
+        context += "        },\n"
+        context += '        "target_language": {\n'
+        context += '          "type": "string",\n'
+        context += '          "description": "The target language for translation (e.g., Chinese, Spanish, French)."\n'
+        context += "        },\n"
+        context += '        "quality": {\n'
+        context += '          "type": "string",\n'
+        context += '          "enum": ["worst", "best", "720p", "1080p", "480p"],\n'
+        context += '          "description": "The video quality to download."\n'
+        context += "        }\n"
+        context += "      },\n"
+        context += '      "optional_parameters": ["quality"]\n'
+        context += "    },\n"
+        context += '    "extract_audio": {\n'
+        context += '      "type": "logic",\n'
+        context += '      "description": "Extract audio from a downloaded video file for translation processing."\n'
+        context += "    },\n"
+        context += '    "transcribe": {\n'
+        context += '      "type": "logic",\n'
+        context += '      "description": "Transcribe the extracted audio to text with speaker diarization."\n'
+        context += "    },\n"
+        context += '    "translate_transcription": {\n'
+        context += '      "type": "logic",\n'
+        context += '      "description": "Translate transcription from source to target language using LLM."\n'
+        context += "    },\n"
+        context += '    "create_new_audio": {\n'
+        context += '      "type": "logic",\n'
+        context += '      "description": "Generate dubbed audio using voice cloning and translated text."\n'
+        context += "    },\n"
+        context += '    "merge_audio": {\n'
+        context += '      "type": "logic",\n'
+        context += '      "description": "Replace original video audio with the dubbed audio."\n'
+        context += "    }\n"
+        context += "  },\n"
+        context += '  "action_notes": [\n'
+        context += '    "The flow automatically passes data between actions using context_data.",\n'
+        context += '    "Only the first action (download_video) receives direct user parameters."\n'
+        context += "  ]\n"
+        context += "}\n```\n\n"
+        
+        context += "## Key Differences\n\n"
+        context += "### Simple Skill (No Flow):\n"
+        context += "- Has only `\"actions\"` object\n"
+        context += "- Each action can be called independently by the LLM\n"
+        context += "- LLM matches user intent to action descriptions\n"
+        context += "- Actions don't depend on each other\n\n"
+        
+        context += "### Complex Skill (With Flow):\n"
+        context += "- Has `\"flow\"` array defining action execution order\n"
+        context += "- Only the FIRST action in the flow is exposed to the LLM\n"
+        context += "- Subsequent actions are triggered automatically in sequence\n"
+        context += "- Data passes between actions via `leon.answer({ 'core': { 'context_data': {...} } })`\n"
+        context += "- Can reference actions from other skills (e.g., `\"music_audio_toolkit_skill:transcribe_audio\"`)\n\n"
+        
+        context += "## Required Fields (Per Schema)\n\n"
+        context += "**Skill Level (Required):**\n"
+        context += "- `$schema`: \"../../schemas/skill-schemas/skill.json\"\n"
+        context += "- `name`: Skill name (string, min 1 char)\n"
+        context += "- `bridge`: \"nodejs\" or \"python\"\n"
+        context += "- `version`: Semver string (e.g., \"1.0.0\")\n"
+        context += "- `description`: What the skill does (string, min 1 char)\n"
+        context += "- `author`: Object with `name` (required), optional `email` and `url`\n"
+        context += "- `actions`: Object containing action definitions\n\n"
+        
+        context += "**Optional Skill Fields:**\n"
+        context += "- `flow`: Array of action names to execute in sequence\n"
+        context += "- `action_notes`: Array of strings for additional LLM context\n\n"
+        
+        context += "**Action Fields:**\n"
+        context += "- `type` (required): \"logic\" (runs code) or \"dialog\" (just responds)\n"
+        context += "- `description` (required): 16-128 chars, used by LLM to match user intent\n"
+        context += "- `parameters` (optional): Object defining expected inputs\n"
+        context += "- `optional_parameters` (optional): Array of parameter names that are optional\n"
+        context += "- `is_loop` (optional): Boolean for action loops\n\n"
+        
+        context += "## Parameter Definition Format\n\n"
+        context += "Parameters support various types:\n\n"
+        context += "```json\n"
+        context += '"parameters": {\n'
+        context += '  "param_name": {\n'
+        context += '    "type": "string",  // or "number"\n'
+        context += '    "description": "What this parameter represents (8-128 chars).",\n'
+        context += '    "enum": ["option1", "option2"]  // Optional: restrict to specific values\n'
+        context += "  },\n"
+        context += '  "complex_param": {\n'
+        context += '    "type": "object",\n'
+        context += '    "properties": {\n'
+        context += '      "nested_field": { "type": "string" }\n'
+        context += "    },\n"
+        context += '    "description": "Object with nested properties."\n'
+        context += "  }\n"
+        context += "}\n```\n\n"
+        
+        context += "## Decision Guide: Flow or No Flow?\n\n"
+        context += "Ask yourself:\n"
+        context += "1. **Does my skill have multiple actions that must run in sequence?**\n"
+        context += "   - YES → Use a `flow` array\n"
+        context += "   - NO → Use direct actions only\n\n"
+        context += "2. **Do my actions need to pass data to each other?**\n"
+        context += "   - YES → Use a `flow` with `context_data`\n"
+        context += "   - NO → Use direct actions\n\n"
+        context += "3. **Is there a clear step-by-step pipeline?**\n"
+        context += "   - YES → Use a `flow`\n"
+        context += "   - NO → Use direct actions\n\n"
+        
+        context += "## CRITICAL: Toolkit Skills - Reusable Actions Across Skills\n\n"
+        context += "**IMPORTANT**: Some skills are designed as **toolkit skills** - their actions can be reused by other skills!\n\n"
+        
+        context += "### What Are Toolkit Skills?\n\n"
+        context += "Toolkit skills are special skills whose primary purpose is to provide **reusable actions** that other skills can call.\n"
+        context += "They typically end with `_toolkit_skill` in their name.\n\n"
+        
+        context += "**Existing Toolkit Skills:**\n"
+        context += "- `music_audio_toolkit_skill`: Provides actions like `transcribe_audio`, `detect_language`, etc.\n"
+        context += "- `search_web_toolkit_skill`: Provides `search` action for web/X research\n"
+        context += "- More toolkit skills may exist in the skills directory\n\n"
+        
+        context += "### How to Use Toolkit Skills in Flows\n\n"
+        context += '**Format**: `"skill_name:action_name"`\n\n'
+        
+        context += "**Example: Using music_audio_toolkit_skill in a flow**\n"
+        context += '```json\n'
+        context += '{\n'
+        context += '  "flow": [\n'
+        context += '    "download_video",\n'
+        context += '    "extract_audio",\n'
+        context += '    "music_audio_toolkit_skill:transcribe_audio",\n'
+        context += '    "translate_transcription"\n'
+        context += '  ],\n'
+        context += '  "actions": {\n'
+        context += '    "download_video": { "type": "logic", "description": "..." },\n'
+        context += '    "extract_audio": { "type": "logic", "description": "..." },\n'
+        context += '    // No need to define transcribe_audio - it comes from the toolkit!\n'
+        context += '    "translate_transcription": { "type": "logic", "description": "..." }\n'
+        context += '  }\n'
+        context += '}\n'
+        context += '```\n\n'
+        
+        context += "### When to Use Toolkit Skills\n\n"
+        context += "**USE toolkit skill actions when:**\n"
+        context += "- ✅ The functionality already exists (transcription, search, etc.)\n"
+        context += "- ✅ You want consistent behavior across multiple skills\n"
+        context += "- ✅ You want to avoid code duplication\n\n"
+        
+        context += "**CREATE your own action when:**\n"
+        context += "- ✅ You need custom logic specific to your skill\n"
+        context += "- ✅ No toolkit skill provides the needed functionality\n\n"
+        
+        context += "### Finding Available Toolkit Actions\n\n"
+        context += "**IMPORTANT**: Before creating a skill, check existing toolkit skills:\n"
+        context += "1. Read `skills/*_toolkit_skill/skill.json` files\n"
+        context += "2. Check their README.md for usage examples\n"
+        context += "3. Look at their `actions` object for available actions\n\n"
+        
+        context += "## Best Practices\n\n"
+        context += "1. **Start simple**: If you only need one action, don't use a flow\n"
+        context += "2. **Check toolkit skills FIRST**: Don't reinvent the wheel - use existing toolkit actions\n"
+        context += "3. **Use flows for pipelines**: Video processing, translation, multi-step tasks\n"
+        context += "4. **Descriptive action descriptions**: LLM uses them to match user intent (16-128 chars)\n"
+        context += "5. **Descriptive action names**: Use verbs (download_video, transcribe, translate)\n"
+        context += "6. **First action gets parameters**: Only the first action in a flow receives user parameters\n"
+        context += "7. **Use context_data**: Pass data between flow actions via `leon.answer({ 'core': { 'context_data': {...} } })`\n"
+        context += "8. **Schema validation**: Always include `$schema` reference at the top\n"
+        context += '9. **Cross-skill format**: Use `"skill_name:action_name"` for toolkit actions in flows\n'
+        context += "10. **Read toolkit READMEs**: They contain usage examples and parameter requirements\n\n"
         
         context += "### locales/en.json - CRITICAL STRUCTURE\n"
         context += "**VERY IMPORTANT**: The locale file has a specific structure with top-level properties.\n"
@@ -743,6 +974,100 @@ class OpenCodeTool(BaseTool):
         context += "5. **Document in README**: Explain what each setting does\n"
         context += "6. **Validate in action**: Check if required settings exist before using them\n"
         context += "7. **Use empty object if no settings**: Don't skip the files, create `{}`\n\n"
+
+        # Add CRITICAL planning section
+        context += "# CRITICAL: Planning and Understanding Tools BEFORE Writing Code\n\n"
+        context += "**EXTREMELY IMPORTANT**: You MUST follow this workflow before writing ANY code:\n\n"
+        
+        context += "## Step 1: Identify Required Tools\n\n"
+        context += "Before writing code, analyze what tools you'll need:\n"
+        context += "1. **Review the available tools list above** - Check if tools already exist\n"
+        context += "2. **Match your needs to existing tools** - Don't duplicate functionality\n"
+        context += "3. **List the tools you plan to use** - Be specific (e.g., FfmpegTool, ChatterboxOnnxTool)\n\n"
+        
+        context += "## Step 2: Read and Understand Tool Implementations\n\n"
+        context += "**CRITICAL**: You MUST read the actual source code of tools before using them!\n\n"
+        file_ext = '.ts' if bridge == 'nodejs' else '.py'
+        bridge_path = 'nodejs' if bridge == 'nodejs' else 'python'
+        context += f"For EACH tool you plan to use:\n"
+        context += f"1. **Read the tool file** at `bridges/{bridge_path}/src/sdk/tools/{{tool-name}}-tool{file_ext}`\n"
+        context += "2. **Understand ALL available methods** - Don't assume, READ the code\n"
+        context += "3. **Check for batch/efficient operations** - Many tools support batch processing!\n"
+        context += "4. **Note the method signatures** - Parameter names, types, return values\n"
+        context += "5. **Look for special features** - Async operations, streaming, callbacks, etc.\n\n"
+        
+        context += "## Step 3: Plan for Efficiency\n\n"
+        context += "**CRITICAL EXAMPLES OF EFFICIENT PATTERNS:**\n\n"
+        
+        context += "### Example: ChatterboxOnnxTool - Batch Processing\n\n"
+        context += "❌ **WRONG** - Multiple separate calls (SLOW):\n"
+        if bridge == 'nodejs':
+            context += "```typescript\n"
+            context += "// DON'T DO THIS - Inefficient!\n"
+            context += "for (const segment of segments) {\n"
+            context += "  await chatterbox.synthesizeSpeechToFiles({\n"
+            context += "    text: segment.text,\n"
+            context += "    audio_path: segment.path\n"
+            context += "  })\n"
+            context += "}\n"
+            context += "```\n\n"
+            
+            context += "✅ **CORRECT** - Single batch call (FAST):\n"
+            context += "```typescript\n"
+            context += "// DO THIS - Read the tool to discover it accepts an array!\n"
+            context += "const tasks = segments.map(segment => ({\n"
+            context += "  text: segment.text,\n"
+            context += "  audio_path: segment.path,\n"
+            context += "  voice_name: segment.voice\n"
+            context += "}))\n\n"
+            context += "// Single call processes all segments efficiently\n"
+            context += "await chatterbox.synthesizeSpeechToFiles(tasks)\n"
+            context += "```\n\n"
+        else:
+            context += "```python\n"
+            context += "# DON'T DO THIS - Inefficient!\n"
+            context += "for segment in segments:\n"
+            context += "    chatterbox.synthesize_speech_to_files({\n"
+            context += "        'text': segment['text'],\n"
+            context += "        'audio_path': segment['path']\n"
+            context += "    })\n"
+            context += "```\n\n"
+            
+            context += "✅ **CORRECT** - Single batch call (FAST):\n"
+            context += "```python\n"
+            context += "# DO THIS - Read the tool to discover it accepts a list!\n"
+            context += "tasks = [{\n"
+            context += "    'text': segment['text'],\n"
+            context += "    'audio_path': segment['path'],\n"
+            context += "    'voice_name': segment['voice']\n"
+            context += "} for segment in segments]\n\n"
+            context += "# Single call processes all segments efficiently\n"
+            context += "chatterbox.synthesize_speech_to_files(tasks)\n"
+            context += "```\n\n"
+        
+        context += "### Why This Matters:\n\n"
+        context += "- **Performance**: Batch processing can be 10-100x faster\n"
+        context += "- **Resource efficiency**: Less overhead, better parallelization\n"
+        context += "- **Better UX**: User gets results much faster\n\n"
+        
+        context += "## Step 4: Plan Your Architecture\n\n"
+        context += "Now that you understand the tools, plan your code:\n"
+        context += "1. **Outline the workflow** - Step-by-step what needs to happen\n"
+        context += "2. **Identify batch opportunities** - Where can you group operations?\n"
+        context += "3. **Plan data structures** - What format does each tool expect?\n"
+        context += "4. **Consider error handling** - What if a tool call fails?\n"
+        context += "5. **Think about progress reporting** - Keep user informed\n\n"
+        
+        context += "## Step 5: Only THEN Write Code\n\n"
+        context += "After completing steps 1-4, you can write efficient, correct code.\n\n"
+        
+        context += "## If Tools or Methods Are Missing\n\n"
+        context += "If you've read the tools and found:\n"
+        context += "- **Tool doesn't exist**: Create a new tool (see guidelines below)\n"
+        context += "- **Method is missing**: Add the method to the existing tool (in BOTH TS + Python)\n"
+        context += "- **Functionality is incomplete**: Extend the tool with new capabilities\n\n"
+        
+        context += "**REMEMBER**: Always implement in BOTH TypeScript AND Python when creating/extending tools!\n\n"
 
         # Add new tool creation and extension documentation
         context += self._get_tool_creation_guidelines(bridge)

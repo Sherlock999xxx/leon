@@ -379,38 +379,6 @@ export default class FfmpegTool extends Tool {
   }
 
   /**
-   * Get the duration of an audio/video file in milliseconds using ffprobe.
-   * @param filePath The path to the audio or video file
-   * @returns A promise that resolves with the duration in milliseconds
-   */
-  async getAudioDuration(filePath: string): Promise<number> {
-    try {
-      const result = await this.executeCommand({
-        binaryName: 'ffprobe',
-        args: ['-hide_banner', '-v', 'error', '-show_format', filePath],
-        options: { sync: true }
-      })
-
-      // Parse the duration from stdout (format: duration=123.456)
-      const lines = result.split('\n')
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (trimmed.startsWith('duration=')) {
-          const durationSeconds = parseFloat(trimmed.split('=')[1] || '')
-          if (!isNaN(durationSeconds)) {
-            return Math.round(durationSeconds * 1_000)
-          }
-        }
-      }
-      throw new Error('Could not parse duration from ffprobe output')
-    } catch (error: unknown) {
-      throw new Error(
-        `Failed to get audio duration: ${(error as Error).message}`
-      )
-    }
-  }
-
-  /**
    * Merges two audio files into one.
    * @param firstAudioPath The path to the first audio file.
    * @param secondAudioPath The path to the second audio file.

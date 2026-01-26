@@ -305,4 +305,36 @@ export default class FfprobeTool extends Tool {
       throw new Error(`Failed to get frames info: ${(error as Error).message}`)
     }
   }
+
+  /**
+   * Get the duration of an audio/video file in milliseconds.
+   * @param filePath - The path to the audio or video file
+   * @returns A promise that resolves with the duration in milliseconds
+   */
+  async getDuration(filePath: string): Promise<number> {
+    try {
+      const result = await this.executeCommand({
+        binaryName: 'ffprobe',
+        args: [
+          '-v',
+          'error',
+          '-show_entries',
+          'format=duration',
+          '-of',
+          'default=noprint_wrappers=1:nokey=1',
+          filePath
+        ],
+        options: { sync: true }
+      })
+
+      // Parse the duration from stdout (just the number in seconds)
+      const durationSeconds = parseFloat(result.trim())
+      if (!isNaN(durationSeconds) && durationSeconds > 0) {
+        return Math.round(durationSeconds * 1_000)
+      }
+      throw new Error('Could not parse duration from ffprobe output')
+    } catch (error: unknown) {
+      throw new Error(`Failed to get duration: ${(error as Error).message}`)
+    }
+  }
 }

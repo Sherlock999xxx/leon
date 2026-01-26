@@ -200,41 +200,6 @@ class FfmpegTool(BaseTool):
         except Exception as e:
             raise Exception(f"Video compression failed: {str(e)}")
 
-    def get_audio_duration(self, file_path: str) -> int:
-        """
-        Get the duration of an audio/video file in milliseconds using ffprobe.
-        
-        Args:
-            file_path: The path to the audio or video file
-            
-        Returns:
-            The duration in milliseconds
-        """
-        try:
-            result = self.execute_command(ExecuteCommandOptions(
-                binary_name='ffprobe',
-                args=self._get_global_args() + [
-                    '-v', 'error',
-                    '-show_format',
-                    file_path
-                ],
-                options={'sync': True}
-            ))
-            
-            # Parse the duration from stdout (format: duration=123.456)
-            for line in result.split('\n'):
-                line = line.strip()
-                if line.startswith('duration='):
-                    try:
-                        duration_seconds = float(line.split('=')[1])
-                        if duration_seconds > 0:
-                            return round(duration_seconds * 1000)
-                    except (ValueError, IndexError):
-                        continue
-            raise Exception('Could not parse duration from ffprobe output')
-        except Exception as e:
-            raise Exception(f"Failed to get audio duration: {str(e)}")
-
     def adjust_tempo(self, input_path: str, output_path: str, speed_factor: float, sample_rate: int = None) -> str:
         """
         Adjusts the tempo (speed) of an audio file using the atempo filter.

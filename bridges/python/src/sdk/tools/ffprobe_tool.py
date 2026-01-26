@@ -247,3 +247,33 @@ class FfprobeTool(BaseTool):
 
         except Exception as e:
             raise Exception(f"Failed to get frames info: {str(e)}")
+
+    def get_duration(self, file_path: str) -> int:
+        """
+        Get the duration of an audio/video file in milliseconds.
+        
+        Args:
+            file_path: The path to the audio or video file
+            
+        Returns:
+            The duration in milliseconds
+        """
+        try:
+            result = self.execute_command(ExecuteCommandOptions(
+                binary_name='ffprobe',
+                args=[
+                    '-v', 'error',
+                    '-show_entries', 'format=duration',
+                    '-of', 'default=noprint_wrappers=1:nokey=1',
+                    file_path
+                ],
+                options={'sync': True}
+            ))
+            
+            # Parse the duration from stdout (just the number in seconds)
+            duration_seconds = float(result.strip())
+            if duration_seconds > 0:
+                return round(duration_seconds * 1000)
+            raise Exception('Could not parse duration from ffprobe output')
+        except Exception as e:
+            raise Exception(f"Failed to get duration: {str(e)}")

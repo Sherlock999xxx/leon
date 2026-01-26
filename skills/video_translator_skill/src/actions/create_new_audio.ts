@@ -8,6 +8,7 @@ import { ParamsHelper } from '@sdk/params-helper'
 import { Settings } from '@sdk/settings'
 import ChatterboxONNXTool from '@sdk/tools/chatterbox_onnx-tool'
 import FfmpegTool from '@sdk/tools/ffmpeg-tool'
+import FfprobeTool from '@sdk/tools/ffprobe-tool'
 import { formatFilePath } from '@sdk/utils'
 
 interface SpeakerReference {
@@ -323,6 +324,7 @@ export const run: ActionFunction = async function (
 
     // Initialize tools
     const ffmpegTool = new FfmpegTool()
+    const ffprobeTool = new FfprobeTool()
 
     // Prepare output directory
     const audioDir = path.dirname(audioPath)
@@ -492,7 +494,7 @@ export const run: ActionFunction = async function (
       // Get the actual generated audio duration using ffprobe for accuracy
       let generatedDurationMs: number
       try {
-        generatedDurationMs = await ffmpegTool.getAudioDuration(rawAudioPath)
+        generatedDurationMs = await ffprobeTool.getDuration(rawAudioPath)
       } catch {
         // Fallback to file size estimation if ffprobe fails
         const generatedStats = await fs.promises.stat(rawAudioPath)
