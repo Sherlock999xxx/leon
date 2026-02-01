@@ -2,6 +2,11 @@ import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 import { Network, NetworkError } from '@sdk/network'
 
+// Hardcoded default settings for Cerebras tool
+// These can be overridden by toolkit settings.json per toolkit.
+const CEREBRAS_API_KEY: string | null = null
+const CEREBRAS_MODEL = 'zai-glm-4.7'
+
 interface ChatMessage {
   role: string
   content: string
@@ -51,14 +56,15 @@ interface ApiResponse {
 export default class CerebrasTool extends Tool {
   private static readonly TOOLKIT = 'communication'
   private readonly config: ReturnType<typeof ToolkitConfig.load>
-  private api_key?: string
+  private api_key: string | null
+  private model: string
   private readonly network: Network
 
   // Popular Cerebras-hosted models (override with full model IDs if needed)
   private readonly popular_models = {
-    'glm-4.7': 'zai-glm-4.7',
-    'qwen-3-32b': 'qwen-3-32b',
-    'qwen-3-235b': 'qwen-3-235b-a22b-instruct-2507'
+    'zai-glm-4.7': 'zai-glm-4.7',
+    'qwen-3-235b-a22b-instruct-2507': 'qwen-3-235b-a22b-instruct-2507',
+    'qwen-3-32b': 'qwen-3-32b'
   }
 
   constructor(apiKey?: string) {
@@ -68,7 +74,19 @@ export default class CerebrasTool extends Tool {
       .toLowerCase()
       .replace('tool', '')
     this.config = ToolkitConfig.load(CerebrasTool.TOOLKIT, toolConfigName)
-    this.api_key = apiKey
+
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      CerebrasTool.TOOLKIT,
+      toolConfigName
+    )
+
+    // Priority: skill-provided apiKey > toolkit settings > hardcoded default
+    this.api_key =
+      apiKey || (toolSettings['CEREBRAS_API_KEY'] as string) || CEREBRAS_API_KEY
+
+    // Load model from toolkit settings or hardcoded default
+    this.model = (toolSettings['CEREBRAS_MODEL'] as string) || CEREBRAS_MODEL
+
     this.network = new Network({ baseURL: 'https://api.cerebras.ai/v1' })
   }
 
@@ -114,7 +132,7 @@ export default class CerebrasTool extends Tool {
   async chatCompletion(options: ChatCompletionOptions): Promise<ApiResponse> {
     const {
       messages,
-      model = 'glm-4.7',
+      model,
       temperature = 0.7,
       max_tokens,
       system_prompt,
@@ -129,7 +147,9 @@ export default class CerebrasTool extends Tool {
       }
     }
 
-    const modelId = this.getModelId(model)
+    // Use default model if none provided
+    const finalModel = model || this.model
+    const modelId = this.getModelId(finalModel)
 
     const requestMessages = []
     if (system_prompt) {
@@ -193,7 +213,7 @@ export default class CerebrasTool extends Tool {
   async completion(options: CompletionOptions): Promise<ApiResponse> {
     const {
       prompt,
-      model = 'glm-4.7',
+      model,
       temperature = 0.7,
       max_tokens,
       system_prompt,
@@ -205,7 +225,7 @@ export default class CerebrasTool extends Tool {
 
     const response = await this.chatCompletion({
       messages,
-      model,
+      model: model || this.model,
       temperature,
       max_tokens,
       system_prompt,
@@ -243,7 +263,7 @@ export default class CerebrasTool extends Tool {
     const {
       prompt,
       json_schema,
-      model = 'glm-4.7',
+      model,
       temperature = 0.7,
       max_tokens,
       system_prompt
@@ -253,7 +273,7 @@ export default class CerebrasTool extends Tool {
 
     const response = await this.chatCompletion({
       messages,
-      model,
+      model: model || this.model,
       temperature,
       max_tokens,
       system_prompt,

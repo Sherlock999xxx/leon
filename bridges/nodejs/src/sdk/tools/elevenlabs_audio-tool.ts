@@ -7,6 +7,11 @@ import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 import { Network } from '@sdk/network'
 
+// Hardcoded default settings for ElevenLabs audio tool
+// These can be overridden by toolkit settings.json per toolkit.
+const ELEVENLABS_AUDIO_API_KEY: string | null = null
+const ELEVENLABS_AUDIO_MODEL = 'scribe_v1'
+
 interface ElevenLabsWord {
   text: string
   start: number
@@ -40,10 +45,25 @@ interface ElevenLabsDubbingStatusResponse {
 export default class ElevenLabsAudioTool extends Tool {
   private static readonly TOOLKIT = 'music_audio'
   private readonly config: ReturnType<typeof ToolkitConfig.load>
+  readonly apiKey: string | null
+  readonly model: string
 
   constructor() {
     super()
     this.config = ToolkitConfig.load(ElevenLabsAudioTool.TOOLKIT, this.toolName)
+
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      ElevenLabsAudioTool.TOOLKIT,
+      this.toolName
+    )
+
+    // Priority: toolkit settings > hardcoded default
+    this.apiKey =
+      (toolSettings['ELEVENLABS_AUDIO_API_KEY'] as string) ||
+      ELEVENLABS_AUDIO_API_KEY
+    this.model =
+      (toolSettings['ELEVENLABS_AUDIO_MODEL'] as string) ||
+      ELEVENLABS_AUDIO_MODEL
   }
 
   get toolName(): string {
@@ -62,24 +82,27 @@ export default class ElevenLabsAudioTool extends Tool {
    * Transcribe audio to a file using ElevenLabs' Scribe v1 API
    * @param inputPath Path to the audio file to transcribe
    * @param outputPath Path to save the JSON transcription (unified format)
-   * @param apiKey ElevenLabs API key
-   * @param model Transcription model (defaults to 'scribe_v1')
+   * @param apiKey ElevenLabs API key (uses env/hardcoded default if not provided)
+   * @param model Transcription model (defaults to tool default)
    * @param diarize Whether to enable speaker diarization (defaults to true)
    */
   async transcribeToFile(
     inputPath: string,
     outputPath: string,
-    apiKey: string,
-    model = 'scribe_v1',
+    apiKey?: string,
+    model?: string,
     diarize = true
   ): Promise<string> {
-    if (!apiKey) {
+    // Use provided values, instance values, or error
+    const finalApiKey = apiKey || this.apiKey
+    const finalModel = model || this.model
+    if (!finalApiKey) {
       throw new Error('ElevenLabs API key is missing')
     }
 
     const form = new FormData()
     form.append('file', fs.createReadStream(inputPath))
-    form.append('model_id', model)
+    form.append('model_id', finalModel)
     form.append('diarize', diarize.toString())
     form.append('tag_audio_events', 'true')
     form.append('timestamps_granularity', 'word')

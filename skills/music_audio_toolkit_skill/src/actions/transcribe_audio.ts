@@ -113,41 +113,40 @@ export const run: ActionFunction = async function (
         fasterWhisperCPUThreads
       )
     } else if (provider === 'openai_audio') {
-      if (!openaiAPIKey) {
+      const tool = new OpenAIAudioTool()
+      const resolvedApiKey = openaiAPIKey || tool.apiKey
+      if (!resolvedApiKey) {
         leon.answer({ key: 'missing_api_key' })
         return
       }
 
-      const tool = new OpenAIAudioTool()
       await tool.transcribeToFile(
         audioPath,
         transcriptionPath,
-        openaiAPIKey,
+        resolvedApiKey,
         openaiModel
       )
     } else if (provider === 'assemblyai_audio') {
-      if (!assemblyaiAPIKey) {
-        leon.answer({ key: 'missing_api_key' })
-        return
-      }
-
       const tool = new AssemblyAIAudioTool()
-      await tool.transcribeToFile(
-        audioPath,
-        transcriptionPath,
-        assemblyaiAPIKey
-      )
-    } else if (provider === 'elevenlabs_audio') {
-      if (!elevenlabsAPIKey) {
+      const resolvedApiKey = assemblyaiAPIKey || tool.apiKey
+      if (!resolvedApiKey) {
         leon.answer({ key: 'missing_api_key' })
         return
       }
 
+      await tool.transcribeToFile(audioPath, transcriptionPath, resolvedApiKey)
+    } else if (provider === 'elevenlabs_audio') {
       const tool = new ElevenLabsAudioTool()
+      const resolvedApiKey = elevenlabsAPIKey || tool.apiKey
+      if (!resolvedApiKey) {
+        leon.answer({ key: 'missing_api_key' })
+        return
+      }
+
       await tool.transcribeToFile(
         audioPath,
         transcriptionPath,
-        elevenlabsAPIKey,
+        resolvedApiKey,
         elevenlabsModel,
         elevenlabsDiarize
       )

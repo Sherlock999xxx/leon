@@ -70,13 +70,6 @@ export const run: ActionFunction = async function (
       return
     }
 
-    if (!openrouterApiKey) {
-      leon.answer({
-        key: 'missing_api_key'
-      })
-      return
-    }
-
     // Read and parse the transcription file
     const transcriptionContent = await fs.promises.readFile(
       transcriptionPath,
@@ -102,7 +95,9 @@ export const run: ActionFunction = async function (
     })
 
     // Initialize OpenRouter tool
-    const tool = new OpenRouterTool(openrouterApiKey)
+    const tool = openrouterApiKey
+      ? new OpenRouterTool(openrouterApiKey)
+      : new OpenRouterTool()
 
     // Prepare translated segments array
     const translatedSegments = [...transcription.segments]

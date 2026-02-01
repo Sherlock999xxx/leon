@@ -11,6 +11,10 @@ import requests
 from ..base_tool import BaseTool
 from ..toolkit_config import ToolkitConfig
 
+# Hardcoded default settings for Grok tool
+# These can be overridden by toolkit settings.json per toolkit.
+GROK_API_KEY = None
+GROK_MODEL = 'grok-4-1-fast-reasoning'
 
 class GrokTool(BaseTool):
     """
@@ -30,7 +34,12 @@ class GrokTool(BaseTool):
         super().__init__()
         tool_config_name = self.__class__.__name__.lower().replace("tool", "")
         self.config = ToolkitConfig.load(self.TOOLKIT, tool_config_name)
-        self.api_key: Optional[str] = None
+
+        tool_settings = ToolkitConfig.load_tool_settings(self.TOOLKIT, tool_config_name)
+
+        # Priority: toolkit settings > hardcoded default
+        self.api_key = tool_settings.get('GROK_API_KEY', GROK_API_KEY)
+        self.model = tool_settings.get('GROK_MODEL', GROK_MODEL)
         self.base_url = "https://api.x.ai"
 
     @property
@@ -83,7 +92,7 @@ class GrokTool(BaseTool):
     def chat_completion(
         self,
         input: List[Dict[str, str]],
-        model: str = "grok-4-1-fast",
+        model: Optional[str] = None,
         temperature: float = 0.7,
         max_completion_tokens: int = 4096,
         stream: bool = False,
@@ -99,6 +108,9 @@ class GrokTool(BaseTool):
                 "success": False,
                 "error": "Grok API key is not set. Please call set_api_key() first.",
             }
+
+        # Use default model if none provided
+        model = model or self.model
 
         try:
             request_body: Dict[str, Any] = {
@@ -200,7 +212,7 @@ class GrokTool(BaseTool):
 
         return self.chat_completion(
             input=[{"role": "user", "content": query}],
-            model="grok-4-1-fast",
+            model=self.model,
             temperature=0.5,
             tools=[web_search_tool],
         )
@@ -246,7 +258,7 @@ class GrokTool(BaseTool):
 
         return self.chat_completion(
             input=[{"role": "user", "content": query}],
-            model="grok-4-1-fast",
+            model=self.model,
             temperature=0.5,
             tools=[x_search_tool],
         )
@@ -283,7 +295,7 @@ class GrokTool(BaseTool):
 
         return self.chat_completion(
             input=[{"role": "user", "content": query}],
-            model="grok-4-1-fast",
+            model=self.model,
             temperature=0.5,
             tools=tools,
         )

@@ -66,13 +66,6 @@ export const run: ActionFunction = async function (
       return
     }
 
-    if (!elevenlabsApiKey) {
-      leon.answer({
-        key: 'missing_api_key'
-      })
-      return
-    }
-
     // Get file info
     const audioStats = await fs.promises.stat(audioPath)
     const audioSizeMB = formatBytes(audioStats.size)
@@ -93,12 +86,19 @@ export const run: ActionFunction = async function (
 
     // Initialize ElevenLabs tool
     const tool = new ElevenLabsAudioTool()
+    const resolvedApiKey = elevenlabsApiKey || tool.apiKey
+    if (!resolvedApiKey) {
+      leon.answer({
+        key: 'missing_api_key'
+      })
+      return
+    }
 
     // Create dubbing project
     const dubbingResponse = await tool.createDubbing(
       audioPath,
       targetLanguageISOCode,
-      elevenlabsApiKey,
+      resolvedApiKey,
       sourceLang,
       numSpeakers,
       watermark
@@ -127,7 +127,7 @@ export const run: ActionFunction = async function (
 
       const statusResponse = await tool.getDubbingStatus(
         dubbingId,
-        elevenlabsApiKey
+        resolvedApiKey
       )
       status = statusResponse.status
 
@@ -181,7 +181,7 @@ export const run: ActionFunction = async function (
       dubbingId,
       targetLanguageISOCode,
       dubbedPath,
-      elevenlabsApiKey
+      resolvedApiKey
     )
 
     // Verify the dubbed file exists

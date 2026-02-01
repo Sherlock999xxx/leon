@@ -7,6 +7,11 @@ import { ToolkitConfig } from '@sdk/toolkit-config'
  * Reference: https://docs.x.ai/docs/guides/tools/search-tools
  */
 
+// Hardcoded default settings for Grok tool
+// These can be overridden by toolkit settings.json per toolkit.
+const GROK_API_KEY: string | null = null
+const GROK_MODEL = 'grok-4-1-fast-reasoning'
+
 interface GrokMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
@@ -98,7 +103,8 @@ interface GrokResponse {
 export default class GrokTool extends Tool {
   private static readonly TOOLKIT = 'search_web'
   private readonly config: ReturnType<typeof ToolkitConfig.load>
-  private apiKey?: string
+  private apiKey: string | null
+  private model: string
   private baseUrl: string = 'https://api.x.ai'
 
   constructor() {
@@ -107,6 +113,15 @@ export default class GrokTool extends Tool {
       .toLowerCase()
       .replace('tool', '')
     this.config = ToolkitConfig.load(GrokTool.TOOLKIT, toolConfigName)
+
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      GrokTool.TOOLKIT,
+      toolConfigName
+    )
+
+    // Priority: toolkit settings > hardcoded default
+    this.apiKey = (toolSettings['GROK_API_KEY'] as string) || GROK_API_KEY
+    this.model = (toolSettings['GROK_MODEL'] as string) || GROK_MODEL
   }
 
   get toolName(): string {
@@ -196,16 +211,19 @@ export default class GrokTool extends Tool {
 
     const {
       input,
-      model = 'grok-4-1-fast',
+      model,
       temperature = 0.7,
       max_completion_tokens = 4096,
       stream = false,
       tools
     } = options
 
+    // Use default model if none provided
+    const finalModel = model || this.model
+
     try {
       const requestBody: Record<string, unknown> = {
-        model,
+        model: finalModel,
         input,
         temperature,
         max_completion_tokens,
@@ -307,7 +325,7 @@ export default class GrokTool extends Tool {
           content: query
         }
       ],
-      model: 'grok-4-1-fast',
+      model: this.model,
       temperature: 0.5,
       tools: [webSearchTool]
     })
@@ -341,7 +359,7 @@ export default class GrokTool extends Tool {
           content: query
         }
       ],
-      model: 'grok-4-1-fast',
+      model: this.model,
       temperature: 0.5,
       tools: [xSearchTool]
     })
@@ -393,7 +411,7 @@ export default class GrokTool extends Tool {
           content: query
         }
       ],
-      model: 'grok-4-1-fast',
+      model: this.model,
       temperature: 0.5,
       tools
     })

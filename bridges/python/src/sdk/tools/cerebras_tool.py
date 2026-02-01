@@ -5,6 +5,10 @@ from ..base_tool import BaseTool
 from ..toolkit_config import ToolkitConfig
 from ..network import Network, NetworkError
 
+# Hardcoded default settings for Cerebras tool
+# These can be overridden by toolkit settings.json per toolkit.
+CEREBRAS_API_KEY = None
+CEREBRAS_MODEL = 'zai-glm-4.7'
 
 class CerebrasTool(BaseTool):
     """Cerebras tool for LLM API access (e.g., GLM 4.7)"""
@@ -16,12 +20,22 @@ class CerebrasTool(BaseTool):
         # Load configuration from central toolkits directory
         tool_config_name = self.__class__.__name__.lower().replace('tool', '')
         self.config = ToolkitConfig.load(self.TOOLKIT, tool_config_name)
-        self.api_key = api_key
+
+        tool_settings = ToolkitConfig.load_tool_settings(self.TOOLKIT, tool_config_name)
+
+        # Priority: skill-provided api_key > toolkit settings > hardcoded default
+        self.api_key = api_key or tool_settings.get('CEREBRAS_API_KEY', CEREBRAS_API_KEY)
+
+        # Load model settings
+        self.model = tool_settings.get('CEREBRAS_MODEL', CEREBRAS_MODEL)
+
         self.network = Network({'base_url': 'https://api.cerebras.ai/v1'})
 
         # Popular Cerebras-hosted models (override with full model IDs if needed)
         self.popular_models = {
-            'glm-4.7': 'glm-4.7'
+            'zai-glm-4.7': 'zai-glm-4.7',
+            'qwen-3-235b-a22b-instruct-2507': 'qwen-3-235b-a22b-instruct-2507',
+            'qwen-3-32b': 'qwen-3-32b'
         }
 
     @property
@@ -51,7 +65,7 @@ class CerebrasTool(BaseTool):
     def chat_completion(
         self,
         messages: List[Dict[str, str]],
-        model: str = 'glm-4.7',
+        model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None,
@@ -78,6 +92,9 @@ class CerebrasTool(BaseTool):
                 'success': False,
                 'error': 'Cerebras API key not configured'
             }
+
+        # Use default model if none provided
+        model = model or self.model
 
         model_id = self.get_model_id(model)
 
@@ -134,7 +151,7 @@ class CerebrasTool(BaseTool):
     def completion(
         self,
         prompt: str,
-        model: str = 'glm-4.7',
+        model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None,
@@ -188,7 +205,7 @@ class CerebrasTool(BaseTool):
         self,
         prompt: str,
         json_schema: Dict[str, Any],
-        model: str = 'glm-4.7',
+        model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None

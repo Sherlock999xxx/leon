@@ -2,6 +2,11 @@ import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 import { Network, NetworkError } from '@sdk/network'
 
+// Hardcoded default settings for OpenRouter tool
+// These can be overridden by toolkit settings.json per toolkit.
+const OPENROUTER_API_KEY: string | null = null
+const OPENROUTER_MODEL = 'google/gemini-3-flash-preview'
+
 interface ChatMessage {
   role: string
   content: string
@@ -51,7 +56,8 @@ interface ApiResponse {
 export default class OpenRouterTool extends Tool {
   private static readonly TOOLKIT = 'communication'
   private readonly config: ReturnType<typeof ToolkitConfig.load>
-  private api_key?: string
+  private api_key: string | null
+  private model: string
   private readonly network: Network
 
   constructor(apiKey?: string) {
@@ -61,7 +67,22 @@ export default class OpenRouterTool extends Tool {
       .toLowerCase()
       .replace('tool', '')
     this.config = ToolkitConfig.load(OpenRouterTool.TOOLKIT, toolConfigName)
-    this.api_key = apiKey
+
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      OpenRouterTool.TOOLKIT,
+      toolConfigName
+    )
+
+    // Priority: skill-provided apiKey > toolkit settings > hardcoded default
+    this.api_key =
+      apiKey ||
+      (toolSettings['OPENROUTER_API_KEY'] as string) ||
+      OPENROUTER_API_KEY
+
+    // Load model from toolkit settings or hardcoded default
+    this.model =
+      (toolSettings['OPENROUTER_MODEL'] as string) || OPENROUTER_MODEL
+
     this.network = new Network({ baseURL: 'https://openrouter.ai/api' })
   }
 
@@ -90,7 +111,7 @@ export default class OpenRouterTool extends Tool {
   async chatCompletion(options: ChatCompletionOptions): Promise<ApiResponse> {
     const {
       messages,
-      model = 'google/gemini-3-flash-preview',
+      model,
       temperature = 0.7,
       max_tokens,
       system_prompt,
@@ -105,6 +126,9 @@ export default class OpenRouterTool extends Tool {
       }
     }
 
+    // Use default model if none provided
+    const finalModel = model || this.model
+
     // Prepare messages with system prompt if provided
     const requestMessages = []
     if (system_prompt) {
@@ -115,7 +139,7 @@ export default class OpenRouterTool extends Tool {
     // Prepare request payload
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload: any = {
-      model,
+      model: finalModel,
       messages: requestMessages,
       temperature
     }
@@ -151,7 +175,7 @@ export default class OpenRouterTool extends Tool {
         success: true,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: response.data as any,
-        model_used: model
+        model_used: finalModel
       }
     } catch (error: unknown) {
       return {
@@ -169,7 +193,7 @@ export default class OpenRouterTool extends Tool {
   async completion(options: CompletionOptions): Promise<ApiResponse> {
     const {
       prompt,
-      model = 'google/gemini-3-flash-preview',
+      model,
       temperature = 0.7,
       max_tokens,
       system_prompt,
@@ -181,7 +205,7 @@ export default class OpenRouterTool extends Tool {
 
     const response = await this.chatCompletion({
       messages,
-      model,
+      model: model || this.model,
       temperature,
       max_tokens,
       system_prompt,
@@ -219,7 +243,7 @@ export default class OpenRouterTool extends Tool {
     const {
       prompt,
       json_schema,
-      model = 'google/gemini-3-flash-preview',
+      model,
       temperature = 0.7,
       max_tokens,
       system_prompt
@@ -229,7 +253,7 @@ export default class OpenRouterTool extends Tool {
 
     const response = await this.chatCompletion({
       messages,
-      model,
+      model: model || this.model,
       temperature,
       max_tokens,
       system_prompt,

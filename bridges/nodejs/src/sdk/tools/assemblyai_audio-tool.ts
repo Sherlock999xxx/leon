@@ -5,6 +5,10 @@ import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 import { Network } from '@sdk/network'
 
+// Hardcoded default setting for AssemblyAI audio tool
+// This can be overridden by toolkit settings.json per toolkit.
+const ASSEMBLYAI_AUDIO_API_KEY: string | null = null
+
 interface AssemblyAIUploadResponse {
   upload_url: string
 }
@@ -40,10 +44,21 @@ interface AssemblyAITranscriptionResponse {
 export default class AssemblyAIAudioTool extends Tool {
   private static readonly TOOLKIT = 'music_audio'
   private readonly config: ReturnType<typeof ToolkitConfig.load>
+  readonly apiKey: string | null
 
   constructor() {
     super()
     this.config = ToolkitConfig.load(AssemblyAIAudioTool.TOOLKIT, this.toolName)
+
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      AssemblyAIAudioTool.TOOLKIT,
+      this.toolName
+    )
+
+    // Priority: toolkit settings > hardcoded default
+    this.apiKey =
+      (toolSettings['ASSEMBLYAI_AUDIO_API_KEY'] as string) ||
+      ASSEMBLYAI_AUDIO_API_KEY
   }
 
   get toolName(): string {
@@ -62,16 +77,18 @@ export default class AssemblyAIAudioTool extends Tool {
    * Transcribe audio to a file using AssemblyAI's audio transcription API via SDK Network
    * @param inputPath Path to the audio file to transcribe
    * @param outputPath Path to save the JSON transcription
-   * @param apiKey AssemblyAI API key
+   * @param apiKey AssemblyAI API key (uses env/hardcoded default if not provided)
    * @param speakerLabels Enable speaker diarization (default: true)
    */
   async transcribeToFile(
     inputPath: string,
     outputPath: string,
-    apiKey: string,
+    apiKey?: string,
     speakerLabels = true
   ): Promise<string> {
-    if (!apiKey) {
+    // Use provided apiKey, instance apiKey, or error
+    const finalApiKey = apiKey || this.apiKey
+    if (!finalApiKey) {
       throw new Error('AssemblyAI API key is missing')
     }
 
@@ -84,7 +101,7 @@ export default class AssemblyAIAudioTool extends Tool {
       method: 'POST',
       data: audioData,
       headers: {
-        Authorization: apiKey,
+        Authorization: finalApiKey,
         'Content-Type': 'application/octet-stream'
       }
     })
@@ -101,7 +118,7 @@ export default class AssemblyAIAudioTool extends Tool {
         speaker_labels: speakerLabels
       },
       headers: {
-        Authorization: apiKey,
+        Authorization: finalApiKey,
         'Content-Type': 'application/json'
       }
     })
@@ -120,7 +137,7 @@ export default class AssemblyAIAudioTool extends Tool {
         url: `/v2/transcript/${transcriptId}`,
         method: 'GET',
         headers: {
-          Authorization: apiKey
+          Authorization: finalApiKey
         }
       })
 

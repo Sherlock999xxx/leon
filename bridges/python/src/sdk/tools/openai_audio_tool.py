@@ -6,6 +6,10 @@ from ..toolkit_config import ToolkitConfig
 from ..network import Network
 from .schemas import TranscriptionOutput, TranscriptionSegment
 
+# Hardcoded default settings for OpenAI audio tool
+# These can be overridden by toolkit settings.json per toolkit.
+OPENAI_AUDIO_API_KEY = None
+OPENAI_AUDIO_MODEL = 'whisper-1'
 
 class OpenAIAudioTool(BaseTool):
     TOOLKIT = 'music_audio'
@@ -13,6 +17,13 @@ class OpenAIAudioTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.config = ToolkitConfig.load(self.TOOLKIT, self.tool_name)
+
+        tool_settings = ToolkitConfig.load_tool_settings(self.TOOLKIT, self.tool_name)
+
+        # Priority: toolkit settings > hardcoded default
+        self.api_key = tool_settings.get('OPENAI_AUDIO_API_KEY', OPENAI_AUDIO_API_KEY)
+        self.model = tool_settings.get('OPENAI_AUDIO_MODEL', OPENAI_AUDIO_MODEL)
+
         self.network = Network({'base_url': 'https://api.openai.com'})
 
     @property
@@ -32,8 +43,8 @@ class OpenAIAudioTool(BaseTool):
         self,
         input_path: str,
         output_path: str,
-        api_key: str,
-        model: str = 'whisper-1'
+        api_key: Optional[str] = None,
+        model: Optional[str] = None
     ) -> str:
         """
         Transcribe audio to a file using OpenAI's audio transcription API via SDK Network
@@ -41,12 +52,15 @@ class OpenAIAudioTool(BaseTool):
         Args:
             input_path: Path to the audio file to transcribe
             output_path: Path to save the JSON transcription (unified format)
-            api_key: OpenAI API key
-            model: Transcription model (e.g. 'whisper-1')
+            api_key: OpenAI API key (uses env/hardcoded default if not provided)
+            model: Transcription model (defaults to tool default)
 
         Returns:
             The path to the transcription file
         """
+        # Use provided values, instance values, or error
+        api_key = api_key or self.api_key
+        model = model or self.model
         if not api_key:
             raise Exception('OpenAI API key is missing')
 

@@ -7,6 +7,9 @@ from ..toolkit_config import ToolkitConfig
 from ..network import Network
 from .schemas.transcription_schema import TranscriptionOutput, TranscriptionSegment
 
+# Hardcoded default settings for AssemblyAI audio tool
+# These can be overridden by toolkit settings.json per toolkit.
+ASSEMBLYAI_AUDIO_API_KEY = None
 
 class AssemblyAIAudioTool(BaseTool):
     TOOLKIT = 'music_audio'
@@ -14,6 +17,15 @@ class AssemblyAIAudioTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.config = ToolkitConfig.load(self.TOOLKIT, self.tool_name)
+
+        tool_settings = ToolkitConfig.load_tool_settings(self.TOOLKIT, self.tool_name)
+
+        # Priority: toolkit settings > hardcoded default
+        self.api_key = tool_settings.get(
+            'ASSEMBLYAI_AUDIO_API_KEY',
+            ASSEMBLYAI_AUDIO_API_KEY
+        )
+
         self.network = Network({'base_url': 'https://api.assemblyai.com'})
 
     @property
@@ -32,7 +44,7 @@ class AssemblyAIAudioTool(BaseTool):
         self,
         input_path: str,
         output_path: str,
-        api_key: str,
+        api_key: Optional[str] = None,
         speaker_labels: bool = True
     ) -> str:
         """
@@ -41,12 +53,14 @@ class AssemblyAIAudioTool(BaseTool):
         Args:
             input_path: Path to the audio file to transcribe
             output_path: Path to save the JSON transcription (unified format)
-            api_key: AssemblyAI API key
+            api_key: AssemblyAI API key (uses env/hardcoded default if not provided)
             speaker_labels: Enable speaker diarization (default: True)
 
         Returns:
             The path to the transcription file
         """
+        # Use provided api_key, instance api_key, or error
+        api_key = api_key or self.api_key
         if not api_key:
             raise Exception('AssemblyAI API key is missing')
 

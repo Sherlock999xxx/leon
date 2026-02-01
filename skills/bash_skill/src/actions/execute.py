@@ -21,18 +21,9 @@ def run(params: ActionParams) -> None:
     except Exception:
         settings = {}
 
-    # Check if OpenRouter API key is configured
     openrouter_api_key = settings.get('openrouter_api_key')
-    if not openrouter_api_key:
-        leon.answer({
-            'key': 'llm_error',
-            'data': {
-                'error': 'OpenRouter API key not configured. Please add your OpenRouter API key to settings.json'
-            }
-        })
-        return
 
-    # Initialize OpenRouter tool
+    # Initialize OpenRouter tool (falls back to toolkit settings if api key is missing)
     openrouter_tool = OpenRouterTool(api_key=openrouter_api_key)
 
     # Initialize bash tool
@@ -42,8 +33,8 @@ def run(params: ActionParams) -> None:
     leon.answer({'key': 'understanding_query'})
 
     try:
-        # Get the preferred model from settings, default to Claude 3.5 Sonnet
-        preferred_model = settings.get('preferred_llm_model', 'claude-3.5-sonnet')
+        # Get the preferred model from settings
+        preferred_model = settings.get('preferred_llm_model')
 
         # Define the system prompt for bash command generation
         system_prompt = """You are a bash command generator. Given a natural language request, generate the appropriate bash command.

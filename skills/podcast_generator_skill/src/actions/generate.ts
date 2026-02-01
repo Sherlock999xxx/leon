@@ -67,11 +67,6 @@ export const run: ActionFunction = async function (
   const guestVoice =
     ((await settings.get('guest_voice')) as string) || 'default_male'
 
-  if (!grokApiKey || !openrouterApiKey) {
-    leon.answer({ key: 'missing_api_key' })
-    return
-  }
-
   try {
     // Step 1: Research the topic using Grok
     leon.answer({
@@ -80,7 +75,9 @@ export const run: ActionFunction = async function (
     })
 
     const grok = new GrokTool()
-    grok.setApiKey(grokApiKey)
+    if (grokApiKey) {
+      grok.setApiKey(grokApiKey)
+    }
 
     const researchResult = await grok.deepResearch(topic, [
       'Recent developments and trends',
@@ -112,7 +109,9 @@ export const run: ActionFunction = async function (
     leon.answer({ key: 'generating_script' })
 
     const openrouter = new OpenRouterTool()
-    openrouter.setApiKey(openrouterApiKey)
+    if (openrouterApiKey) {
+      openrouter.setApiKey(openrouterApiKey)
+    }
 
     // Calculate approximate word count (150 words per minute of speech)
     const targetWordCount = duration * 150

@@ -9,6 +9,11 @@ from typing import Dict, Any, Optional, List
 from ..base_tool import BaseTool
 from ..toolkit_config import ToolkitConfig
 
+# Hardcoded default settings for OpenCode tool
+# These can be overridden by toolkit settings.json per toolkit.
+OPENCODE_OPENROUTER_API_KEY = None
+OPENCODE_OPENROUTER_MODEL = 'openrouter/moonshotai/kimi-k2.5'
+
 
 class OpenCodeTool(BaseTool):
     """OpenCode tool for AI-powered code generation using OpenCode CLI"""
@@ -19,30 +24,42 @@ class OpenCodeTool(BaseTool):
         super().__init__()
         self.config = ToolkitConfig.load(self.TOOLKIT, self.tool_name)
         self.providers: Dict[str, Dict[str, Any]] = {}
+        tool_settings = ToolkitConfig.load_tool_settings(self.TOOLKIT, self.tool_name)
+
+        # Auto-configure providers from toolkit settings
+        self._load_providers_from_settings(tool_settings)
 
         # Provider configurations based on OpenCode documentation
         self.provider_configs = {
-            'cerebras': {
-                'name': 'Cerebras',
-                'default_model': 'cerebras/llama-3.3-70b'
-            },
-            'minimax': {
-                'name': 'MiniMax',
-                'default_model': 'minimax/abab6.5s-chat'
-            },
-            'anthropic': {
-                'name': 'Anthropic',
-                'default_model': 'anthropic/claude-sonnet-4'
-            },
-            'openai': {
-                'name': 'OpenAI',
-                'default_model': 'openai/gpt-4o'
-            },
-            'gemini': {
-                'name': 'Google Gemini',
-                'default_model': 'google/gemini-2.0-flash-exp'
+            'openrouter': {
+                'name': 'OpenRouter',
+                'default_model': 'openrouter/moonshotai/kimi-k2.5'
             }
         }
+
+    def _load_providers_from_settings(self, tool_settings: Dict[str, Any]) -> None:
+        """Load provider configurations from toolkit settings"""
+        provider_settings_map = {
+            'openrouter': {
+                'api_key_key': 'OPENCODE_OPENROUTER_API_KEY',
+                'model_key': 'OPENCODE_OPENROUTER_MODEL',
+                'api_key_default': OPENCODE_OPENROUTER_API_KEY,
+                'model_default': OPENCODE_OPENROUTER_MODEL
+            }
+        }
+
+        for provider, settings_config in provider_settings_map.items():
+            api_key = tool_settings.get(
+                settings_config['api_key_key'],
+                settings_config['api_key_default']
+            )
+            model = tool_settings.get(
+                settings_config['model_key'],
+                settings_config['model_default']
+            )
+
+            if api_key and api_key.strip():
+                self.configure_provider(provider, api_key, model)
 
     @property
     def tool_name(self) -> str:
@@ -922,7 +939,7 @@ class OpenCodeTool(BaseTool):
         context += "```json\n"
         context += "// src/settings.sample.json and src/settings.json\n"
         context += "{\n"
-        context += '  "translation_openrouter_api_key": "sk-or-v1-...",\n'
+        context += '  "translation_openrouter_api_key": "",\n'
         context += '  "translation_openrouter_model": "google/gemini-3-flash-preview",\n'
         context += '  "translation_max_tokens_per_request": 2000,\n'
         context += '  "translation_segments_per_batch": 10,\n'
@@ -969,7 +986,7 @@ class OpenCodeTool(BaseTool):
         context += "## Settings Best Practices\n\n"
         context += "1. **Always create both files**: settings.sample.json AND settings.json (identical initially)\n"
         context += "2. **Use descriptive keys**: `translation_api_key` not `key1`\n"
-        context += "3. **Provide placeholder values**: Show the format (e.g., `\"sk-...\"` for API keys)\n"
+        context += "3. **Provide placeholder values**: Show the format. But set null for API keys or credentials\n"
         context += "4. **Include defaults**: For non-sensitive settings (model names, timeouts, etc.)\n"
         context += "5. **Document in README**: Explain what each setting does\n"
         context += "6. **Validate in action**: Check if required settings exist before using them\n"

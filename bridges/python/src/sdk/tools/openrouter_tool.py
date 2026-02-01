@@ -4,6 +4,10 @@ from ..base_tool import BaseTool
 from ..toolkit_config import ToolkitConfig
 from ..network import Network, NetworkError
 
+# Hardcoded default settings for OpenRouter tool
+# These can be overridden by toolkit settings.json per toolkit.
+OPENROUTER_API_KEY = None
+OPENROUTER_MODEL = 'google/gemini-3-flash-preview'
 
 class OpenRouterTool(BaseTool):
     """OpenRouter tool for unified LLM API access across all skills"""
@@ -15,7 +19,15 @@ class OpenRouterTool(BaseTool):
         # Load configuration from central toolkits directory
         tool_config_name = self.__class__.__name__.lower().replace('tool', '')
         self.config = ToolkitConfig.load(self.TOOLKIT, tool_config_name)
-        self.api_key = api_key
+
+        tool_settings = ToolkitConfig.load_tool_settings(self.TOOLKIT, tool_config_name)
+
+        # Priority: skill-provided api_key > toolkit settings > hardcoded default
+        self.api_key = api_key or tool_settings.get('OPENROUTER_API_KEY', OPENROUTER_API_KEY)
+
+        # Load model settings
+        self.model = tool_settings.get('OPENROUTER_MODEL', OPENROUTER_MODEL)
+
         self.network = Network({'base_url': 'https://openrouter.ai/api'})
 
     @property
@@ -37,7 +49,7 @@ class OpenRouterTool(BaseTool):
     def chat_completion(
             self,
             messages: List[Dict[str, str]],
-            model: str = 'google/gemini-3-flash-preview',
+            model: Optional[str] = None,
             temperature: float = 0.7,
             max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None,
@@ -64,6 +76,9 @@ class OpenRouterTool(BaseTool):
                 'success': False,
                 'error': 'OpenRouter API key not configured'
             }
+
+        # Use default model if none provided
+        model = model or self.model
 
         # Prepare messages with system prompt if provided
         request_messages = []
@@ -119,7 +134,7 @@ class OpenRouterTool(BaseTool):
     def completion(
             self,
         prompt: str,
-        model: str = 'google/gemini-3-flash-preview',
+        model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None,
@@ -173,7 +188,7 @@ class OpenRouterTool(BaseTool):
             self,
             prompt: str,
         json_schema: Dict[str, Any],
-            model: str = 'google/gemini-3-flash-preview',
+            model: Optional[str] = None,
             temperature: float = 0.7,
             max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None

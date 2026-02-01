@@ -9,17 +9,8 @@ import OpenCodeTool from '@sdk/tools/opencode-tool'
 import { SKILL_PLAN_SYSTEM_PROMPT } from '../lib/skill-plan-llm'
 
 interface SkillWriterSettings extends Record<string, unknown> {
-  opencode_provider?: string
-  opencode_cerebras_api_key?: string
-  opencode_cerebras_model?: string
-  opencode_minimax_api_key?: string
-  opencode_minimax_model?: string
-  opencode_anthropic_api_key?: string
-  opencode_anthropic_model?: string
-  opencode_openai_api_key?: string
-  opencode_openai_model?: string
-  opencode_gemini_api_key?: string
-  opencode_gemini_model?: string
+  opencode_openrouter_api_key?: string
+  opencode_openrouter_model?: string
 }
 
 const normalizeSkillFolderName = (value: string): string => {
@@ -57,24 +48,13 @@ export const run: ActionFunction = async function (
   }
 
   const settings = new Settings<SkillWriterSettings>()
-  const provider = ((await settings.get('opencode_provider')) ||
-    'cerebras') as string
-
-  // Get provider-specific settings
-  const apiKey = (await settings.get(`opencode_${provider}_api_key`)) as
+  const provider = 'openrouter'
+  const apiKey = (await settings.get('opencode_openrouter_api_key')) as
     | string
     | undefined
-  const model = (await settings.get(`opencode_${provider}_model`)) as
+  const model = (await settings.get('opencode_openrouter_model')) as
     | string
     | undefined
-
-  if (!apiKey) {
-    leon.answer({
-      key: 'missing_api_key',
-      data: { provider }
-    })
-    return
-  }
 
   leon.answer({ key: 'generating_skill' })
 

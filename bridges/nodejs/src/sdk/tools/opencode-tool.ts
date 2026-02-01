@@ -5,6 +5,11 @@ import os from 'node:os'
 import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 
+// Hardcoded default settings for OpenCode tool
+// These can be overridden by toolkit settings.json per toolkit.
+const OPENCODE_OPENROUTER_API_KEY: string | null = null
+const OPENCODE_OPENROUTER_MODEL = 'openrouter/moonshotai/kimi-k2.5'
+
 interface OpenCodeProvider {
   name: string
   api_key?: string
@@ -43,27 +48,7 @@ export default class OpenCodeTool extends Tool {
   private readonly provider_configs = {
     openrouter: {
       name: 'OpenRouter',
-      default_model: 'openrouter/google/gemini-3-flash-preview'
-    },
-    cerebras: {
-      name: 'Cerebras',
-      default_model: 'cerebras/zai-glm-4.7'
-    },
-    minimax: {
-      name: 'MiniMax',
-      default_model: 'minimax/abab6.5s-chat'
-    },
-    anthropic: {
-      name: 'Anthropic',
-      default_model: 'anthropic/claude-sonnet-4'
-    },
-    openai: {
-      name: 'OpenAI',
-      default_model: 'openai/gpt-4o'
-    },
-    gemini: {
-      name: 'Google Gemini',
-      default_model: 'google/gemini-2.0-flash-exp'
+      default_model: 'openrouter/moonshotai/kimi-k2.5'
     }
   }
 
@@ -71,6 +56,53 @@ export default class OpenCodeTool extends Tool {
     super()
     this.config = ToolkitConfig.load(OpenCodeTool.TOOLKIT, this.toolName)
     this.providers = new Map()
+
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      OpenCodeTool.TOOLKIT,
+      this.toolName
+    )
+
+    // Auto-configure providers from toolkit settings
+    this.loadProvidersFromSettings(toolSettings)
+  }
+
+  /**
+   * Load provider configurations from environment variables
+   */
+  private loadProvidersFromSettings(
+    toolSettings: Record<string, unknown>
+  ): void {
+    const providerSettingsMap: Record<
+      string,
+      {
+        apiKeyKey: string
+        modelKey: string
+        apiKeyDefault: string
+        modelDefault: string
+      }
+    > = {
+      openrouter: {
+        apiKeyKey: 'OPENCODE_OPENROUTER_API_KEY',
+        modelKey: 'OPENCODE_OPENROUTER_MODEL',
+        apiKeyDefault: OPENCODE_OPENROUTER_API_KEY,
+        modelDefault: OPENCODE_OPENROUTER_MODEL
+      }
+    }
+
+    for (const [provider, settingsConfig] of Object.entries(
+      providerSettingsMap
+    )) {
+      const apiKey =
+        (toolSettings[settingsConfig.apiKeyKey] as string) ||
+        settingsConfig.apiKeyDefault
+      const model =
+        (toolSettings[settingsConfig.modelKey] as string) ||
+        settingsConfig.modelDefault
+
+      if (apiKey && apiKey.trim()) {
+        this.configureProvider(provider, apiKey, model)
+      }
+    }
   }
 
   get toolName(): string {
@@ -1306,7 +1338,7 @@ export default class OpenCodeTool extends Tool {
     context += `\`\`\`json\n`
     context += `// src/settings.sample.json and src/settings.json\n`
     context += `{\n`
-    context += `  "translation_openrouter_api_key": "sk-or-v1-...",\n`
+    context += `  "translation_openrouter_api_key": "",\n`
     context += `  "translation_openrouter_model": "google/gemini-3-flash-preview",\n`
     context += `  "translation_max_tokens_per_request": 2000,\n`
     context += `  "translation_segments_per_batch": 10,\n`
@@ -1354,7 +1386,7 @@ export default class OpenCodeTool extends Tool {
     context += `## Settings Best Practices\n\n`
     context += `1. **Always create both files**: settings.sample.json AND settings.json (identical initially)\n`
     context += `2. **Use descriptive keys**: \`translation_api_key\` not \`key1\`\n`
-    context += `3. **Provide placeholder values**: Show the format (e.g., \`"sk-..."\` for API keys)\n`
+    context += `3. **Provide placeholder values**: Show the format. But set null for API keys or credentials\n`
     context += `4. **Include defaults**: For non-sensitive settings (model names, timeouts, etc.)\n`
     context += `5. **Document in README**: Explain what each setting does\n`
     context += `6. **Validate in action**: Check if required settings exist before using them\n`

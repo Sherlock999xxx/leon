@@ -62,18 +62,10 @@ export const run: ActionFunction = async function (
     const grokApiKey = (await settings.get('grok_api_key')) as
       | string
       | undefined
-    if (!grokApiKey || grokApiKey === 'xai-...') {
-      leon.answer({
-        key: 'missing_api_key',
-        data: {
-          provider: 'Grok'
-        }
-      })
-      return
-    }
-
     const grok = new GrokTool()
-    grok.setApiKey(grokApiKey)
+    if (grokApiKey) {
+      grok.setApiKey(grokApiKey)
+    }
 
     // Perform search based on type
     if (deepResearch) {

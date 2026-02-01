@@ -33,6 +33,7 @@ tcp_server/src/Pipfile.lock
 !**/*.sample*
 skills/**/src/settings.json
 skills/**/memory/*.json
+bridges/toolkits/**/settings.json
 core/data/models/*.nlp
 core/data/models/*.json
 core/data/models/llm/*

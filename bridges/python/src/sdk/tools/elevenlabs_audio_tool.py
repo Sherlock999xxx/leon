@@ -6,6 +6,10 @@ from ..toolkit_config import ToolkitConfig
 from ..network import Network
 from .schemas import TranscriptionOutput, TranscriptionSegment
 
+# Hardcoded default settings for ElevenLabs audio tool
+# These can be overridden by toolkit settings.json per toolkit.
+ELEVENLABS_AUDIO_API_KEY = None
+ELEVENLABS_AUDIO_MODEL = 'scribe_v1'
 
 class ElevenLabsAudioTool(BaseTool):
     TOOLKIT = 'music_audio'
@@ -13,6 +17,19 @@ class ElevenLabsAudioTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.config = ToolkitConfig.load(self.TOOLKIT, self.tool_name)
+
+        tool_settings = ToolkitConfig.load_tool_settings(self.TOOLKIT, self.tool_name)
+
+        # Priority: toolkit settings > hardcoded default
+        self.api_key = tool_settings.get(
+            'ELEVENLABS_AUDIO_API_KEY',
+            ELEVENLABS_AUDIO_API_KEY
+        )
+        self.model = tool_settings.get(
+            'ELEVENLABS_AUDIO_MODEL',
+            ELEVENLABS_AUDIO_MODEL
+        )
+
         self.network = Network({'base_url': 'https://api.elevenlabs.io'})
 
     @property
@@ -31,8 +48,8 @@ class ElevenLabsAudioTool(BaseTool):
             self,
             input_path: str,
             output_path: str,
-            api_key: str,
-            model: str = 'scribe_v1',
+            api_key: Optional[str] = None,
+            model: Optional[str] = None,
             diarize: bool = True
     ) -> str:
         """
@@ -41,13 +58,16 @@ class ElevenLabsAudioTool(BaseTool):
         Args:
             input_path: Path to the audio file to transcribe
             output_path: Path to save the JSON transcription (unified format)
-            api_key: ElevenLabs API key
-            model: Transcription model (defaults to 'scribe_v1')
+            api_key: ElevenLabs API key (uses env/hardcoded default if not provided)
+            model: Transcription model (defaults to tool default)
             diarize: Whether to enable speaker diarization (defaults to True)
 
         Returns:
             The path to the transcription file
         """
+        # Use provided values, instance values, or error
+        api_key = api_key or self.api_key
+        model = model or self.model
         if not api_key:
             raise Exception('ElevenLabs API key is missing')
 

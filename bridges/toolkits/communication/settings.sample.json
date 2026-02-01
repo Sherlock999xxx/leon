@@ -1,0 +1,10 @@
+{
+  "openrouter": {
+    "OPENROUTER_API_KEY": null,
+    "OPENROUTER_MODEL": "google/gemini-3-flash-preview"
+  },
+  "cerebras": {
+    "CEREBRAS_API_KEY": null,
+    "CEREBRAS_MODEL": "zai-glm-4.7"
+  }
+}
