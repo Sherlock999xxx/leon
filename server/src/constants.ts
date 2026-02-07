@@ -59,6 +59,7 @@ export const NVIDIA_CUBLAS_PATH = path.join(NVIDIA_LIBS_PATH, 'cublas')
 export const NVIDIA_CUDNN_PATH = path.join(NVIDIA_LIBS_PATH, 'cudnn')
 export const NVIDIA_CUSPARSE_PATH = path.join(NVIDIA_LIBS_PATH, 'cusparse')
 export const NVIDIA_NCCL_PATH = path.join(NVIDIA_LIBS_PATH, 'nccl')
+export const NVIDIA_NVSHMEM_PATH = path.join(NVIDIA_LIBS_PATH, 'nvshmem')
 export const NVIDIA_VERSIONS_PATH = path.join(NVIDIA_LIBS_PATH, 'versions.json')
 export const NVIDIA_CUBLAS_MANIFEST_PATH = path.join(
   NVIDIA_CUBLAS_PATH,
@@ -76,6 +77,10 @@ export const NVIDIA_NCCL_MANIFEST_PATH = path.join(
   NVIDIA_NCCL_PATH,
   'manifest.json'
 )
+export const NVIDIA_NVSHMEM_MANIFEST_PATH = path.join(
+  NVIDIA_NVSHMEM_PATH,
+  'manifest.json'
+)
 const NVIDIA_VERSIONS = JSON.parse(
   fs.readFileSync(NVIDIA_VERSIONS_PATH, 'utf8')
 )
@@ -84,6 +89,7 @@ export const NVIDIA_CUDNN_VERSION = NVIDIA_VERSIONS.cudnn
 export const NVIDIA_CUBLAS_VERSION = NVIDIA_VERSIONS.cublas
 export const NVIDIA_CUSPARSE_VERSION = NVIDIA_VERSIONS.cusparse
 export const NVIDIA_NCCL_VERSION = NVIDIA_VERSIONS.nccl
+export const NVIDIA_NVSHMEM_VERSION = NVIDIA_VERSIONS.nvshmem
 
 /**
  * Binaries / distribution

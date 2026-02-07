@@ -7,15 +7,18 @@ import {
   NVIDIA_CUDNN_PATH,
   NVIDIA_CUSPARSE_PATH,
   NVIDIA_NCCL_PATH,
+  NVIDIA_NVSHMEM_PATH,
   NVIDIA_CUBLAS_MANIFEST_PATH,
   NVIDIA_CUDNN_MANIFEST_PATH,
   NVIDIA_CUSPARSE_MANIFEST_PATH,
   NVIDIA_NCCL_MANIFEST_PATH,
+  NVIDIA_NVSHMEM_MANIFEST_PATH,
   NVIDIA_CUDA_VERSION,
   NVIDIA_CUBLAS_VERSION,
   NVIDIA_CUDNN_VERSION,
   NVIDIA_CUSPARSE_VERSION,
-  NVIDIA_NCCL_VERSION
+  NVIDIA_NCCL_VERSION,
+  NVIDIA_NVSHMEM_VERSION
 } from '@/constants'
 import { FileHelper } from '@/helpers/file-helper'
 import { SystemHelper } from '@/helpers/system-helper'
@@ -77,15 +80,20 @@ function getNVIDIADownloadURL(library, version) {
     }
 
     return `https://developer.download.nvidia.com/compute/nccl/redist/nccl/${OS_TYPE}-${arch}/nccl-${OS_TYPE}-${arch}-${version}-archive.${ext}`
-  }
+  } else if (library === 'nvshmem') {
+    // NVSHMEM is only available on Linux x86_64
+    if (!SystemHelper.isLinux() || arch !== 'x86_64') {
+      throw new Error('NVSHMEM is only available on Linux x86_64')
+    }
 
-  throw new Error(`Unknown library: ${library}`)
+    return `https://developer.download.nvidia.com/compute/nvshmem/redist/libnvshmem/${OS_TYPE}-${arch}/libnvshmem-${OS_TYPE}-${arch}-${version}_cuda${NVIDIA_CUDA_VERSION}-archive.${ext}`
+  }
 }
 
 /**
- * Install CUDA library if needed
+ * Install NVIDIA libraries if needed
  */
-async function installCUDALibrary(
+async function installNVIDIALibrary(
   library,
   requiredVersion,
   targetPath,
@@ -190,7 +198,7 @@ async function setupNvidiaLibs() {
     }
 
     // Install/update cuBLAS
-    await installCUDALibrary(
+    await installNVIDIALibrary(
       'cublas',
       NVIDIA_CUBLAS_VERSION,
       NVIDIA_CUBLAS_PATH,
@@ -198,7 +206,7 @@ async function setupNvidiaLibs() {
     )
 
     // Install/update cuDNN
-    await installCUDALibrary(
+    await installNVIDIALibrary(
       'cudnn',
       NVIDIA_CUDNN_VERSION,
       NVIDIA_CUDNN_PATH,
@@ -208,7 +216,7 @@ async function setupNvidiaLibs() {
     // Install/update cuSPARSE-Lt (Linux only, both x86_64 and aarch64)
     if (SystemHelper.isLinux()) {
       try {
-        await installCUDALibrary(
+        await installNVIDIALibrary(
           'cusparse',
           NVIDIA_CUSPARSE_VERSION,
           NVIDIA_CUSPARSE_PATH,
@@ -222,7 +230,7 @@ async function setupNvidiaLibs() {
     // Install/update NCCL (Linux x86_64 only)
     if (SystemHelper.isLinux() && mapToNvidiaArch(CPU_ARCH) === 'x86_64') {
       try {
-        await installCUDALibrary(
+        await installNVIDIALibrary(
           'nccl',
           NVIDIA_NCCL_VERSION,
           NVIDIA_NCCL_PATH,
@@ -233,9 +241,23 @@ async function setupNvidiaLibs() {
       }
     }
 
-    LogHelper.success(`CUDA runtime setup complete in: ${NVIDIA_LIBS_PATH}`)
+    // Install/update NVSHMEM (Linux x86_64 only)
+    if (SystemHelper.isLinux() && mapToNvidiaArch(CPU_ARCH) === 'x86_64') {
+      try {
+        await installNVIDIALibrary(
+          'nvshmem',
+          NVIDIA_NVSHMEM_VERSION,
+          NVIDIA_NVSHMEM_PATH,
+          NVIDIA_NVSHMEM_MANIFEST_PATH
+        )
+      } catch (error) {
+        LogHelper.warning(`NVSHMEM installation skipped: ${error.message}`)
+      }
+    }
+
+    LogHelper.success(`NVIDIA libraries setup complete in: ${NVIDIA_LIBS_PATH}`)
   } catch (error) {
-    LogHelper.error(`CUDA runtime setup failed: ${error}`)
+    LogHelper.error(`NVIDIA libraries setup failed: ${error}`)
     process.exit(1)
   }
 }
