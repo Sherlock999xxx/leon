@@ -97,9 +97,6 @@ export default class UltimateVocalRemoverONNXTool extends Tool {
         args,
         options: { sync: true }
       })
-
-      // Clean up temporary files
-      await fs.promises.rm(tempDir, { recursive: true, force: true })
     } catch (error: unknown) {
       throw new Error(`Vocal separation failed: ${(error as Error).message}`)
     }

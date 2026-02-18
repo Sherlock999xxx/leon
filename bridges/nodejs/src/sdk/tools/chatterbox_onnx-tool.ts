@@ -194,39 +194,34 @@ export default class ChatterboxONNXTool extends Tool {
         'utf8'
       )
 
-      try {
-        const args = [
-          '--function',
-          'synthesize_speech',
-          '--json_file',
-          jsonFilePath,
-          '--resource_path',
-          modelPath
-        ]
+      const args = [
+        '--function',
+        'synthesize_speech',
+        '--json_file',
+        jsonFilePath,
+        '--resource_path',
+        modelPath
+      ]
 
-        // Auto-detect CUDA runtime path if not provided
-        const platformName = getPlatformName()
-        const shouldUseCuda =
-          platformName === 'linux-x86_64' || platformName === 'win-amd64'
-        const finalCudaRuntimePath =
-          cudaRuntimePath ?? (shouldUseCuda ? NVIDIA_LIBS_PATH : undefined)
+      // Auto-detect CUDA runtime path if not provided
+      const platformName = getPlatformName()
+      const shouldUseCuda =
+        platformName === 'linux-x86_64' || platformName === 'win-amd64'
+      const finalCudaRuntimePath =
+        cudaRuntimePath ?? (shouldUseCuda ? NVIDIA_LIBS_PATH : undefined)
 
-        if (finalCudaRuntimePath) {
-          args.push('--cuda_runtime_path', finalCudaRuntimePath)
-        }
-
-        await this.executeCommand({
-          binaryName: 'chatterbox_onnx',
-          args,
-          options: { sync: true }
-        })
-
-        // Return the processed tasks so caller knows which files were created
-        return tasksToSynthesize
-      } finally {
-        // Clean up temporary JSON files
-        await fs.promises.rm(tempDir, { recursive: true, force: true })
+      if (finalCudaRuntimePath) {
+        args.push('--cuda_runtime_path', finalCudaRuntimePath)
       }
+
+      await this.executeCommand({
+        binaryName: 'chatterbox_onnx',
+        args,
+        options: { sync: true }
+      })
+
+      // Return the processed tasks so caller knows which files were created
+      return tasksToSynthesize
     } catch (error: unknown) {
       throw new Error(`Speech synthesis failed: ${(error as Error).message}`)
     }

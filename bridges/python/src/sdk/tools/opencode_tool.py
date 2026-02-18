@@ -12,13 +12,13 @@ from ..toolkit_config import ToolkitConfig
 # Hardcoded default settings for OpenCode tool
 # These can be overridden by toolkit settings.json per toolkit.
 OPENCODE_OPENROUTER_API_KEY = None
-OPENCODE_OPENROUTER_MODEL = 'openrouter/moonshotai/kimi-k2.5'
+OPENCODE_OPENROUTER_MODEL = "openrouter/moonshotai/kimi-k2.5"
 
 
 class OpenCodeTool(BaseTool):
     """OpenCode tool for AI-powered code generation using OpenCode CLI"""
 
-    TOOLKIT = 'coding_development'
+    TOOLKIT = "coding_development"
 
     def __init__(self):
         super().__init__()
@@ -31,31 +31,29 @@ class OpenCodeTool(BaseTool):
 
         # Provider configurations based on OpenCode documentation
         self.provider_configs = {
-            'openrouter': {
-                'name': 'OpenRouter',
-                'default_model': 'openrouter/moonshotai/kimi-k2.5'
+            "openrouter": {
+                "name": "OpenRouter",
+                "default_model": "openrouter/moonshotai/kimi-k2.5",
             }
         }
 
     def _load_providers_from_settings(self, tool_settings: Dict[str, Any]) -> None:
         """Load provider configurations from toolkit settings"""
         provider_settings_map = {
-            'openrouter': {
-                'api_key_key': 'OPENCODE_OPENROUTER_API_KEY',
-                'model_key': 'OPENCODE_OPENROUTER_MODEL',
-                'api_key_default': OPENCODE_OPENROUTER_API_KEY,
-                'model_default': OPENCODE_OPENROUTER_MODEL
+            "openrouter": {
+                "api_key_key": "OPENCODE_OPENROUTER_API_KEY",
+                "model_key": "OPENCODE_OPENROUTER_MODEL",
+                "api_key_default": OPENCODE_OPENROUTER_API_KEY,
+                "model_default": OPENCODE_OPENROUTER_MODEL,
             }
         }
 
         for provider, settings_config in provider_settings_map.items():
             api_key = tool_settings.get(
-                settings_config['api_key_key'],
-                settings_config['api_key_default']
+                settings_config["api_key_key"], settings_config["api_key_default"]
             )
             model = tool_settings.get(
-                settings_config['model_key'],
-                settings_config['model_default']
+                settings_config["model_key"], settings_config["model_default"]
             )
 
             if api_key and api_key.strip():
@@ -63,7 +61,7 @@ class OpenCodeTool(BaseTool):
 
     @property
     def tool_name(self) -> str:
-        return 'opencode'
+        return "opencode"
 
     @property
     def toolkit(self) -> str:
@@ -71,18 +69,20 @@ class OpenCodeTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return self.config['description']
+        return self.config["description"]
 
-    def configure_provider(self, provider: str, api_key: str, model: Optional[str] = None) -> None:
+    def configure_provider(
+        self, provider: str, api_key: str, model: Optional[str] = None
+    ) -> None:
         """Configure a provider with API key"""
         if provider not in self.provider_configs:
             raise ValueError(f"Unknown provider: {provider}")
 
         provider_config = self.provider_configs[provider]
         self.providers[provider] = {
-            'name': provider_config['name'],
-            'api_key': api_key,
-            'model': model or provider_config['default_model']
+            "name": provider_config["name"],
+            "api_key": api_key,
+            "model": model or provider_config["default_model"],
         }
 
     def get_configured_providers(self) -> List[str]:
@@ -98,40 +98,38 @@ class OpenCodeTool(BaseTool):
         if provider not in self.provider_configs:
             raise ValueError(f"Unknown provider: {provider}")
 
-        return self.provider_configs[provider]['default_model']
-
-
+        return self.provider_configs[provider]["default_model"]
 
     def _setup_provider_auth(self, provider: str, api_key: str) -> None:
         """Setup OpenCode auth for a provider"""
-        auth_file = Path.home() / '.local' / 'share' / 'opencode' / 'auth.json'
-        
+        auth_file = Path.home() / ".local" / "share" / "opencode" / "auth.json"
+
         # Ensure directory exists
         auth_file.parent.mkdir(parents=True, exist_ok=True)
-        
+
         auth_data: Dict[str, Dict[str, str]] = {}
-        
+
         # Read existing auth if it exists
         if auth_file.exists():
-            with open(auth_file, 'r') as f:
+            with open(auth_file, "r") as f:
                 auth_data = json.load(f)
-        
+
         # Add/update provider auth
-        auth_data[provider] = {'apiKey': api_key}
-        
+        auth_data[provider] = {"apiKey": api_key}
+
         # Write auth file
-        with open(auth_file, 'w') as f:
+        with open(auth_file, "w") as f:
             json.dump(auth_data, f, indent=2)
 
     def _analyze_relevant_toolkits(self, description: str) -> set:
         """Analyze skill description to determine relevant toolkits"""
         description_lower = description.lower()
         relevant_toolkits = set()
-        toolkits_dir = Path('bridges/toolkits')
+        toolkits_dir = Path("bridges/toolkits")
 
         if not toolkits_dir.exists():
             # Default to coding_development if toolkits directory doesn't exist
-            relevant_toolkits.add('coding_development')
+            relevant_toolkits.add("coding_development")
             return relevant_toolkits
 
         try:
@@ -139,7 +137,7 @@ class OpenCodeTool(BaseTool):
                 if not toolkit_dir.is_dir():
                     continue
 
-                toolkit_json = toolkit_dir / 'toolkit.json'
+                toolkit_json = toolkit_dir / "toolkit.json"
                 if not toolkit_json.exists():
                     continue
 
@@ -147,19 +145,21 @@ class OpenCodeTool(BaseTool):
                     with open(toolkit_json) as f:
                         toolkit_data = json.load(f)
 
-                    if not toolkit_data.get('description'):
+                    if not toolkit_data.get("description"):
                         continue
 
                     # Extract meaningful words from toolkit description
-                    toolkit_desc_lower = toolkit_data['description'].lower()
+                    toolkit_desc_lower = toolkit_data["description"].lower()
                     toolkit_words = [
-                        word for word in toolkit_desc_lower.split()
+                        word
+                        for word in toolkit_desc_lower.split()
                         if len(word) > 3  # Filter out short words
                     ]
 
                     # Also extract words from toolkit name
                     toolkit_name_words = [
-                        word for word in (toolkit_data.get('name', '')).lower().split()
+                        word
+                        for word in (toolkit_data.get("name", "")).lower().split()
                         if len(word) > 3
                     ]
 
@@ -175,17 +175,17 @@ class OpenCodeTool(BaseTool):
 
             # If no specific toolkits matched, include coding_development as a default
             if not relevant_toolkits:
-                relevant_toolkits.add('coding_development')
+                relevant_toolkits.add("coding_development")
 
         except Exception:
             # If we can't scan toolkits, default to coding_development
-            relevant_toolkits.add('coding_development')
+            relevant_toolkits.add("coding_development")
 
         return relevant_toolkits
 
-    def _scan_available_toolkits(self, relevant_toolkits: set = None) -> str:
+    def _scan_available_toolkits(self, relevant_toolkits: Optional[set] = None) -> str:
         """Scan available toolkits and their tools (optionally filtered)"""
-        toolkits_dir = Path('bridges/toolkits')
+        toolkits_dir = Path("bridges/toolkits")
         toolkit_info = "# Available Leon Tools & Toolkits\n\n"
         toolkit_info += "**IMPORTANT**: You must USE existing tools instead of creating duplicate functionality.\n"
         toolkit_info += "You can EXTEND existing tools with new methods OR create NEW tools when necessary.\n\n"
@@ -200,10 +200,13 @@ class OpenCodeTool(BaseTool):
                     continue
 
                 # Skip if filtering is enabled and this toolkit is not relevant
-                if relevant_toolkits is not None and toolkit_dir.name not in relevant_toolkits:
+                if (
+                    relevant_toolkits is not None
+                    and toolkit_dir.name not in relevant_toolkits
+                ):
                     continue
 
-                toolkit_json = toolkit_dir / 'toolkit.json'
+                toolkit_json = toolkit_dir / "toolkit.json"
                 if not toolkit_json.exists():
                     continue
 
@@ -211,19 +214,24 @@ class OpenCodeTool(BaseTool):
                     with open(toolkit_json) as f:
                         toolkit_data = json.load(f)
 
-                    tools = toolkit_data.get('tools', {})
+                    tools = toolkit_data.get("tools", {})
                     if not tools:
                         continue
 
                     toolkit_info += f"## {toolkit_data.get('name', toolkit_dir.name)}\n"
-                    toolkit_info += f"{toolkit_data.get('description', 'No description')}\n\n"
+                    toolkit_info += (
+                        f"{toolkit_data.get('description', 'No description')}\n\n"
+                    )
 
                     for tool_name, tool_config in tools.items():
                         toolkit_info += f"### {tool_name}\n"
                         toolkit_info += f"- **Description**: {tool_config.get('description', 'No description')}\n"
-                        
+
                         # Convert to PascalCase for import
-                        pascal_name = ''.join(word.capitalize() for word in tool_name.replace('-', '_').split('_'))
+                        pascal_name = "".join(
+                            word.capitalize()
+                            for word in tool_name.replace("-", "_").split("_")
+                        )
                         toolkit_info += f"- **Import**: `import {pascal_name}Tool from '@sdk/tools/{tool_name}-tool'`\n"
 
                         # Try to get method information from the actual tool file
@@ -246,42 +254,42 @@ class OpenCodeTool(BaseTool):
 
     def _get_tool_methods(self, tool_name: str) -> List[Dict[str, str]]:
         """Get method signatures from a tool file"""
-        tool_path = Path('bridges/nodejs/src/sdk/tools') / f'{tool_name}-tool.ts'
-        
+        tool_path = Path("bridges/nodejs/src/sdk/tools") / f"{tool_name}-tool.ts"
+
         if not tool_path.exists():
             return []
 
         try:
-            with open(tool_path, 'r') as f:
+            with open(tool_path, "r") as f:
                 content = f.read()
 
             methods = []
             # Simple regex to extract public method signatures and JSDoc comments
-            method_pattern = r'/\*\*[\s\S]*?\*/\s*(?:async\s+)?(\w+)\s*\([^)]*\):[^{]*'
+            method_pattern = r"/\*\*[\s\S]*?\*/\s*(?:async\s+)?(\w+)\s*\([^)]*\):[^{]*"
             matches = re.findall(method_pattern, content)
 
             for match in matches:
                 method_name = match
-                
+
                 # Skip private methods and getters
-                if method_name.startswith('_') or method_name == 'constructor':
+                if method_name.startswith("_") or method_name == "constructor":
                     continue
 
                 # Extract JSDoc for this method (simplified)
                 description = "No description"
-                
+
                 # Look for JSDoc before the method
-                jsdoc_match = re.search(r'/\*\*([\s\S]*?)\*/\s*(?:async\s+)?' + re.escape(method_name), content)
+                jsdoc_match = re.search(
+                    r"/\*\*([\s\S]*?)\*/\s*(?:async\s+)?" + re.escape(method_name),
+                    content,
+                )
                 if jsdoc_match:
                     jsdoc_content = jsdoc_match.group(1)
-                    desc_match = re.search(r'\*\s*([^@\n]+)', jsdoc_content)
+                    desc_match = re.search(r"\*\s*([^@\n]+)", jsdoc_content)
                     if desc_match:
                         description = desc_match.group(1).strip()
 
-                methods.append({
-                    'name': method_name,
-                    'description': description
-                })
+                methods.append({"name": method_name, "description": description})
 
             return methods
 
@@ -290,7 +298,7 @@ class OpenCodeTool(BaseTool):
 
     def _scan_aurora_components(self) -> str:
         """Scan Aurora SDK components and document their usage"""
-        aurora_dir = Path('bridges/nodejs/src/sdk/aurora')
+        aurora_dir = Path("bridges/nodejs/src/sdk/aurora")
         aurora_doc = ""
 
         aurora_doc += "# Aurora UI Components\n\n"
@@ -304,9 +312,21 @@ class OpenCodeTool(BaseTool):
 
             component_files = list(aurora_dir.iterdir())
             non_interactive_components = [
-                'card', 'circular-progress', 'flexbox', 'icon', 'image', 'link',
-                'list', 'list-header', 'list-item', 'loader', 'progress',
-                'scroll-container', 'status', 'text', 'widget-wrapper'
+                "card",
+                "circular-progress",
+                "flexbox",
+                "icon",
+                "image",
+                "link",
+                "list",
+                "list-header",
+                "list-item",
+                "loader",
+                "progress",
+                "scroll-container",
+                "status",
+                "text",
+                "widget-wrapper",
             ]
 
             aurora_doc += "## Available Components\n\n"
@@ -318,13 +338,17 @@ class OpenCodeTool(BaseTool):
 
             aurora_doc += "## Widget Pattern (Python)\n\n"
             aurora_doc += "```python\n"
-            aurora_doc += "from bridges.python.src.sdk.widget import Widget, WidgetOptions\n"
+            aurora_doc += (
+                "from bridges.python.src.sdk.widget import Widget, WidgetOptions\n"
+            )
             aurora_doc += "from bridges.python.src.sdk.aurora.flexbox import Flexbox\n"
             aurora_doc += "from bridges.python.src.sdk.aurora.text import Text\n\n"
             aurora_doc += "class MyWidget(Widget[Params]):\n"
             aurora_doc += "    def render(self):\n"
             aurora_doc += "        # Use Flexbox or List as root (NOT Card!)\n"
-            aurora_doc += "        return Flexbox({'children': [Text({'children': 'Hello'})]})\n"
+            aurora_doc += (
+                "        return Flexbox({'children': [Text({'children': 'Hello'})]})\n"
+            )
             aurora_doc += "```\n\n"
 
             aurora_doc += "## Common Component Props\n\n"
@@ -390,7 +414,7 @@ class OpenCodeTool(BaseTool):
 
         guidelines += "## Creating a New Tool\n\n"
 
-        if bridge == 'nodejs':
+        if bridge == "nodejs":
             guidelines += "### TypeScript Tool Structure\n\n"
             guidelines += "Create a new file at `bridges/nodejs/src/sdk/tools/{tool-name}-tool.ts`:\n\n"
             guidelines += "```typescript\n"
@@ -398,7 +422,9 @@ class OpenCodeTool(BaseTool):
             guidelines += "import { ToolkitConfig } from '@sdk/toolkit-config'\n\n"
             guidelines += "export default class MyNewTool extends Tool {\n"
             guidelines += "  private static readonly TOOLKIT = 'toolkit_name'  // e.g., 'music_audio'\n"
-            guidelines += "  private readonly config: ReturnType<typeof ToolkitConfig.load>\n\n"
+            guidelines += (
+                "  private readonly config: ReturnType<typeof ToolkitConfig.load>\n\n"
+            )
             guidelines += "  constructor() {\n"
             guidelines += "    super()\n"
             guidelines += "    const toolConfigName = this.constructor.name.toLowerCase().replace('tool', '')\n"
@@ -418,7 +444,9 @@ class OpenCodeTool(BaseTool):
             guidelines += "   */\n"
             guidelines += "  async myMethod(param: string): Promise<string> {\n"
             guidelines += "    // Implementation\n"
-            guidelines += "    // If the tool needs a binary, use this.executeCommand()\n"
+            guidelines += (
+                "    // If the tool needs a binary, use this.executeCommand()\n"
+            )
             guidelines += "    return 'result'\n"
             guidelines += "  }\n"
             guidelines += "}\n"
@@ -452,13 +480,13 @@ class OpenCodeTool(BaseTool):
         guidelines += "Add to `bridges/toolkits/{toolkit_name}/toolkit.json`:\n\n"
         guidelines += "```json\n"
         guidelines += "{\n"
-        guidelines += "  \"name\": \"Toolkit Name\",\n"
-        guidelines += "  \"description\": \"Description\",\n"
-        guidelines += "  \"tools\": {\n"
-        guidelines += "    \"mynew\": {\n"
-        guidelines += "      \"description\": \"My new tool description\",\n"
-        guidelines += "      \"binaries\": {  // Optional: only if tool needs a binary\n"
-        guidelines += "        \"linux-x86_64\": \"https://url-to-binary.tar.gz\"\n"
+        guidelines += '  "name": "Toolkit Name",\n'
+        guidelines += '  "description": "Description",\n'
+        guidelines += '  "tools": {\n'
+        guidelines += '    "mynew": {\n'
+        guidelines += '      "description": "My new tool description",\n'
+        guidelines += '      "binaries": {  // Optional: only if tool needs a binary\n'
+        guidelines += '        "linux-x86_64": "https://url-to-binary.tar.gz"\n'
         guidelines += "      }\n"
         guidelines += "    }\n"
         guidelines += "  }\n"
@@ -468,7 +496,7 @@ class OpenCodeTool(BaseTool):
         guidelines += "## Extending an Existing Tool\n\n"
         guidelines += "To add a new method to an existing tool:\n\n"
 
-        if bridge == 'nodejs':
+        if bridge == "nodejs":
             guidelines += "1. Open the existing tool file (e.g., `bridges/nodejs/src/sdk/tools/ytdlp-tool.ts`)\n"
             guidelines += "2. Add your new method to the class:\n\n"
             guidelines += "```typescript\n"
@@ -490,7 +518,7 @@ class OpenCodeTool(BaseTool):
             guidelines += "2. Add your new method to the class:\n\n"
             guidelines += "```python\n"
             guidelines += "    def my_new_method(self, param: str) -> str:\n"
-            guidelines += "        \"\"\"My new method description\"\"\"\n"
+            guidelines += '        """My new method description"""\n'
             guidelines += "        # Use self.execute_command() for binary tools\n"
             guidelines += "        result = self.execute_command(\n"
             guidelines += "            binary_name='yt-dlp',\n"
@@ -513,23 +541,23 @@ class OpenCodeTool(BaseTool):
         description: str,
         system_prompt: Optional[str] = None,
         context_files: Optional[List[str]] = None,
-        bridge: str = 'nodejs'
+        bridge: str = "nodejs",
     ) -> str:
         """Build Leon-specific context for OpenCode"""
-        context = ''
-        
+        context = ""
+
         if system_prompt:
             context += f"# System Instructions\n\n{system_prompt}\n\n"
-        
+
         # Analyze and determine relevant toolkits based on skill description
         relevant_toolkits = self._analyze_relevant_toolkits(description)
-        
+
         # Add available toolkits and tools information (filtered by relevance)
         context += self._scan_available_toolkits(relevant_toolkits)
-        
-        language = 'TypeScript' if bridge == 'nodejs' else 'Python'
-        file_extension = '.ts' if bridge == 'nodejs' else '.py'
-        
+
+        language = "TypeScript" if bridge == "nodejs" else "Python"
+        file_extension = ".ts" if bridge == "nodejs" else ".py"
+
         context += "# Leon Skill Development Guidelines\n\n"
         context += f"You are generating code for Leon AI assistant using **{language}**. Follow these guidelines:\n\n"
         context += f"- **Language**: CRITICAL - Write ALL skill source code in {language} (actions, widgets, utilities, everything)\n"
@@ -538,8 +566,8 @@ class OpenCodeTool(BaseTool):
         context += "- **Skill Location**: CRITICAL - Create skills directly in the `skills/` folder, NOT in subfolders\n"
         context += "- **Use existing tools**: Check the tools listed above first! Don't recreate functionality.\n"
         context += "- **DON'T modify tools**: Never edit existing tool files. Only use them in your actions.\n"
-        
-        if bridge == 'nodejs':
+
+        if bridge == "nodejs":
             context += "- **Tool usage**: Import tools like `import YtdlpTool from '@sdk/tools/ytdlp-tool'`\n"
             context += "- **SDK imports**: @sdk/types, @sdk/leon, @sdk/params-helper\n"
             context += "- **Action structure**: Export a `run` function as the action entry point\n"
@@ -553,7 +581,7 @@ class OpenCodeTool(BaseTool):
             context += "- **Responses**: Use leon.answer() to respond to users\n"
             context += f"- **File extensions**: ALL files MUST use {file_extension} (actions, widgets, utilities)\n"
             context += f"- **File structure**: skill.json + locales/en.json + src/actions/*{file_extension} + src/widgets/*{file_extension}\n"
-        
+
         context += "- **Validation**: Validate against schemas in ../../schemas/skill-schemas/\n\n"
 
         context += "# Skill Directory Structure - CRITICAL\n\n"
@@ -576,19 +604,23 @@ class OpenCodeTool(BaseTool):
         context += "## WRONG - Do NOT Create Skills in Subfolders\n\n"
         context += "```\n"
         context += "skills/\n"
-        context += "├── utilities/               # ❌ WRONG - Don't use category subfolders\n"
+        context += (
+            "├── utilities/               # ❌ WRONG - Don't use category subfolders\n"
+        )
         context += "│   └── my_skill/\n"
         context += "├── entertainment/           # ❌ WRONG\n"
         context += "│   └── my_skill/\n"
         context += "```\n\n"
         context += "**Key Rules:**\n"
-        context += "1. Skills go directly in `skills/skill_name/` (no intermediate folders)\n"
+        context += (
+            "1. Skills go directly in `skills/skill_name/` (no intermediate folders)\n"
+        )
         context += "2. Skill folder name should be lowercase with underscores (e.g., `video_translator_skill`)\n"
         context += "3. Always end skill folder name with `_skill` suffix\n"
         context += f"4. CRITICAL: ALL source files use {file_extension} - actions, widgets, utilities (bridge={bridge})\n\n"
-        
+
         context += f"## Bridge Consistency - ABSOLUTELY CRITICAL\n\n"
-        context += f"**VERY IMPORTANT**: When bridge is set to \"{bridge}\", ALL skill source code MUST be in {language}.\n\n"
+        context += f'**VERY IMPORTANT**: When bridge is set to "{bridge}", ALL skill source code MUST be in {language}.\n\n'
         context += "**This means:**\n"
         context += f"- Actions: {file_extension} ({language})\n"
         context += f"- Widgets: {file_extension} ({language})\n"
@@ -609,33 +641,39 @@ class OpenCodeTool(BaseTool):
         context += "├── actions/\n"
         context += f"│   └── my_action{file_extension}      # ✅ {language}\n"
         context += "└── widgets/\n"
-        context += f"    └── my_widget{file_extension}       # ✅ {language} - CONSISTENT!\n"
+        context += (
+            f"    └── my_widget{file_extension}       # ✅ {language} - CONSISTENT!\n"
+        )
         context += "```\n\n"
 
         # Add JSON file schema requirements
         context += "# JSON File Schema References - CRITICAL\n\n"
         context += "**IMPORTANT**: All JSON configuration files MUST include schema references at the beginning.\n\n"
-        
+
         context += "## Required Schema References\n\n"
-        
+
         context += "### skill.json - COMPLETE STRUCTURE (Based on schemas/skill-schemas/skill.json)\n\n"
         context += "**CRITICAL**: Understanding skill.json structure is essential for creating skills correctly.\n\n"
-        
+
         context += "## When to Use Flow vs Direct Actions\n\n"
         context += "### Use Direct Actions (No Flow) When:\n"
-        context += "- **Single-step tasks**: Skill has only one action (e.g., \"generate podcast\")\n"
+        context += '- **Single-step tasks**: Skill has only one action (e.g., "generate podcast")\n'
         context += "- **Independent actions**: Each action is standalone, not part of a sequence\n"
         context += "- **Simple skills**: No multi-step workflows needed\n\n"
-        
+
         context += "### Use Flow When:\n"
         context += "- **Multi-step workflows**: Actions must be executed in a specific sequence\n"
-        context += "- **Data passing**: One action's output is needed by the next action\n"
+        context += (
+            "- **Data passing**: One action's output is needed by the next action\n"
+        )
         context += "- **Complex processes**: Like video translation (download → transcribe → translate → synthesize → merge)\n\n"
-        
+
         context += "## skill.json Structure Examples\n\n"
-        
+
         context += "### Example 1: Simple Skill (No Flow) - Single Action\n"
-        context += "Use this when the skill has only one action or independent actions:\n\n"
+        context += (
+            "Use this when the skill has only one action or independent actions:\n\n"
+        )
         context += "```json\n{\n"
         context += '  "$schema": "../../schemas/skill-schemas/skill.json",\n'
         context += '  "name": "Podcast Generator",\n'
@@ -664,7 +702,7 @@ class OpenCodeTool(BaseTool):
         context += "    }\n"
         context += "  }\n"
         context += "}\n```\n\n"
-        
+
         context += "### Example 2: Complex Skill with Flow - Multi-Step Workflow\n"
         context += "Use this when actions must execute in sequence and share data:\n\n"
         context += "```json\n{\n"
@@ -672,7 +710,9 @@ class OpenCodeTool(BaseTool):
         context += '  "name": "Video Translator",\n'
         context += '  "bridge": "nodejs",\n'
         context += '  "version": "1.0.0",\n'
-        context += '  "description": "Translate and dub videos into different languages.",\n'
+        context += (
+            '  "description": "Translate and dub videos into different languages.",\n'
+        )
         context += '  "author": {\n'
         context += '    "name": "Your Name",\n'
         context += '    "email": "your.email@example.com"\n'
@@ -732,49 +772,55 @@ class OpenCodeTool(BaseTool):
         context += '    "Only the first action (download_video) receives direct user parameters."\n'
         context += "  ]\n"
         context += "}\n```\n\n"
-        
+
         context += "## Key Differences\n\n"
         context += "### Simple Skill (No Flow):\n"
-        context += "- Has only `\"actions\"` object\n"
+        context += '- Has only `"actions"` object\n'
         context += "- Each action can be called independently by the LLM\n"
         context += "- LLM matches user intent to action descriptions\n"
         context += "- Actions don't depend on each other\n\n"
-        
+
         context += "### Complex Skill (With Flow):\n"
-        context += "- Has `\"flow\"` array defining action execution order\n"
+        context += '- Has `"flow"` array defining action execution order\n'
         context += "- Only the FIRST action in the flow is exposed to the LLM\n"
         context += "- Subsequent actions are triggered automatically in sequence\n"
         context += "- Data passes between actions via `leon.answer({ 'core': { 'context_data': {...} } })`\n"
-        context += "- Can reference actions from other skills (e.g., `\"music_audio_toolkit_skill:transcribe_audio\"`)\n\n"
-        
+        context += '- Can reference actions from other skills (e.g., `"music_audio_toolkit_skill:transcribe_audio"`)\n\n'
+
         context += "## Required Fields (Per Schema)\n\n"
         context += "**Skill Level (Required):**\n"
-        context += "- `$schema`: \"../../schemas/skill-schemas/skill.json\"\n"
+        context += '- `$schema`: "../../schemas/skill-schemas/skill.json"\n'
         context += "- `name`: Skill name (string, min 1 char)\n"
-        context += "- `bridge`: \"nodejs\" or \"python\"\n"
-        context += "- `version`: Semver string (e.g., \"1.0.0\")\n"
+        context += '- `bridge`: "nodejs" or "python"\n'
+        context += '- `version`: Semver string (e.g., "1.0.0")\n'
         context += "- `description`: What the skill does (string, min 1 char)\n"
-        context += "- `author`: Object with `name` (required), optional `email` and `url`\n"
+        context += (
+            "- `author`: Object with `name` (required), optional `email` and `url`\n"
+        )
         context += "- `actions`: Object containing action definitions\n\n"
-        
+
         context += "**Optional Skill Fields:**\n"
         context += "- `flow`: Array of action names to execute in sequence\n"
         context += "- `action_notes`: Array of strings for additional LLM context\n\n"
-        
+
         context += "**Action Fields:**\n"
-        context += "- `type` (required): \"logic\" (runs code) or \"dialog\" (just responds)\n"
+        context += (
+            '- `type` (required): "logic" (runs code) or "dialog" (just responds)\n'
+        )
         context += "- `description` (required): 16-128 chars, used by LLM to match user intent\n"
         context += "- `parameters` (optional): Object defining expected inputs\n"
         context += "- `optional_parameters` (optional): Array of parameter names that are optional\n"
         context += "- `is_loop` (optional): Boolean for action loops\n\n"
-        
+
         context += "## Parameter Definition Format\n\n"
         context += "Parameters support various types:\n\n"
         context += "```json\n"
         context += '"parameters": {\n'
         context += '  "param_name": {\n'
         context += '    "type": "string",  // or "number"\n'
-        context += '    "description": "What this parameter represents (8-128 chars).",\n'
+        context += (
+            '    "description": "What this parameter represents (8-128 chars).",\n'
+        )
         context += '    "enum": ["option1", "option2"]  // Optional: restrict to specific values\n'
         context += "  },\n"
         context += '  "complex_param": {\n'
@@ -785,10 +831,12 @@ class OpenCodeTool(BaseTool):
         context += '    "description": "Object with nested properties."\n'
         context += "  }\n"
         context += "}\n```\n\n"
-        
+
         context += "## Decision Guide: Flow or No Flow?\n\n"
         context += "Ask yourself:\n"
-        context += "1. **Does my skill have multiple actions that must run in sequence?**\n"
+        context += (
+            "1. **Does my skill have multiple actions that must run in sequence?**\n"
+        )
         context += "   - YES → Use a `flow` array\n"
         context += "   - NO → Use direct actions only\n\n"
         context += "2. **Do my actions need to pass data to each other?**\n"
@@ -797,81 +845,99 @@ class OpenCodeTool(BaseTool):
         context += "3. **Is there a clear step-by-step pipeline?**\n"
         context += "   - YES → Use a `flow`\n"
         context += "   - NO → Use direct actions\n\n"
-        
+
         context += "## CRITICAL: Toolkit Skills - Reusable Actions Across Skills\n\n"
         context += "**IMPORTANT**: Some skills are designed as **toolkit skills** - their actions can be reused by other skills!\n\n"
-        
+
         context += "### What Are Toolkit Skills?\n\n"
         context += "Toolkit skills are special skills whose primary purpose is to provide **reusable actions** that other skills can call.\n"
         context += "They typically end with `_toolkit_skill` in their name.\n\n"
-        
+
         context += "**Existing Toolkit Skills:**\n"
         context += "- `music_audio_toolkit_skill`: Provides actions like `transcribe_audio`, `detect_language`, etc.\n"
         context += "- `search_web_toolkit_skill`: Provides `search` action for web/X research\n"
         context += "- More toolkit skills may exist in the skills directory\n\n"
-        
+
         context += "### How to Use Toolkit Skills in Flows\n\n"
         context += '**Format**: `"skill_name:action_name"`\n\n'
-        
+
         context += "**Example: Using music_audio_toolkit_skill in a flow**\n"
-        context += '```json\n'
-        context += '{\n'
+        context += "```json\n"
+        context += "{\n"
         context += '  "flow": [\n'
         context += '    "download_video",\n'
         context += '    "extract_audio",\n'
         context += '    "music_audio_toolkit_skill:transcribe_audio",\n'
         context += '    "translate_transcription"\n'
-        context += '  ],\n'
+        context += "  ],\n"
         context += '  "actions": {\n'
         context += '    "download_video": { "type": "logic", "description": "..." },\n'
         context += '    "extract_audio": { "type": "logic", "description": "..." },\n'
-        context += '    // No need to define transcribe_audio - it comes from the toolkit!\n'
-        context += '    "translate_transcription": { "type": "logic", "description": "..." }\n'
-        context += '  }\n'
-        context += '}\n'
-        context += '```\n\n'
-        
+        context += (
+            "    // No need to define transcribe_audio - it comes from the toolkit!\n"
+        )
+        context += (
+            '    "translate_transcription": { "type": "logic", "description": "..." }\n'
+        )
+        context += "  }\n"
+        context += "}\n"
+        context += "```\n\n"
+
         context += "### When to Use Toolkit Skills\n\n"
         context += "**USE toolkit skill actions when:**\n"
-        context += "- ✅ The functionality already exists (transcription, search, etc.)\n"
+        context += (
+            "- ✅ The functionality already exists (transcription, search, etc.)\n"
+        )
         context += "- ✅ You want consistent behavior across multiple skills\n"
         context += "- ✅ You want to avoid code duplication\n\n"
-        
+
         context += "**CREATE your own action when:**\n"
         context += "- ✅ You need custom logic specific to your skill\n"
         context += "- ✅ No toolkit skill provides the needed functionality\n\n"
-        
+
         context += "### Finding Available Toolkit Actions\n\n"
-        context += "**IMPORTANT**: Before creating a skill, check existing toolkit skills:\n"
+        context += (
+            "**IMPORTANT**: Before creating a skill, check existing toolkit skills:\n"
+        )
         context += "1. Read `skills/*_toolkit_skill/skill.json` files\n"
         context += "2. Check their README.md for usage examples\n"
         context += "3. Look at their `actions` object for available actions\n\n"
-        
+
         context += "## Best Practices\n\n"
-        context += "1. **Start simple**: If you only need one action, don't use a flow\n"
+        context += (
+            "1. **Start simple**: If you only need one action, don't use a flow\n"
+        )
         context += "2. **Check toolkit skills FIRST**: Don't reinvent the wheel - use existing toolkit actions\n"
         context += "3. **Use flows for pipelines**: Video processing, translation, multi-step tasks\n"
         context += "4. **Descriptive action descriptions**: LLM uses them to match user intent (16-128 chars)\n"
         context += "5. **Descriptive action names**: Use verbs (download_video, transcribe, translate)\n"
         context += "6. **First action gets parameters**: Only the first action in a flow receives user parameters\n"
         context += "7. **Use context_data**: Pass data between flow actions via `leon.answer({ 'core': { 'context_data': {...} } })`\n"
-        context += "8. **Schema validation**: Always include `$schema` reference at the top\n"
+        context += (
+            "8. **Schema validation**: Always include `$schema` reference at the top\n"
+        )
         context += '9. **Cross-skill format**: Use `"skill_name:action_name"` for toolkit actions in flows\n'
         context += "10. **Read toolkit READMEs**: They contain usage examples and parameter requirements\n\n"
-        
+
         context += "### locales/en.json - CRITICAL STRUCTURE\n"
         context += "**VERY IMPORTANT**: The locale file has a specific structure with top-level properties.\n"
         context += "DO NOT put action names directly at the root level!\n\n"
         context += "```json\n"
         context += "{\n"
-        context += '  "$schema": "../../../schemas/skill-schemas/skill-locale-config.json",\n'
+        context += (
+            '  "$schema": "../../../schemas/skill-schemas/skill-locale-config.json",\n'
+        )
         context += '  "actions": {\n'
         context += '    "action_name_1": {\n'
         context += '      "missing_param_follow_ups": {\n'
-        context += '        "param_name": ["Follow up question 1", "Follow up question 2"]\n'
+        context += (
+            '        "param_name": ["Follow up question 1", "Follow up question 2"]\n'
+        )
         context += "      },\n"
         context += '      "answers": {\n'
-        context += '        "answer_key": ["Answer variation 1", "Answer variation 2"]\n'
+        context += (
+            '        "answer_key": ["Answer variation 1", "Answer variation 2"]\n'
+        )
         context += "      }\n"
         context += "    },\n"
         context += '    "action_name_2": {\n'
@@ -889,10 +955,12 @@ class OpenCodeTool(BaseTool):
         context += "  }\n"
         context += "}\n"
         context += "```\n\n"
-        
+
         context += "**Locale File Structure Rules:**\n"
         context += "1. Must have `$schema` reference at the top\n"
-        context += "2. Must have `actions` object containing all action configurations\n"
+        context += (
+            "2. Must have `actions` object containing all action configurations\n"
+        )
         context += "3. Can have optional `common_answers` for shared responses\n"
         context += "4. Can have optional `variables` for reusable values\n"
         context += "5. Can have optional `widget_contents` for widget text\n"
@@ -901,23 +969,25 @@ class OpenCodeTool(BaseTool):
         # Add settings files documentation
         context += "# Skill Settings Files - REQUIRED\n\n"
         context += "**CRITICAL**: Every skill MUST have both settings files, even if empty.\n\n"
-        
+
         context += "## Required Files\n\n"
         context += "1. **src/settings.sample.json** - Sample configuration template\n"
         context += "2. **src/settings.json** - Actual configuration (initially identical to sample)\n\n"
-        
+
         context += "Both files must be **identical** when created. Users will modify settings.json with their values.\n\n"
-        
+
         context += "## Settings File Patterns\n\n"
-        
+
         context += "### Pattern 1: No Configuration Needed\n\n"
         context += "If the skill doesn't need any API keys or configuration:\n\n"
         context += "```json\n"
         context += "{}\n"
         context += "```\n\n"
-        
+
         context += "### Pattern 2: API Keys and Configuration\n\n"
-        context += "If the skill needs API keys, provider selection, or other settings:\n\n"
+        context += (
+            "If the skill needs API keys, provider selection, or other settings:\n\n"
+        )
         context += "```json\n"
         context += "{\n"
         context += '  "provider_api_key": "sk-...",\n'
@@ -926,30 +996,32 @@ class OpenCodeTool(BaseTool):
         context += '  "temperature": 0.7\n'
         context += "}\n"
         context += "```\n\n"
-        
+
         context += "## Real Examples\n\n"
-        
+
         context += "### Example 1: Simple Skill (No Settings)\n"
         context += "```json\n"
         context += "// src/settings.sample.json and src/settings.json\n"
         context += "{}\n"
         context += "```\n\n"
-        
+
         context += "### Example 2: Skill with API Configuration\n"
         context += "```json\n"
         context += "// src/settings.sample.json and src/settings.json\n"
         context += "{\n"
         context += '  "translation_openrouter_api_key": "",\n'
-        context += '  "translation_openrouter_model": "google/gemini-3-flash-preview",\n'
+        context += (
+            '  "translation_openrouter_model": "google/gemini-3-flash-preview",\n'
+        )
         context += '  "translation_max_tokens_per_request": 2000,\n'
         context += '  "translation_segments_per_batch": 10,\n'
         context += '  "speech_synthesis_provider": "chatterbox_onnx"\n'
         context += "}\n"
         context += "```\n\n"
-        
+
         context += "## How to Use Settings in Actions\n\n"
-        
-        if bridge == 'nodejs':
+
+        if bridge == "nodejs":
             context += "```typescript\n"
             context += "import { Settings } from '@sdk/settings'\n\n"
             context += "interface MySkillSettings extends Record<string, unknown> {\n"
@@ -961,7 +1033,9 @@ class OpenCodeTool(BaseTool):
             context += "  const settings = new Settings<MySkillSettings>()\n"
             context += "  const apiKey = await settings.get('provider_api_key') as string | undefined\n"
             context += "  const model = (await settings.get('provider_model')) || 'default-model'\n"
-            context += "  const maxTokens = (await settings.get('max_tokens')) || 1000\n\n"
+            context += (
+                "  const maxTokens = (await settings.get('max_tokens')) || 1000\n\n"
+            )
             context += "  if (!apiKey) {\n"
             context += "    leon.answer({ key: 'missing_api_key' })\n"
             context += "    return\n"
@@ -982,7 +1056,7 @@ class OpenCodeTool(BaseTool):
             context += "        return\n\n"
             context += "    # Use settings...\n"
             context += "```\n\n"
-        
+
         context += "## Settings Best Practices\n\n"
         context += "1. **Always create both files**: settings.sample.json AND settings.json (identical initially)\n"
         context += "2. **Use descriptive keys**: `translation_api_key` not `key1`\n"
@@ -993,32 +1067,36 @@ class OpenCodeTool(BaseTool):
         context += "7. **Use empty object if no settings**: Don't skip the files, create `{}`\n\n"
 
         # Add CRITICAL planning section
-        context += "# CRITICAL: Planning and Understanding Tools BEFORE Writing Code\n\n"
+        context += (
+            "# CRITICAL: Planning and Understanding Tools BEFORE Writing Code\n\n"
+        )
         context += "**EXTREMELY IMPORTANT**: You MUST follow this workflow before writing ANY code:\n\n"
-        
+
         context += "## Step 1: Identify Required Tools\n\n"
         context += "Before writing code, analyze what tools you'll need:\n"
         context += "1. **Review the available tools list above** - Check if tools already exist\n"
         context += "2. **Match your needs to existing tools** - Don't duplicate functionality\n"
         context += "3. **List the tools you plan to use** - Be specific (e.g., FfmpegTool, ChatterboxOnnxTool)\n\n"
-        
+
         context += "## Step 2: Read and Understand Tool Implementations\n\n"
         context += "**CRITICAL**: You MUST read the actual source code of tools before using them!\n\n"
-        file_ext = '.ts' if bridge == 'nodejs' else '.py'
-        bridge_path = 'nodejs' if bridge == 'nodejs' else 'python'
+        file_ext = ".ts" if bridge == "nodejs" else ".py"
+        bridge_path = "nodejs" if bridge == "nodejs" else "python"
         context += f"For EACH tool you plan to use:\n"
         context += f"1. **Read the tool file** at `bridges/{bridge_path}/src/sdk/tools/{{tool-name}}-tool{file_ext}`\n"
-        context += "2. **Understand ALL available methods** - Don't assume, READ the code\n"
+        context += (
+            "2. **Understand ALL available methods** - Don't assume, READ the code\n"
+        )
         context += "3. **Check for batch/efficient operations** - Many tools support batch processing!\n"
         context += "4. **Note the method signatures** - Parameter names, types, return values\n"
         context += "5. **Look for special features** - Async operations, streaming, callbacks, etc.\n\n"
-        
+
         context += "## Step 3: Plan for Efficiency\n\n"
         context += "**CRITICAL EXAMPLES OF EFFICIENT PATTERNS:**\n\n"
-        
+
         context += "### Example: ChatterboxOnnxTool - Batch Processing\n\n"
         context += "❌ **WRONG** - Multiple separate calls (SLOW):\n"
-        if bridge == 'nodejs':
+        if bridge == "nodejs":
             context += "```typescript\n"
             context += "// DON'T DO THIS - Inefficient!\n"
             context += "for (const segment of segments) {\n"
@@ -1028,7 +1106,7 @@ class OpenCodeTool(BaseTool):
             context += "  })\n"
             context += "}\n"
             context += "```\n\n"
-            
+
             context += "✅ **CORRECT** - Single batch call (FAST):\n"
             context += "```typescript\n"
             context += "// DO THIS - Read the tool to discover it accepts an array!\n"
@@ -1049,7 +1127,7 @@ class OpenCodeTool(BaseTool):
             context += "        'audio_path': segment['path']\n"
             context += "    })\n"
             context += "```\n\n"
-            
+
             context += "✅ **CORRECT** - Single batch call (FAST):\n"
             context += "```python\n"
             context += "# DO THIS - Read the tool to discover it accepts a list!\n"
@@ -1061,29 +1139,35 @@ class OpenCodeTool(BaseTool):
             context += "# Single call processes all segments efficiently\n"
             context += "chatterbox.synthesize_speech_to_files(tasks)\n"
             context += "```\n\n"
-        
+
         context += "### Why This Matters:\n\n"
         context += "- **Performance**: Batch processing can be 10-100x faster\n"
         context += "- **Resource efficiency**: Less overhead, better parallelization\n"
         context += "- **Better UX**: User gets results much faster\n\n"
-        
+
         context += "## Step 4: Plan Your Architecture\n\n"
         context += "Now that you understand the tools, plan your code:\n"
         context += "1. **Outline the workflow** - Step-by-step what needs to happen\n"
-        context += "2. **Identify batch opportunities** - Where can you group operations?\n"
+        context += (
+            "2. **Identify batch opportunities** - Where can you group operations?\n"
+        )
         context += "3. **Plan data structures** - What format does each tool expect?\n"
         context += "4. **Consider error handling** - What if a tool call fails?\n"
         context += "5. **Think about progress reporting** - Keep user informed\n\n"
-        
+
         context += "## Step 5: Only THEN Write Code\n\n"
-        context += "After completing steps 1-4, you can write efficient, correct code.\n\n"
-        
+        context += (
+            "After completing steps 1-4, you can write efficient, correct code.\n\n"
+        )
+
         context += "## If Tools or Methods Are Missing\n\n"
         context += "If you've read the tools and found:\n"
-        context += "- **Tool doesn't exist**: Create a new tool (see guidelines below)\n"
+        context += (
+            "- **Tool doesn't exist**: Create a new tool (see guidelines below)\n"
+        )
         context += "- **Method is missing**: Add the method to the existing tool (in BOTH TS + Python)\n"
         context += "- **Functionality is incomplete**: Extend the tool with new capabilities\n\n"
-        
+
         context += "**REMEMBER**: Always implement in BOTH TypeScript AND Python when creating/extending tools!\n\n"
 
         # Add new tool creation and extension documentation
@@ -1095,8 +1179,8 @@ class OpenCodeTool(BaseTool):
         context += "# Understanding leon.answer() - Critical Information\n\n"
         context += "The `leon.answer()` method is your primary way to communicate with users and pass data between actions.\n\n"
         context += "## Basic Usage\n\n"
-        
-        if bridge == 'nodejs':
+
+        if bridge == "nodejs":
             context += "```typescript\n"
             context += "// Simple text response with localized message key\n"
             context += "leon.answer({\n"
@@ -1121,8 +1205,8 @@ class OpenCodeTool(BaseTool):
 
         context += "## Passing Data to Next Action (context_data)\n\n"
         context += "Use `core.context_data` to pass data between actions in a multi-step workflow:\n\n"
-        
-        if bridge == 'nodejs':
+
+        if bridge == "nodejs":
             context += "```typescript\n"
             context += "// Action 1: Download video and pass path to next action\n"
             context += "leon.answer({\n"
@@ -1133,13 +1217,17 @@ class OpenCodeTool(BaseTool):
             context += "  core: {\n"
             context += "    context_data: {\n"
             context += "      video_path: videoPath,           // Pass full path\n"
-            context += "      target_language: targetLanguage, // Pass other needed data\n"
+            context += (
+                "      target_language: targetLanguage, // Pass other needed data\n"
+            )
             context += "      quality: quality\n"
             context += "    }\n"
             context += "  }\n"
             context += "})\n\n"
             context += "// Action 2: Retrieve data from previous action\n"
-            context += "const videoPath = paramsHelper.getContextData<string>('video_path')\n"
+            context += (
+                "const videoPath = paramsHelper.getContextData<string>('video_path')\n"
+            )
             context += "const targetLanguage = paramsHelper.getContextData<string>('target_language')\n"
             context += "```\n\n"
         else:
@@ -1153,14 +1241,18 @@ class OpenCodeTool(BaseTool):
             context += "  'core': {\n"
             context += "    'context_data': {\n"
             context += "      'video_path': video_path,           # Pass full path\n"
-            context += "      'target_language': target_language, # Pass other needed data\n"
+            context += (
+                "      'target_language': target_language, # Pass other needed data\n"
+            )
             context += "      'quality': quality\n"
             context += "    }\n"
             context += "  }\n"
             context += "})\n\n"
             context += "# Action 2: Retrieve data from previous action\n"
             context += "video_path = params_helper.get_context_data('video_path')\n"
-            context += "target_language = params_helper.get_context_data('target_language')\n"
+            context += (
+                "target_language = params_helper.get_context_data('target_language')\n"
+            )
             context += "```\n\n"
 
         context += "## Widget Usage\n\n"
@@ -1174,29 +1266,29 @@ class OpenCodeTool(BaseTool):
         context += "- **core.context_data**: Data for next action\n"
         context += "- **core.next_action**: Chain to 'skill:action'\n"
         context += "- **replaceMessageId**: Update existing message\n\n"
-        
+
         if context_files:
             context += "# Reference Files\n\n"
             context += "Please study these example files:\n"
             for file in context_files:
                 context += f"- {file}\n"
             context += "\n"
-        
+
         return context
 
     def _get_created_files(self, target_path: str) -> List[str]:
         """Get list of files created in target directory"""
         files = []
         target = Path(target_path)
-        
+
         if not target.exists():
             return files
-        
-        for file_path in target.rglob('*'):
+
+        for file_path in target.rglob("*"):
             if file_path.is_file():
                 relative = file_path.relative_to(target)
                 files.append(str(relative))
-        
+
         return files
 
     def generate_skill(
@@ -1208,7 +1300,7 @@ class OpenCodeTool(BaseTool):
         api_key: Optional[str] = None,
         context_files: Optional[List[str]] = None,
         system_prompt: Optional[str] = None,
-        bridge: str = 'nodejs'
+        bridge: str = "nodejs",
     ) -> Dict[str, Any]:
         """
         Generate skill using OpenCode CLI with agentic loop
@@ -1231,32 +1323,31 @@ class OpenCodeTool(BaseTool):
         # If not configured, configure with provided API key
         if not provider_data and api_key:
             provider_config = self.provider_configs[provider]
-            model_to_use = model or provider_config['default_model']
-            
+            model_to_use = model or provider_config["default_model"]
+
             self.configure_provider(provider, api_key, model_to_use)
             provider_data = self.providers.get(provider)
-            
+
             # Setup OpenCode auth
             self._setup_provider_auth(provider, api_key)
 
-        if not provider_data or not provider_data.get('api_key'):
+        if not provider_data or not provider_data.get("api_key"):
             return {
-                'success': False,
-                'error': f"Provider '{provider}' is not configured. Please provide an API key."
+                "success": False,
+                "error": f"Provider '{provider}' is not configured. Please provide an API key.",
             }
 
-        model_to_use = provider_data.get('model')
+        model_to_use = provider_data.get("model")
 
         # Build the OpenCode prompt with Leon-specific context
-        leon_context = self._build_leon_context(description, system_prompt, context_files or [], bridge)
+        leon_context = self._build_leon_context(
+            description, system_prompt, context_files or [], bridge
+        )
         full_prompt = f"{leon_context}\n\n{description}"
 
         # Create temporary prompt file
         with tempfile.NamedTemporaryFile(
-            mode='w',
-            suffix='.txt',
-            delete=False,
-            prefix='opencode-leon-'
+            mode="w", suffix=".txt", delete=False, prefix="opencode-leon-"
         ) as tmp:
             tmp.write(full_prompt)
             prompt_file = tmp.name
@@ -1265,38 +1356,31 @@ class OpenCodeTool(BaseTool):
             # Execute OpenCode CLI using 'run' command for non-interactive execution
             result = subprocess.run(
                 [
-                    'opencode',
-                    'run',
-                    '--model', model_to_use or '',
-                    '--file', prompt_file
+                    "opencode",
+                    "run",
+                    "--model",
+                    model_to_use or "",
+                    "--file",
+                    prompt_file,
                 ],
                 cwd=target_path,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minutes timeout
+                timeout=300,  # 5 minutes timeout
             )
 
-            # Clean up temp file
-            try:
-                os.unlink(prompt_file)
-            except:
-                pass
-
             if result.returncode != 0:
-                return {
-                    'success': False,
-                    'error': f'OpenCode failed: {result.stderr}'
-                }
+                return {"success": False, "error": f"OpenCode failed: {result.stderr}"}
 
             # Get created files
             files_created = self._get_created_files(target_path)
 
             return {
-                'success': True,
-                'output': result.stdout,
-                'provider_used': provider,
-                'model_used': model_to_use,
-                'files_created': files_created
+                "success": True,
+                "output": result.stdout,
+                "provider_used": provider,
+                "model_used": model_to_use,
+                "files_created": files_created,
             }
 
         except subprocess.TimeoutExpired:
@@ -1307,8 +1391,8 @@ class OpenCodeTool(BaseTool):
                 pass
 
             return {
-                'success': False,
-                'error': 'OpenCode generation timed out after 5 minutes'
+                "success": False,
+                "error": "OpenCode generation timed out after 5 minutes",
             }
 
         except Exception as e:
@@ -1318,7 +1402,4 @@ class OpenCodeTool(BaseTool):
             except:
                 pass
 
-            return {
-                'success': False,
-                'error': f'OpenCode generation error: {str(e)}'
-            }
+            return {"success": False, "error": f"OpenCode generation error: {str(e)}"}

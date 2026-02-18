@@ -1,7 +1,18 @@
 import json
 import os
 import tempfile
-from typing import Optional, Union, List, TypedDict
+from typing import (
+    Optional,
+    Union,
+    List,
+    TypedDict,
+    TypeVar,
+    Mapping,
+    Any,
+    Sequence,
+    cast,
+)
+from collections.abc import Sequence as SequenceABC, Mapping as MappingABC
 
 from ..base_tool import BaseTool, ExecuteCommandOptions
 from ..toolkit_config import ToolkitConfig
@@ -10,6 +21,8 @@ from ...constants import NVIDIA_LIBS_PATH, PYTORCH_TORCH_PATH
 MODEL_BASE_NAME = "Qwen3-TTS-12Hz-1.7B-Base"
 MODEL_DESIGN_NAME = "Qwen3-TTS-12Hz-1.7B-VoiceDesign"
 MODEL_CUSTOM_NAME = "Qwen3-TTS-12Hz-1.7B-CustomVoice"
+
+TTask = TypeVar("TTask", bound=Mapping[str, Any])
 
 
 class SynthesizeSpeechTask(TypedDict, total=False):
@@ -205,13 +218,18 @@ class Qwen3TTSTool(BaseTool):
     def _run_tasks(
         self,
         function_name: str,
-        tasks: Union[dict, List[dict]],
+        tasks: Union[TTask, Sequence[TTask]],
         model_names: List[str],
         device: str,
         nvidia_libs_path: Optional[str],
         torch_path: Optional[str],
-    ) -> List[dict]:
-        task_list = tasks if isinstance(tasks, list) else [tasks]
+    ) -> List[TTask]:
+        if isinstance(tasks, MappingABC):
+            task_list = [cast(TTask, tasks)]
+        elif isinstance(tasks, SequenceABC):
+            task_list = cast(List[TTask], list(tasks))
+        else:
+            task_list = [cast(TTask, tasks)]
 
         try:
             resource_root = self._resolve_resource_root(model_names)
@@ -228,32 +246,28 @@ class Qwen3TTSTool(BaseTool):
                 json_file_path = temp_file.name
                 json.dump(task_list, temp_file, indent=2, ensure_ascii=False)
 
-            try:
-                args = [
-                    "--function",
-                    function_name,
-                    "--json_file",
-                    json_file_path,
-                    "--resource_path",
-                    resource_root,
-                    "--device",
-                    device,
-                    "--torch_path",
-                    final_torch_path,
-                ]
+            args = [
+                "--function",
+                function_name,
+                "--json_file",
+                json_file_path,
+                "--resource_path",
+                resource_root,
+                "--device",
+                device,
+                "--torch_path",
+                final_torch_path,
+            ]
 
-                if final_nvidia_libs_path:
-                    args.extend(["--nvidia_libs_path", final_nvidia_libs_path])
+            if final_nvidia_libs_path:
+                args.extend(["--nvidia_libs_path", final_nvidia_libs_path])
 
-                self.execute_command(
-                    ExecuteCommandOptions(
-                        binary_name="qwen3_tts", args=args, options={"sync": True}
-                    )
+            self.execute_command(
+                ExecuteCommandOptions(
+                    binary_name="qwen3_tts", args=args, options={"sync": True}
                 )
+            )
 
-                return task_list
-            finally:
-                if json_file_path and os.path.exists(json_file_path):
-                    os.remove(json_file_path)
+            return task_list
         except Exception as e:
             raise Exception(f"Qwen3-TTS execution failed: {str(e)}")

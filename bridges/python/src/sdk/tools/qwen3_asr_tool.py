@@ -6,7 +6,7 @@ from typing import Optional
 
 from ..base_tool import BaseTool, ExecuteCommandOptions
 from ..toolkit_config import ToolkitConfig
-from .schemas import TranscriptionOutput, TranscriptionSegment
+from .schemas.transcription_schema import TranscriptionOutput, TranscriptionSegment
 from ...constants import NVIDIA_LIBS_PATH, PYTORCH_TORCH_PATH
 
 MODEL_NAME = "qwen3-asr-1.7b"
@@ -78,8 +78,12 @@ class Qwen3ASRTool(BaseTool):
         try:
             model_path = self.get_resource_path(MODEL_NAME)
             forced_aligner_path = None
-            nvidia_libs_path = cuda_runtime_path if cuda_runtime_path is not None else NVIDIA_LIBS_PATH
-            torch_libs_path = torch_path if torch_path is not None else PYTORCH_TORCH_PATH
+            nvidia_libs_path = (
+                cuda_runtime_path if cuda_runtime_path is not None else NVIDIA_LIBS_PATH
+            )
+            torch_libs_path = (
+                torch_path if torch_path is not None else PYTORCH_TORCH_PATH
+            )
 
             if return_timestamps and use_forced_aligner:
                 forced_aligner_path = self.get_resource_path(FORCED_ALIGNER_MODEL_NAME)
@@ -92,56 +96,52 @@ class Qwen3ASRTool(BaseTool):
                 json_file_path = temp_file.name
                 json.dump(tasks, temp_file, indent=2, ensure_ascii=False)
 
-            try:
-                args = [
-                    "--function",
-                    "transcribe_audio",
-                    "--json_file",
-                    json_file_path,
-                    "--model_path",
-                    model_path,
-                    "--device",
-                    device,
-                    "--batch_size",
-                    str(batch_size),
-                    "--language",
-                    language,
-                    "--return_timestamps",
-                    "true" if return_timestamps else "false",
-                    "--chunk_duration",
-                    str(chunk_duration),
-                ]
+            args = [
+                "--function",
+                "transcribe_audio",
+                "--json_file",
+                json_file_path,
+                "--model_path",
+                model_path,
+                "--device",
+                device,
+                "--batch_size",
+                str(batch_size),
+                "--language",
+                language,
+                "--return_timestamps",
+                "true" if return_timestamps else "false",
+                "--chunk_duration",
+                str(chunk_duration),
+            ]
 
-                if nvidia_libs_path:
-                    args.extend(["--cuda_runtime_path", nvidia_libs_path])
+            if nvidia_libs_path:
+                args.extend(["--cuda_runtime_path", nvidia_libs_path])
 
-                if torch_libs_path:
-                    args.extend(["--torch_path", torch_libs_path])
+            if torch_libs_path:
+                args.extend(["--torch_path", torch_libs_path])
 
-                if forced_aligner_path:
-                    args.extend(["--forced_aligner_model_path", forced_aligner_path])
+            if forced_aligner_path:
+                args.extend(["--forced_aligner_model_path", forced_aligner_path])
 
-                if cpu_batch_size is not None:
-                    args.extend(["--cpu_batch_size", str(cpu_batch_size)])
+            if cpu_batch_size is not None:
+                args.extend(["--cpu_batch_size", str(cpu_batch_size)])
 
-                self.execute_command(
-                    ExecuteCommandOptions(
-                        binary_name="qwen3_asr", args=args, options={"sync": True}
-                    )
+            self.execute_command(
+                ExecuteCommandOptions(
+                    binary_name="qwen3_asr", args=args, options={"sync": True}
                 )
+            )
 
-                with open(output_path, "r", encoding="utf-8") as f:
-                    transcription_content = f.read()
+            with open(output_path, "r", encoding="utf-8") as f:
+                transcription_content = f.read()
 
-                parsed_output = self.parse_transcription(transcription_content)
+            parsed_output = self.parse_transcription(transcription_content)
 
-                with open(output_path, "w", encoding="utf-8") as f:
-                    json.dump(parsed_output, f, indent=2, ensure_ascii=False)
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(parsed_output, f, indent=2, ensure_ascii=False)
 
-                return output_path
-            finally:
-                if json_file_path and os.path.exists(json_file_path):
-                    os.remove(json_file_path)
+            return output_path
         except Exception as e:
             raise Exception(f"Audio transcription failed: {str(e)}")
 

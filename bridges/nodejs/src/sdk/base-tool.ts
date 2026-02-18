@@ -477,16 +477,14 @@ export abstract class Tool {
     for (const resourceUrl of resourceUrls) {
       const adjustedUrl = await setHuggingFaceURL(resourceUrl)
 
-      // Extract filename from URL
-      const urlPath = new URL(adjustedUrl).pathname
-      const fileName = path.basename(urlPath).split('?')[0] // Remove query parameters
+      const relativePath = this.getResourceRelativePath(adjustedUrl)
 
-      // Ensure fileName is not empty
-      if (!fileName) {
+      if (!relativePath) {
         throw new Error(`Invalid filename extracted from URL: ${adjustedUrl}`)
       }
 
-      const filePath = path.join(resourcePath, fileName)
+      const fileName = path.basename(relativePath)
+      const filePath = path.join(resourcePath, relativePath)
 
       await this.report('bridges.tools.downloading_resource_file', {
         resource_name: resourceName,
@@ -495,6 +493,7 @@ export abstract class Tool {
       })
 
       try {
+        await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
         const engine = await downloadFile({
           url: adjustedUrl,
           savePath: filePath,
@@ -546,21 +545,45 @@ export abstract class Tool {
     resourceUrls: string[]
   ): boolean {
     for (const resourceUrl of resourceUrls) {
-      const urlPath = new URL(resourceUrl).pathname
-      const fileName = path.basename(urlPath).split('?')[0] // Remove query parameters
+      const relativePath = this.getResourceRelativePath(resourceUrl)
 
-      // Skip if fileName is empty
-      if (!fileName) {
+      if (!relativePath) {
         return false
       }
 
-      const filePath = path.join(resourcePath, fileName)
+      const filePath = path.join(resourcePath, relativePath)
 
       if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
         return false
       }
     }
     return true
+  }
+
+  /**
+   * Resolve a resource URL to a relative file path inside the resource directory.
+   * Preserves subfolders (e.g., speech_tokenizer/config.json) when present.
+   */
+  private getResourceRelativePath(resourceUrl: string): string {
+    const urlPath = new URL(resourceUrl).pathname
+    const markers = ['/resolve/', '/raw/']
+
+    for (const marker of markers) {
+      const markerIndex = urlPath.indexOf(marker)
+      if (markerIndex === -1) {
+        continue
+      }
+
+      const afterMarker = urlPath.slice(markerIndex + marker.length)
+      const parts = afterMarker.split('/').filter(Boolean)
+
+      if (parts.length > 1) {
+        const relativePath = parts.slice(1).join('/')
+        return path.posix.normalize(relativePath).replace(/^\/+/, '')
+      }
+    }
+
+    return path.basename(urlPath)
   }
 
   /**

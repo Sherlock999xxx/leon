@@ -217,7 +217,7 @@ export default class Qwen3TTSTool extends Tool {
       )
     }
 
-    return modelPaths.length > 0 ? path.dirname(modelPaths[0]) : ''
+    return modelPaths.length > 0 ? path.dirname(modelPaths[0] ?? '') : ''
   }
 
   private async runTasks<T extends Record<string, unknown>>(
@@ -274,13 +274,6 @@ export default class Qwen3TTSTool extends Tool {
       return taskArray
     } catch (error: unknown) {
       throw new Error(`Qwen3-TTS execution failed: ${(error as Error).message}`)
-    } finally {
-      if (jsonFilePath) {
-        await fs.promises.rm(jsonFilePath, { force: true })
-      }
-      if (tempDir) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true })
-      }
     }
   }
 }

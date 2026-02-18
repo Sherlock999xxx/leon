@@ -1,12 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import type { ActionFunction, ActionParams } from '@sdk/types'
+import type { ActionFunction, ActionParams, CustomEnumEntity } from '@sdk/types'
 import type { TranscriptionOutput } from '@sdk/tools/schemas'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
 import { Settings } from '@sdk/settings'
 import ChatterboxONNXTool from '@sdk/tools/chatterbox_onnx-tool'
+import Qwen3TTSTool from '@sdk/tools/qwen3_tts-tool'
 import FfmpegTool from '@sdk/tools/ffmpeg-tool'
 import FfprobeTool from '@sdk/tools/ffprobe-tool'
 import { formatFilePath } from '@sdk/utils'
@@ -30,7 +31,7 @@ interface ProcessedSegment {
 }
 
 interface VideoTranslatorSkillSettings extends Record<string, unknown> {
-  speech_synthesis_provider?: 'chatterbox_onnx'
+  speech_synthesis_provider?: 'qwen3_tts' | 'chatterbox_onnx'
   translation_openrouter_api_key?: string
   translation_openrouter_model?: string
   translation_max_tokens_per_request?: number
@@ -246,7 +247,13 @@ export const run: ActionFunction = async function (
 
   // Extract target language from entity 'language' and format for Chatterbox ONNX
   // The entity option contains a locale like "fr-FR", we need just "fr"
-  const languageEntity = paramsHelper.findLastEntityFromContext('language')
+  const languageEntity = paramsHelper.findLastEntityFromContext('language') as
+    | CustomEnumEntity
+    | undefined
+  const languageName =
+    languageEntity?.resolution?.value ||
+    languageEntity?.sourceText ||
+    languageEntity?.utteranceText
   const targetLanguageLocale =
     languageEntity && 'option' in languageEntity
       ? (languageEntity.option as string)
@@ -259,7 +266,7 @@ export const run: ActionFunction = async function (
     // Load settings
     const settings = new Settings<VideoTranslatorSkillSettings>()
     const provider = ((await settings.get('speech_synthesis_provider')) ||
-      'chatterbox_onnx') as NonNullable<
+      'qwen3_tts') as NonNullable<
       VideoTranslatorSkillSettings['speech_synthesis_provider']
     >
 
@@ -445,7 +452,18 @@ export const run: ActionFunction = async function (
       })
 
       try {
-        if (provider === 'chatterbox_onnx') {
+        if (provider === 'qwen3_tts') {
+          const qwen3TTSTool = new Qwen3TTSTool()
+          const qwenTasks = synthesisTasks.map((task) => ({
+            text: task.text,
+            target_language: languageName ?? 'Auto',
+            audio_path: task.audio_path,
+            speaker_reference_path: task.speaker_reference_path,
+            x_vector_only_mode: true
+          }))
+
+          await qwen3TTSTool.synthesizeSpeech(qwenTasks)
+        } else if (provider === 'chatterbox_onnx') {
           const chatterboxTool = new ChatterboxONNXTool()
           // Note: auto_split is disabled for video translator, so processedTasks === synthesisTasks
           await chatterboxTool.synthesizeSpeechToFiles(synthesisTasks)

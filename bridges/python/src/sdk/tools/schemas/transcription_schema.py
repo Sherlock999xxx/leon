@@ -1,18 +1,15 @@
 from typing import TypedDict, List, Union
 
 
-class TranscriptionSegment(TypedDict):
-    # Start time in seconds (using from_ since 'from' is a Python keyword)
-    from_: float
-
-    # End time in seconds
-    to: float
-
-    # Transcribed text for this segment
-    text: str
-
-    # Speaker identifier
-    speaker: Union[str, None]
+TranscriptionSegment = TypedDict(
+    "TranscriptionSegment",
+    {
+        "from": float,
+        "to": float,
+        "text": str,
+        "speaker": Union[str, None],
+    },
+)
 
 
 class TranscriptionMetadata(TypedDict):
@@ -26,7 +23,7 @@ class TranscriptionOutput(TypedDict):
 
     # List of unique speaker identifiers
     speakers: List[str]
-    
+
     # Number of unique speakers
     speaker_count: int
 

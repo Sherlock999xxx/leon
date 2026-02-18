@@ -154,13 +154,6 @@ export default class Qwen3ASRTool extends Tool {
       return outputPath
     } catch (error: unknown) {
       throw new Error(`Audio transcription failed: ${(error as Error).message}`)
-    } finally {
-      if (jsonFilePath) {
-        await fs.promises.rm(jsonFilePath, { force: true })
-      }
-      if (tempDir) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true })
-      }
     }
   }
 
@@ -199,7 +192,7 @@ export default class Qwen3ASRTool extends Tool {
       segments.push({
         from: 0,
         to: 0,
-        text: lines[0],
+        text: lines[0] ?? '',
         speaker: null
       })
     }
