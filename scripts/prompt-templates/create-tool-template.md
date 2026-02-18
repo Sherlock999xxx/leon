@@ -26,6 +26,7 @@ You must create a new tool for `{TOOL_ALIAS_NAME}`. {TOOL_DESCRIPTION}
 - Tool file names must be `{TOOL_TS_FILE_NAME}` and `{TOOL_PYTHON_FILE_NAME}`.
 - You must reuse the classes and functions provided by the SDK (network, settings, etc.). You will find them in the SDK folder.
 - Make sure to understand the parent class of the tool. It is located in `sdk/base-tool.ts` and `sdk/base_tool.py`.
+- When creating temporary files, you must not delete them after usage. They will be cleaned up by the OS.
 
 ### Binary Tool
 
