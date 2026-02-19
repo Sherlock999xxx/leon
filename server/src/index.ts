@@ -53,6 +53,7 @@ import { LogHelper } from '@/helpers/log-helper'
    * then can manually delete process from task manager to avoid
    * to have 2 TCP servers running at the same time
    */
+  LogHelper.time('TCP Server ready')
   global.pythonTCPServerProcess = spawn(
     `${PYTHON_TCP_SERVER_BIN_PATH} ${LangHelper.getShortCode(LEON_LANG)}`,
     {
@@ -63,6 +64,10 @@ import { LogHelper } from '@/helpers/log-helper'
   global.pythonTCPServerProcess.stdout.on('data', (data: Buffer) => {
     LogHelper.title('Python TCP Server')
     LogHelper.info(data.toString())
+
+    if (data.toString().includes('connection...')) {
+      LogHelper.timeEnd('TCP Server ready')
+    }
   })
   global.pythonTCPServerProcess.stderr.on('data', (data: Buffer) => {
     const formattedData = data.toString().trim()
@@ -80,13 +85,17 @@ import { LogHelper } from '@/helpers/log-helper'
   PYTHON_TCP_CLIENT.connect()
 
   try {
+    LogHelper.time('LLM Provider ready')
     await LLM_PROVIDER.init()
+    LogHelper.timeEnd('LLM Provider ready')
   } catch (e) {
     LogHelper.error(`LLM Provider failed to init: ${e}`)
   }
 
   try {
+    LogHelper.time('LLM Manager ready')
     await LLM_MANAGER.loadLLM()
+    LogHelper.timeEnd('LLM Manager ready')
   } catch (e) {
     LogHelper.error(`LLM Manager failed to load: ${e}`)
   }
@@ -146,7 +155,9 @@ import { LogHelper } from '@/helpers/log-helper'
 
   try {
     // Start the HTTP server
+    LogHelper.time('HTTP Server ready')
     await HTTP_SERVER.init()
+    LogHelper.timeEnd('HTTP Server ready')
   } catch (e) {
     LogHelper.error(`HTTP server failed to init: ${e}`)
   }

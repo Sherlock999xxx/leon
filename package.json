@@ -18,11 +18,11 @@
     "url": "https://github.com/leon-ai/leon/issues"
   },
   "engines": {
-    "node": ">=22.13.1",
-    "npm": ">=10.9.2"
+    "node": ">=24.0.0",
+    "npm": ">=11.3.0"
   },
   "volta": {
-    "node": "22.13.1"
+    "node": "24.13.1"
   },
   "pnpm": {
     "neverBuiltDependencies": []
@@ -47,8 +47,8 @@
     "preinstall": "node scripts/setup/preinstall.js",
     "postinstall": "tsx scripts/setup/setup.js",
     "dev:app": "vite --config app/vite.config.js",
-    "dev:server": "npm run train && npm run generate:skills-endpoints && cross-env LEON_NODE_ENV=development LEON_WARM_UP_LLM_DUTIES=true nodemon",
-    "dev:server:no-lint": "npm run train && npm run generate:skills-endpoints && cross-env LEON_NODE_ENV=development LEON_WARM_UP_LLM_DUTIES=true nodemon --config nodemon.nolint.json",
+    "dev:server": "npm --loglevel=error run train && npm --loglevel=error run generate:skills-endpoints && cross-env LEON_NODE_ENV=development LEON_WARM_UP_LLM_DUTIES=true nodemon",
+    "dev:server:no-lint": "npm --loglevel=error run train && npm --loglevel=error run generate:skills-endpoints && cross-env LEON_NODE_ENV=development LEON_WARM_UP_LLM_DUTIES=true nodemon --config nodemon.nolint.json",
     "inspect:gpu": "./node_modules/node-llama-cpp/dist/cli/cli.js inspect gpu",
     "wake": "cross-env LEON_HOST=http://localhost LEON_PORT=1337 node hotword/index.js",
     "delete-dist:server": "shx rm -rf ./server/dist",
