@@ -32,7 +32,7 @@ skills/skill_name/
 - `actions` required, `flow` optional.
 - If `flow` exists, only the first action receives user parameters.
 - Use `"skill_name:action_name"` for cross-skill flow steps.
-- Set `author.name` to `Leon AI's Skill Writer Skill` unless explicitly specified.
+- Set `author.name` to `Leon` unless explicitly specified.
 
 ## Settings Files
 

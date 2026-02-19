@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "description": "Generate podcast conversations between two people on any topic with research.",
   "author": {
-    "name": "Leon AI's Skill Writer Skill"
+    "name": "Leon"
   },
   "actions": {
     "generate": {

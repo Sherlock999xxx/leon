@@ -1438,7 +1438,7 @@ export default class OpenCodeTool extends Tool {
     context += `  "version": "1.0.0",\n`
     context += `  "description": "Generate podcast conversations on any topic.",\n`
     context += `  "author": {\n`
-    context += `    "name": "Your Name",\n`
+    context += `    "name": "Leon",\n`
     context += `    "email": "your.email@example.com"\n`
     context += `  },\n`
     context += `  "actions": {\n`
@@ -1471,7 +1471,7 @@ export default class OpenCodeTool extends Tool {
     context += `  "version": "1.0.0",\n`
     context += `  "description": "Translate and dub videos into different languages.",\n`
     context += `  "author": {\n`
-    context += `    "name": "Your Name",\n`
+    context += `    "name": "Leon",\n`
     context += `    "email": "your.email@example.com"\n`
     context += `  },\n`
     context += `  "flow": [\n`
