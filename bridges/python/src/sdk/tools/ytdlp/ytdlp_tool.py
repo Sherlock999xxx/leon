@@ -57,13 +57,25 @@ class YtdlpTool(BaseTool):
 
             # Parse the output to get the actual filename
             lines = result.split("\n")
-            for line in lines:
-                if "has already been downloaded" in line or "Destination:" in line:
-                    filename = line.split(" ")[-1]
-                    if filename:
-                        return filename
+            downloaded_file_path = output_template
 
-            return output_template
+            for line in lines:
+                if "Destination:" in line:
+                    import re
+
+                    match = re.search(r"Destination:\s+(.+)$", line)
+                    if match and match.group(1):
+                        downloaded_file_path = match.group(1).strip()
+                elif "has already been downloaded" in line:
+                    import re
+
+                    match = re.search(
+                        r"\[download\]\s+(.+)\s+has already been downloaded", line
+                    )
+                    if match and match.group(1):
+                        downloaded_file_path = match.group(1).strip()
+
+            return downloaded_file_path
 
         except Exception as e:
             raise Exception(f"Video download failed: {str(e)}")
@@ -104,13 +116,25 @@ class YtdlpTool(BaseTool):
 
             # Parse the output to get the actual filename
             lines = result.split("\n")
-            for line in lines:
-                if "has already been downloaded" in line or "Destination:" in line:
-                    filename = line.split(" ")[-1]
-                    if filename:
-                        return filename
+            downloaded_file_path = output_template
 
-            return output_template
+            for line in lines:
+                if "Destination:" in line:
+                    import re
+
+                    match = re.search(r"Destination:\s+(.+)$", line)
+                    if match and match.group(1):
+                        downloaded_file_path = match.group(1).strip()
+                elif "has already been downloaded" in line:
+                    import re
+
+                    match = re.search(
+                        r"\[download\]\s+(.+)\s+has already been downloaded", line
+                    )
+                    if match and match.group(1):
+                        downloaded_file_path = match.group(1).strip()
+
+            return downloaded_file_path
 
         except Exception as e:
             raise Exception(f"Audio download failed: {str(e)}")
@@ -211,14 +235,17 @@ class YtdlpTool(BaseTool):
 
                         # Check for completed download or destination file
                         if (
-                            "[download] Destination:" in line
+                            "Destination:" in line
                             or "has already been downloaded" in line
                         ):
                             import re
 
                             path_match = re.search(
                                 r"Destination:\s+(.+)$", line
-                            ) or re.search(r"(.+)\s+has already been downloaded", line)
+                            ) or re.search(
+                                r"\[download\]\s+(.+)\s+has already been downloaded",
+                                line,
+                            )
                             if path_match:
                                 downloaded_file_path = path_match.group(1).strip()
 
@@ -322,13 +349,25 @@ class YtdlpTool(BaseTool):
 
             # Parse the output to get the actual filename
             lines = result.split("\n")
-            for line in lines:
-                if "has already been downloaded" in line or "Destination:" in line:
-                    filename = line.split(" ")[-1]
-                    if filename:
-                        return filename
+            downloaded_file_path = output_template
 
-            return output_template
+            for line in lines:
+                if "Destination:" in line:
+                    import re
+
+                    match = re.search(r"Destination:\s+(.+)$", line)
+                    if match and match.group(1):
+                        downloaded_file_path = match.group(1).strip()
+                elif "has already been downloaded" in line:
+                    import re
+
+                    match = re.search(
+                        r"\[download\]\s+(.+)\s+has already been downloaded", line
+                    )
+                    if match and match.group(1):
+                        downloaded_file_path = match.group(1).strip()
+
+            return downloaded_file_path
 
         except Exception as e:
             raise Exception(f"Video download with thumbnail failed: {str(e)}")

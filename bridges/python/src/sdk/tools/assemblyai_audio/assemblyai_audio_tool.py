@@ -92,7 +92,11 @@ class AssemblyAIAudioTool(BaseTool):
                         "Authorization": api_key,
                         "Content-Type": "application/json",
                     },
-                    "data": {"audio_url": upload_url, "speaker_labels": speaker_labels},
+                    "data": {
+                        "audio_url": upload_url,
+                        "speaker_labels": speaker_labels,
+                        "language_detection": True
+                    },
                     "use_json": True,
                 }
             )

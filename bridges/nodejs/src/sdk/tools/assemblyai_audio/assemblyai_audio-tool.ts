@@ -115,7 +115,8 @@ export default class AssemblyAIAudioTool extends Tool {
       method: 'POST',
       data: {
         audio_url: uploadUrl,
-        speaker_labels: speakerLabels
+        speaker_labels: speakerLabels,
+        language_detection: true
       },
       headers: {
         Authorization: finalApiKey,

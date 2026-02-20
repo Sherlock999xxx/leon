@@ -57,18 +57,21 @@ export default class YtdlpTool extends Tool {
 
       // Parse the output to get the actual filename
       const lines = result.split('\n')
+      let downloadedFilePath = outputTemplate
+
       for (const line of lines) {
-        if (
-          line.includes('has already been downloaded') ||
-          line.includes('Destination:')
-        ) {
-          const filename = line.split(' ').pop()
-          if (filename) return filename
+        if (line.includes('Destination:')) {
+          const match = line.match(/Destination:\s+(.+)$/)
+          if (match && match[1]) downloadedFilePath = match[1].trim()
+        } else if (line.includes('has already been downloaded')) {
+          const match = line.match(
+            /\[download\]\s+(.+)\s+has already been downloaded/
+          )
+          if (match && match[1]) downloadedFilePath = match[1].trim()
         }
       }
 
-      // If we can't parse the exact filename, return the template path
-      return outputTemplate
+      return downloadedFilePath
     } catch (error: unknown) {
       throw new Error(`Video download failed: ${(error as Error).message}`)
     }
@@ -108,17 +111,21 @@ export default class YtdlpTool extends Tool {
 
       // Parse the output to get the actual filename
       const lines = result.split('\n')
+      let downloadedFilePath = outputTemplate
+
       for (const line of lines) {
-        if (
-          line.includes('has already been downloaded') ||
-          line.includes('Destination:')
-        ) {
-          const filename = line.split(' ').pop()
-          if (filename) return filename
+        if (line.includes('Destination:')) {
+          const match = line.match(/Destination:\s+(.+)$/)
+          if (match && match[1]) downloadedFilePath = match[1].trim()
+        } else if (line.includes('has already been downloaded')) {
+          const match = line.match(
+            /\[download\]\s+(.+)\s+has already been downloaded/
+          )
+          if (match && match[1]) downloadedFilePath = match[1].trim()
         }
       }
 
-      return outputTemplate
+      return downloadedFilePath
     } catch (error: unknown) {
       throw new Error(`Audio download failed: ${(error as Error).message}`)
     }
@@ -233,12 +240,14 @@ export default class YtdlpTool extends Tool {
 
               // Check for completed download or destination file
               if (
-                line.includes('[download] Destination:') ||
+                line.includes('Destination:') ||
                 line.includes('has already been downloaded')
               ) {
                 const pathMatch =
                   line.match(/Destination:\s+(.+)$/) ||
-                  line.match(/(.+)\s+has already been downloaded/)
+                  line.match(
+                    /\[download\]\s+(.+)\s+has already been downloaded/
+                  )
                 if (pathMatch && pathMatch[1]) {
                   downloadedFilePath = pathMatch[1].trim()
                 }
@@ -339,17 +348,21 @@ export default class YtdlpTool extends Tool {
 
       // Parse the output to get the actual filename
       const lines = result.split('\n')
+      let downloadedFilePath = outputTemplate
+
       for (const line of lines) {
-        if (
-          line.includes('has already been downloaded') ||
-          line.includes('Destination:')
-        ) {
-          const filename = line.split(' ').pop()
-          if (filename) return filename
+        if (line.includes('Destination:')) {
+          const match = line.match(/Destination:\s+(.+)$/)
+          if (match && match[1]) downloadedFilePath = match[1].trim()
+        } else if (line.includes('has already been downloaded')) {
+          const match = line.match(
+            /\[download\]\s+(.+)\s+has already been downloaded/
+          )
+          if (match && match[1]) downloadedFilePath = match[1].trim()
         }
       }
 
-      return outputTemplate
+      return downloadedFilePath
     } catch (error: unknown) {
       throw new Error(
         `Video with thumbnail download failed: ${(error as Error).message}`
