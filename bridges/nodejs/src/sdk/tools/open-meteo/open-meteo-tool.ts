@@ -2,6 +2,9 @@ import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 import { Network, NetworkError } from '@sdk/network'
 
+const DEFAULT_SETTINGS: Record<string, unknown> = {}
+const REQUIRED_SETTINGS: string[] = []
+
 interface GeocodingResult {
   id: number
   name: string
@@ -136,6 +139,14 @@ export default class OpenMeteoTool extends Tool {
       .replace('tool', '')
       .replace(/-/g, '')
     this.config = ToolkitConfig.load(OpenMeteoTool.TOOLKIT, toolConfigName)
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      OpenMeteoTool.TOOLKIT,
+      toolConfigName,
+      DEFAULT_SETTINGS
+    )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(toolConfigName)
     this.geocodingNetwork = new Network({
       baseURL: 'https://geocoding-api.open-meteo.com'
     })

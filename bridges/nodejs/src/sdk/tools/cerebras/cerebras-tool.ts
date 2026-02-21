@@ -3,9 +3,13 @@ import { ToolkitConfig } from '@sdk/toolkit-config'
 import { Network, NetworkError } from '@sdk/network'
 
 // Hardcoded default settings for Cerebras tool
-// These can be overridden by toolkit settings.json per toolkit.
 const CEREBRAS_API_KEY: string | null = null
 const CEREBRAS_MODEL = 'zai-glm-4.7'
+const DEFAULT_SETTINGS: Record<string, unknown> = {
+  CEREBRAS_API_KEY,
+  CEREBRAS_MODEL
+}
+const REQUIRED_SETTINGS = ['CEREBRAS_API_KEY']
 
 interface ChatMessage {
   role: string
@@ -77,15 +81,21 @@ export default class CerebrasTool extends Tool {
 
     const toolSettings = ToolkitConfig.loadToolSettings(
       CerebrasTool.TOOLKIT,
-      toolConfigName
+      toolConfigName,
+      DEFAULT_SETTINGS
     )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(toolConfigName)
 
     // Priority: skill-provided apiKey > toolkit settings > hardcoded default
     this.api_key =
-      apiKey || (toolSettings['CEREBRAS_API_KEY'] as string) || CEREBRAS_API_KEY
+      apiKey ||
+      (this.settings['CEREBRAS_API_KEY'] as string) ||
+      CEREBRAS_API_KEY
 
     // Load model from toolkit settings or hardcoded default
-    this.model = (toolSettings['CEREBRAS_MODEL'] as string) || CEREBRAS_MODEL
+    this.model = (this.settings['CEREBRAS_MODEL'] as string) || CEREBRAS_MODEL
 
     this.network = new Network({ baseURL: 'https://api.cerebras.ai/v1' })
   }

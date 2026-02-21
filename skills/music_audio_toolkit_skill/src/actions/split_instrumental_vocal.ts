@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { ActionFunction, ActionParams } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import UltimateVocalRemoverONNXTool from '@sdk/tools/ultimate_vocal_remover_onnx'
 import { formatFilePath } from '@sdk/utils'
 
@@ -40,7 +41,7 @@ export const run: ActionFunction = async function (
       }
     })
 
-    const tool = new UltimateVocalRemoverONNXTool()
+    const tool = await ToolManager.initTool(UltimateVocalRemoverONNXTool)
     await tool.separateVocals({
       audio_path: audioPath,
       vocal_output_path: vocalPath,
@@ -71,6 +72,9 @@ export const run: ActionFunction = async function (
       }
     })
   } catch (error) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     leon.answer({
       key: 'vocal_separation_error',
       data: { error: (error as Error).message }

@@ -5,6 +5,7 @@ import path from 'node:path'
 import type { ActionFunction } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import Qwen3TtsTool from '@sdk/tools/qwen3_tts'
 import { formatFilePath } from '@sdk/utils'
 
@@ -44,7 +45,7 @@ export const run: ActionFunction = async function (
     `${sanitizeFileName(speechText.slice(0, 64))}.wav`
   )
 
-  const tool = new Qwen3TtsTool()
+  const tool = await ToolManager.initTool(Qwen3TtsTool)
 
   try {
     leon.answer({ key: 'designing_voice' })
@@ -86,6 +87,9 @@ export const run: ActionFunction = async function (
       }
     })
   } catch (error) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     leon.answer({
       key: 'error',
       data: {

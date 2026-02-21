@@ -1,6 +1,7 @@
 import type { ActionFunction } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import OpenMeteoTool from '@sdk/tools/open-meteo'
 import { WeatherForecastWidget } from '../widgets/weather-forecast-widget'
 
@@ -39,51 +40,58 @@ export const run: ActionFunction = async function (
     return
   }
 
-  const weatherTool = new OpenMeteoTool()
-  const result = await weatherTool.getCurrentConditions(location)
+  try {
+    const weatherTool = await ToolManager.initTool(OpenMeteoTool)
+    const result = await weatherTool.getCurrentConditions(location)
 
-  if (!result.success || !result.data) {
-    const errorMessage = result.error || 'Unknown weather service error.'
-    const isNotFound =
-      errorMessage.toLowerCase().includes('not found') ||
-      errorMessage.toLowerCase().includes('no weather data') ||
-      errorMessage.toLowerCase().includes('not available')
+    if (!result.success || !result.data) {
+      const errorMessage = result.error || 'Unknown weather service error.'
+      const isNotFound =
+        errorMessage.toLowerCase().includes('not found') ||
+        errorMessage.toLowerCase().includes('no weather data') ||
+        errorMessage.toLowerCase().includes('not available')
 
-    leon.answer({
-      key: isNotFound ? 'location_not_found' : 'forecast_error',
-      data: {
-        location,
-        error: errorMessage
+      leon.answer({
+        key: isNotFound ? 'location_not_found' : 'forecast_error',
+        data: {
+          location,
+          error: errorMessage
+        }
+      })
+      return
+    }
+
+    const temperature =
+      units === 'imperial'
+        ? formatTemperature(result.data.temperatureF, units)
+        : formatTemperature(result.data.temperatureC, units)
+    const feelsLike =
+      units === 'imperial'
+        ? formatTemperature(result.data.feelsLikeF, units)
+        : formatTemperature(result.data.feelsLikeC, units)
+    const humidity = result.data.humidity ? `${result.data.humidity}%` : 'N/A'
+    const windSpeed =
+      units === 'imperial'
+        ? formatWind(result.data.windMph, result.data.windDirection, units)
+        : formatWind(result.data.windKmph, result.data.windDirection, units)
+
+    const widget = new WeatherForecastWidget({
+      params: {
+        location: result.data.location || location,
+        description: result.data.description,
+        temperature,
+        feelsLike,
+        humidity,
+        wind: windSpeed,
+        observationTime: result.data.observationTime
       }
     })
-    return
-  }
 
-  const temperature =
-    units === 'imperial'
-      ? formatTemperature(result.data.temperatureF, units)
-      : formatTemperature(result.data.temperatureC, units)
-  const feelsLike =
-    units === 'imperial'
-      ? formatTemperature(result.data.feelsLikeF, units)
-      : formatTemperature(result.data.feelsLikeC, units)
-  const humidity = result.data.humidity ? `${result.data.humidity}%` : 'N/A'
-  const windSpeed =
-    units === 'imperial'
-      ? formatWind(result.data.windMph, result.data.windDirection, units)
-      : formatWind(result.data.windKmph, result.data.windDirection, units)
-
-  const widget = new WeatherForecastWidget({
-    params: {
-      location: result.data.location || location,
-      description: result.data.description,
-      temperature,
-      feelsLike,
-      humidity,
-      wind: windSpeed,
-      observationTime: result.data.observationTime
+    await leon.answer({ widget })
+  } catch (error: unknown) {
+    if (isMissingToolSettingsError(error)) {
+      return
     }
-  })
-
-  await leon.answer({ widget })
+    throw error
+  }
 }

@@ -8,6 +8,8 @@ import { ToolkitConfig } from '@sdk/toolkit-config'
 import { getPlatformName } from '@sdk/utils'
 
 const MODEL_NAME = 'ultimate-vocal-remover-onnx'
+const DEFAULT_SETTINGS: Record<string, unknown> = {}
+const REQUIRED_SETTINGS: string[] = []
 
 interface VocalSeparationTask {
   audio_path: string
@@ -27,6 +29,14 @@ export default class UltimateVocalRemoverONNXTool extends Tool {
       UltimateVocalRemoverONNXTool.TOOLKIT,
       this.toolName
     )
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      UltimateVocalRemoverONNXTool.TOOLKIT,
+      this.toolName,
+      DEFAULT_SETTINGS
+    )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(this.toolName)
   }
 
   get toolName(): string {

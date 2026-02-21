@@ -6,8 +6,11 @@ import { ToolkitConfig } from '@sdk/toolkit-config'
 import { Network } from '@sdk/network'
 
 // Hardcoded default setting for AssemblyAI audio tool
-// This can be overridden by toolkit settings.json per toolkit.
 const ASSEMBLYAI_AUDIO_API_KEY: string | null = null
+const DEFAULT_SETTINGS: Record<string, unknown> = {
+  ASSEMBLYAI_AUDIO_API_KEY
+}
+const REQUIRED_SETTINGS = ['ASSEMBLYAI_AUDIO_API_KEY']
 
 interface AssemblyAIUploadResponse {
   upload_url: string
@@ -52,12 +55,16 @@ export default class AssemblyAIAudioTool extends Tool {
 
     const toolSettings = ToolkitConfig.loadToolSettings(
       AssemblyAIAudioTool.TOOLKIT,
-      this.toolName
+      this.toolName,
+      DEFAULT_SETTINGS
     )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(this.toolName)
 
     // Priority: toolkit settings > hardcoded default
     this.apiKey =
-      (toolSettings['ASSEMBLYAI_AUDIO_API_KEY'] as string) ||
+      (this.settings['ASSEMBLYAI_AUDIO_API_KEY'] as string) ||
       ASSEMBLYAI_AUDIO_API_KEY
   }
 

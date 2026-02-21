@@ -12,14 +12,19 @@ from ...base_tool import BaseTool
 from ...toolkit_config import ToolkitConfig
 
 # Hardcoded default settings for Grok tool
-# These can be overridden by toolkit settings.json per toolkit.
 GROK_API_KEY = None
-GROK_MODEL = 'grok-4-1-fast-reasoning'
+GROK_MODEL = "grok-4-1-fast-reasoning"
+DEFAULT_SETTINGS = {
+    "GROK_API_KEY": GROK_API_KEY,
+    "GROK_MODEL": GROK_MODEL,
+}
+REQUIRED_SETTINGS = ["GROK_API_KEY"]
+
 
 class GrokTool(BaseTool):
     """
     Grok Tool for AI-powered web and X/Twitter search using xAI's server-side tools.
-    
+
     Features:
     - Web search with domain filtering and image understanding
     - X/Twitter search with handle filtering, date ranges, and video understanding
@@ -35,11 +40,16 @@ class GrokTool(BaseTool):
         tool_config_name = self.__class__.__name__.lower().replace("tool", "")
         self.config = ToolkitConfig.load(self.TOOLKIT, tool_config_name)
 
-        tool_settings = ToolkitConfig.load_tool_settings(self.TOOLKIT, tool_config_name)
+        tool_settings = ToolkitConfig.load_tool_settings(
+            self.TOOLKIT, tool_config_name, DEFAULT_SETTINGS
+        )
+        self.settings = tool_settings
+        self.required_settings = REQUIRED_SETTINGS
+        self._check_required_settings(tool_config_name)
 
         # Priority: toolkit settings > hardcoded default
-        self.api_key = tool_settings.get('GROK_API_KEY', GROK_API_KEY)
-        self.model = tool_settings.get('GROK_MODEL', GROK_MODEL)
+        self.api_key = self.settings.get("GROK_API_KEY", GROK_API_KEY)
+        self.model = self.settings.get("GROK_MODEL", GROK_MODEL)
         self.base_url = "https://api.x.ai"
 
     @property
@@ -157,17 +167,14 @@ class GrokTool(BaseTool):
                         if isinstance(content_array, list):
                             # Find output_text in the content array
                             for content_item in content_array:
-                                if (
-                                    content_item.get("type") == "output_text"
-                                    and content_item.get("text")
-                                ):
+                                if content_item.get(
+                                    "type"
+                                ) == "output_text" and content_item.get("text"):
                                     content = content_item["text"]
                                     annotations = content_item.get("annotations", [])
                                     # Extract URLs from annotations for citations
                                     citations = [
-                                        a["url"]
-                                        for a in annotations
-                                        if a.get("url")
+                                        a["url"] for a in annotations if a.get("url")
                                     ]
                                     break
                         break
@@ -194,7 +201,7 @@ class GrokTool(BaseTool):
         Search the web using Grok's server-side agentic web search tool.
         The model will autonomously call the web_search tool during reasoning.
         Reference: https://docs.x.ai/docs/guides/tools/search-tools
-        
+
         Args:
             query: The search query
             allowed_domains: Max 5 domains to search within
@@ -231,7 +238,7 @@ class GrokTool(BaseTool):
         Search X/Twitter using Grok's server-side agentic X search tool.
         The model will autonomously call the x_search tool during reasoning.
         Reference: https://docs.x.ai/docs/guides/tools/search-tools
-        
+
         Args:
             query: The search query
             allowed_x_handles: Max 10 handles to search within
@@ -273,7 +280,7 @@ class GrokTool(BaseTool):
         Search both web and X using both server-side search tools.
         The model will autonomously call both tools during reasoning.
         Reference: https://docs.x.ai/docs/guides/tools/search-tools
-        
+
         Args:
             query: The search query
             web_options: Options for web search (allowed_domains, excluded_domains, etc.)
@@ -310,7 +317,7 @@ class GrokTool(BaseTool):
         Perform deep research on a topic using web search.
         The model will iteratively call search tools to gather comprehensive information.
         Reference: https://docs.x.ai/docs/guides/tools/search-tools
-        
+
         Args:
             topic: The research topic
             focus_areas: Specific areas to focus on
@@ -348,7 +355,7 @@ Use web search to gather current and accurate information."""
         """
         Get what's trending on X/Twitter.
         Reference: https://docs.x.ai/docs/guides/tools/search-tools
-        
+
         Args:
             location: Geographic location (e.g., "United States", "London")
         """

@@ -27,6 +27,7 @@ debug.log
 leon.json
 bridges/python/src/Pipfile.lock
 bridges/toolkits/**/bins
+bridges/toolkits/**/settings/*
 tcp_server/src/Pipfile.lock
 !tcp_server/**/.gitkeep
 !bridges/toolkits/**/.gitkeep
@@ -35,7 +36,7 @@ tcp_server/src/Pipfile.lock
 !**/*.sample*
 skills/**/src/settings.json
 skills/**/memory/*.json
-bridges/toolkits/**/settings.json
+bridges/toolkits/**/settings/*.json
 core/data/models/*.nlp
 core/data/models/*.json
 core/data/models/llm/*

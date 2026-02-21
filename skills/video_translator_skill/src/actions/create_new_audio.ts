@@ -6,6 +6,7 @@ import type { TranscriptionOutput } from '@sdk/tools/transcription-schema'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
 import { Settings } from '@sdk/settings'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import ChatterboxONNXTool from '@sdk/tools/chatterbox_onnx'
 import Qwen3TTSTool from '@sdk/tools/qwen3_tts'
 import FfmpegTool from '@sdk/tools/ffmpeg'
@@ -330,8 +331,8 @@ export const run: ActionFunction = async function (
     })
 
     // Initialize tools
-    const ffmpegTool = new FfmpegTool()
-    const ffprobeTool = new FfprobeTool()
+    const ffmpegTool = await ToolManager.initTool(FfmpegTool)
+    const ffprobeTool = await ToolManager.initTool(FfprobeTool)
 
     // Prepare output directory
     const audioDir = path.dirname(audioPath)
@@ -453,7 +454,7 @@ export const run: ActionFunction = async function (
 
       try {
         if (provider === 'qwen3_tts') {
-          const qwen3TTSTool = new Qwen3TTSTool()
+          const qwen3TTSTool = await ToolManager.initTool(Qwen3TTSTool)
           const qwenTasks = synthesisTasks.map((task) => ({
             text: task.text,
             target_language: languageName ?? 'Auto',
@@ -464,7 +465,7 @@ export const run: ActionFunction = async function (
 
           await qwen3TTSTool.synthesizeSpeech(qwenTasks)
         } else if (provider === 'chatterbox_onnx') {
-          const chatterboxTool = new ChatterboxONNXTool()
+          const chatterboxTool = await ToolManager.initTool(ChatterboxONNXTool)
           // Note: auto_split is disabled for video translator, so processedTasks === synthesisTasks
           await chatterboxTool.synthesizeSpeechToFiles(synthesisTasks)
         } else {
@@ -692,6 +693,9 @@ export const run: ActionFunction = async function (
       }
     })
   } catch (error) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     leon.answer({
       key: 'synthesis_error',
       data: {

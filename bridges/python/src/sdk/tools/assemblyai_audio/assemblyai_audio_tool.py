@@ -8,8 +8,11 @@ from ...network import Network
 from ...transcription_schema import TranscriptionOutput, TranscriptionSegment
 
 # Hardcoded default settings for AssemblyAI audio tool
-# These can be overridden by toolkit settings.json per toolkit.
 ASSEMBLYAI_AUDIO_API_KEY = None
+DEFAULT_SETTINGS = {
+    "ASSEMBLYAI_AUDIO_API_KEY": ASSEMBLYAI_AUDIO_API_KEY,
+}
+REQUIRED_SETTINGS = ["ASSEMBLYAI_AUDIO_API_KEY"]
 
 
 class AssemblyAIAudioTool(BaseTool):
@@ -19,10 +22,15 @@ class AssemblyAIAudioTool(BaseTool):
         super().__init__()
         self.config = ToolkitConfig.load(self.TOOLKIT, self.tool_name)
 
-        tool_settings = ToolkitConfig.load_tool_settings(self.TOOLKIT, self.tool_name)
+        tool_settings = ToolkitConfig.load_tool_settings(
+            self.TOOLKIT, self.tool_name, DEFAULT_SETTINGS
+        )
+        self.settings = tool_settings
+        self.required_settings = REQUIRED_SETTINGS
+        self._check_required_settings(self.tool_name)
 
         # Priority: toolkit settings > hardcoded default
-        self.api_key = tool_settings.get(
+        self.api_key = self.settings.get(
             "ASSEMBLYAI_AUDIO_API_KEY", ASSEMBLYAI_AUDIO_API_KEY
         )
 
@@ -95,7 +103,7 @@ class AssemblyAIAudioTool(BaseTool):
                     "data": {
                         "audio_url": upload_url,
                         "speaker_labels": speaker_labels,
-                        "language_detection": True
+                        "language_detection": True,
                     },
                     "use_json": True,
                 }

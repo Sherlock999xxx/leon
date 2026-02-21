@@ -11,6 +11,8 @@ type Qwen3ASRTranscriptionOutput = string
 
 const MODEL_NAME = 'qwen3-asr-1.7b'
 const FORCED_ALIGNER_MODEL_NAME = 'qwen3-forcedaligner-0.6b'
+const DEFAULT_SETTINGS: Record<string, unknown> = {}
+const REQUIRED_SETTINGS: string[] = []
 
 interface Qwen3ASRTask {
   audio_path: string
@@ -25,6 +27,14 @@ export default class Qwen3ASRTool extends Tool {
     super()
     // Load configuration from central toolkits directory
     this.config = ToolkitConfig.load(Qwen3ASRTool.TOOLKIT, this.toolName)
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      Qwen3ASRTool.TOOLKIT,
+      this.toolName,
+      DEFAULT_SETTINGS
+    )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(this.toolName)
   }
 
   get toolName(): string {

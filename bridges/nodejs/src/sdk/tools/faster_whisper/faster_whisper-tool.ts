@@ -18,6 +18,8 @@ import { ToolkitConfig } from '@sdk/toolkit-config'
 type FasterWhisperTranscriptionOutput = string
 
 const MODEL_NAME = 'faster-whisper-large-v3'
+const DEFAULT_SETTINGS: Record<string, unknown> = {}
+const REQUIRED_SETTINGS: string[] = []
 
 export default class FasterWhisperTool extends Tool {
   private static readonly TOOLKIT = 'music_audio'
@@ -27,6 +29,14 @@ export default class FasterWhisperTool extends Tool {
     super()
     // Load configuration from central toolkits directory
     this.config = ToolkitConfig.load(FasterWhisperTool.TOOLKIT, this.toolName)
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      FasterWhisperTool.TOOLKIT,
+      this.toolName,
+      DEFAULT_SETTINGS
+    )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(this.toolName)
   }
 
   get toolName(): string {

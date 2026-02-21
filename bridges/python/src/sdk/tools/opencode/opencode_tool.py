@@ -10,9 +10,13 @@ from ...base_tool import BaseTool, ExecuteCommandOptions
 from ...toolkit_config import ToolkitConfig
 
 # Hardcoded default settings for OpenCode tool
-# These can be overridden by toolkit settings.json per toolkit.
 OPENCODE_OPENROUTER_API_KEY = None
 OPENCODE_OPENROUTER_MODEL = "openrouter/openai/gpt-5.2-codex"
+DEFAULT_SETTINGS = {
+    "OPENCODE_OPENROUTER_API_KEY": OPENCODE_OPENROUTER_API_KEY,
+    "OPENCODE_OPENROUTER_MODEL": OPENCODE_OPENROUTER_MODEL,
+}
+REQUIRED_SETTINGS = ["OPENCODE_OPENROUTER_API_KEY"]
 
 
 class OpenCodeTool(BaseTool):
@@ -24,10 +28,15 @@ class OpenCodeTool(BaseTool):
         super().__init__()
         self.config = ToolkitConfig.load(self.TOOLKIT, self.tool_name)
         self.providers: Dict[str, Dict[str, Any]] = {}
-        tool_settings = ToolkitConfig.load_tool_settings(self.TOOLKIT, self.tool_name)
+        tool_settings = ToolkitConfig.load_tool_settings(
+            self.TOOLKIT, self.tool_name, DEFAULT_SETTINGS
+        )
+        self.settings = tool_settings
+        self.required_settings = REQUIRED_SETTINGS
+        self._check_required_settings(self.tool_name)
 
         # Auto-configure providers from toolkit settings
-        self._load_providers_from_settings(tool_settings)
+        self._load_providers_from_settings(self.settings)
 
         # Provider configurations based on OpenCode documentation
         self.provider_configs = {

@@ -48,6 +48,21 @@ export interface ExecuteCommandOptions {
 
 export abstract class Tool {
   /**
+   * Tool settings loaded from toolkit settings.json
+   */
+  protected settings: Record<string, unknown> = {}
+  /**
+   * Required settings keys for this tool
+   */
+  protected requiredSettings: string[] = []
+  /**
+   * Missing required settings details
+   */
+  protected missingSettings: {
+    missing: string[]
+    settingsPath: string
+  } | null = null
+  /**
    * Tool name
    */
   abstract get toolName(): string
@@ -66,6 +81,51 @@ export abstract class Tool {
    * Enable CLI progress display for downloads (logs to stdout instead of stderr to avoid JSON interference)
    */
   protected cliProgress: boolean = true
+
+  /**
+   * Get the settings.json path for this tool
+   */
+  protected getSettingsPath(toolName?: string): string {
+    const resolvedToolName = toolName || this.toolName
+    return path.join(
+      TOOLKITS_PATH,
+      this.toolkit,
+      'settings',
+      `${resolvedToolName}.json`
+    )
+  }
+
+  /**
+   * Check required settings and store missing ones
+   */
+  protected checkRequiredSettings(toolName?: string): void {
+    if (this.requiredSettings.length === 0) {
+      this.missingSettings = null
+      return
+    }
+
+    const missing = this.requiredSettings.filter((key) => {
+      const value = this.settings[key]
+      if (value === undefined || value === null) return true
+      if (typeof value === 'string' && value.trim() === '') return true
+      return false
+    })
+
+    this.missingSettings =
+      missing.length > 0
+        ? {
+            missing,
+            settingsPath: this.getSettingsPath(toolName)
+          }
+        : null
+  }
+
+  /**
+   * Get missing required settings information
+   */
+  getMissingSettings(): { missing: string[]; settingsPath: string } | null {
+    return this.missingSettings
+  }
 
   /**
    * Resolve module directory from module URL

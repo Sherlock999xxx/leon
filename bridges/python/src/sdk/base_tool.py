@@ -52,6 +52,9 @@ class BaseTool(ABC):
     def __init__(self):
         """Initialize the tool with default settings"""
         self.cli_progress = True
+        self.settings: Dict[str, Any] = {}
+        self.required_settings: List[str] = []
+        self.missing_settings: Optional[Dict[str, Any]] = None
 
     @property
     @abstractmethod
@@ -70,6 +73,38 @@ class BaseTool(ABC):
     def description(self) -> str:
         """Tool description"""
         pass
+
+    def _get_settings_path(self, tool_name: Optional[str] = None) -> str:
+        resolved_tool_name = tool_name or self.tool_name
+        return os.path.join(
+            TOOLKITS_PATH, self.toolkit, "settings", f"{resolved_tool_name}.json"
+        )
+
+    def _check_required_settings(self, tool_name: Optional[str] = None) -> None:
+        if not self.required_settings:
+            self.missing_settings = None
+            return
+
+        missing: List[str] = []
+        for key in self.required_settings:
+            value = self.settings.get(key)
+            if value is None:
+                missing.append(key)
+                continue
+            if isinstance(value, str) and value.strip() == "":
+                missing.append(key)
+
+        self.missing_settings = (
+            {
+                "missing": missing,
+                "settings_path": self._get_settings_path(tool_name),
+            }
+            if missing
+            else None
+        )
+
+    def get_missing_settings(self) -> Optional[Dict[str, Any]]:
+        return self.missing_settings
 
     def _escape_shell_arg(self, arg: str) -> str:
         """

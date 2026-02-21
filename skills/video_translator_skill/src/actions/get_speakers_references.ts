@@ -5,6 +5,7 @@ import type { ActionFunction, ActionParams } from '@sdk/types'
 import type { TranscriptionOutput } from '@sdk/tools/transcription-schema'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import FfmpegTool from '@sdk/tools/ffmpeg'
 import { formatFilePath } from '@sdk/utils'
 
@@ -87,7 +88,7 @@ export const run: ActionFunction = async function (
     const firstThirdEnd = transcription.duration / 3
 
     // Initialize ffmpeg tool
-    const ffmpegTool = new FfmpegTool()
+    const ffmpegTool = await ToolManager.initTool(FfmpegTool)
 
     // Prepare output directory
     const audioDir = path.dirname(audioPath)
@@ -237,6 +238,9 @@ export const run: ActionFunction = async function (
       }
     })
   } catch (error) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     leon.answer({
       key: 'extraction_error',
       data: {

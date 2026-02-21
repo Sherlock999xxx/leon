@@ -5,6 +5,7 @@ import type { ActionFunction, ActionParams } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
 import { Settings } from '@sdk/settings'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import ElevenLabsAudioTool from '@sdk/tools/elevenlabs_audio'
 import { formatBytes, formatFilePath } from '@sdk/utils'
 
@@ -85,7 +86,7 @@ export const run: ActionFunction = async function (
     })
 
     // Initialize ElevenLabs tool
-    const tool = new ElevenLabsAudioTool()
+    const tool = await ToolManager.initTool(ElevenLabsAudioTool)
     const resolvedApiKey = elevenlabsApiKey || tool.apiKey
     if (!resolvedApiKey) {
       leon.answer({
@@ -216,6 +217,9 @@ export const run: ActionFunction = async function (
       }
     })
   } catch (error) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     leon.answer({
       key: 'dubbing_error',
       data: { error: (error as Error).message }

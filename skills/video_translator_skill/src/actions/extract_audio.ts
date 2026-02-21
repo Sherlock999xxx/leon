@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { ActionFunction, ActionParams } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import FfmpegTool from '@sdk/tools/ffmpeg'
 import { formatBytes, formatFilePath } from '@sdk/utils'
 
@@ -36,7 +37,7 @@ export const run: ActionFunction = async function (
     }
 
     // Initialize ffmpeg tool
-    const ffmpegTool = new FfmpegTool()
+    const ffmpegTool = await ToolManager.initTool(FfmpegTool)
 
     // Verify the input video file exists
     if (!fs.existsSync(videoPath)) {
@@ -119,6 +120,9 @@ export const run: ActionFunction = async function (
       }
     })
   } catch (error) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     leon.answer({
       key: 'extraction_error',
       data: {

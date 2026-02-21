@@ -1,7 +1,8 @@
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { getPlatformName } from '@sdk/utils'
+import { TOOLKITS_PATH } from '@bridge/constants'
 
 interface ToolConfig {
   description: string
@@ -29,13 +30,7 @@ export class ToolkitConfig {
 
     // Load toolkit config if not cached
     if (!this.configCache.has(cacheKey)) {
-      const configPath = join(
-        process.cwd(),
-        'bridges',
-        'toolkits',
-        toolkitName,
-        'toolkit.json'
-      )
+      const configPath = join(TOOLKITS_PATH, toolkitName, 'toolkit.json')
       const configContent = readFileSync(configPath, 'utf-8')
       const config = JSON.parse(configContent) as ToolkitConfigData
 
@@ -55,46 +50,53 @@ export class ToolkitConfig {
   }
 
   /**
-   * Load toolkit settings from bridges/toolkits directory
-   * @param toolkitName - The toolkit name (e.g., 'video_streaming')
-   */
-  static loadSettings(toolkitName: string): Record<string, unknown> {
-    const cacheKey = toolkitName
-
-    if (!this.settingsCache.has(cacheKey)) {
-      const settingsPath = join(
-        process.cwd(),
-        'bridges',
-        'toolkits',
-        toolkitName,
-        'settings.json'
-      )
-
-      let settingsConfig: Record<string, unknown> = {}
-      if (existsSync(settingsPath)) {
-        const settingsContent = readFileSync(settingsPath, 'utf-8')
-        settingsConfig = JSON.parse(settingsContent) as Record<string, unknown>
-      }
-
-      this.settingsCache.set(cacheKey, settingsConfig)
-    }
-
-    return this.settingsCache.get(cacheKey) || {}
-  }
-
-  /**
    * Load tool-specific settings from toolkit settings file
    * @param toolkitName - The toolkit name (e.g., 'video_streaming')
    * @param toolName - Name of the tool (e.g., 'ffmpeg')
+   * @param defaults - Default tool settings to apply when missing
    */
   static loadToolSettings(
     toolkitName: string,
-    toolName: string
+    toolName: string,
+    defaults: Record<string, unknown> = {}
   ): Record<string, unknown> {
-    const settings = this.loadSettings(toolkitName)
-    const toolSettings = settings[toolName] as Record<string, unknown>
+    const cacheKey = `${toolkitName}:${toolName}`
+    if (this.settingsCache.has(cacheKey)) {
+      return this.settingsCache.get(cacheKey) || {}
+    }
 
-    return toolSettings && typeof toolSettings === 'object' ? toolSettings : {}
+    const settingsDir = join(TOOLKITS_PATH, toolkitName, 'settings')
+    const settingsPath = join(settingsDir, `${toolName}.json`)
+
+    mkdirSync(settingsDir, { recursive: true })
+
+    let toolSettings: Record<string, unknown> = {}
+    let shouldWrite = false
+
+    if (existsSync(settingsPath)) {
+      const settingsContent = readFileSync(settingsPath, 'utf-8')
+      toolSettings = JSON.parse(settingsContent) as Record<string, unknown>
+    } else {
+      shouldWrite = true
+    }
+
+    const mergedSettings = { ...defaults, ...toolSettings }
+
+    if (!shouldWrite) {
+      for (const key of Object.keys(defaults)) {
+        if (!Object.prototype.hasOwnProperty.call(toolSettings, key)) {
+          shouldWrite = true
+          break
+        }
+      }
+    }
+
+    if (shouldWrite) {
+      writeFileSync(settingsPath, JSON.stringify(mergedSettings, null, 2))
+    }
+
+    this.settingsCache.set(cacheKey, mergedSettings)
+    return mergedSettings
   }
 
   /**

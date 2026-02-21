@@ -11,6 +11,8 @@ from ....constants import NVIDIA_LIBS_PATH
 
 MODEL_NAME = "chatterbox-multilingual-onnx"
 DEFAULT_MAX_CHARS = 272  # Character limit to avoid hallucination
+DEFAULT_SETTINGS = {}
+REQUIRED_SETTINGS = []
 
 
 def split_text_at_punctuation(
@@ -101,6 +103,11 @@ class ChatterboxONNXTool(BaseTool):
         super().__init__()
         # Load configuration from central toolkits directory
         self.config = ToolkitConfig.load(self.TOOLKIT, self.tool_name)
+        self.settings = ToolkitConfig.load_tool_settings(
+            self.TOOLKIT, self.tool_name, DEFAULT_SETTINGS
+        )
+        self.required_settings = REQUIRED_SETTINGS
+        self._check_required_settings(self.tool_name)
 
     @property
     def tool_name(self) -> str:

@@ -2,6 +2,7 @@ import type { ActionFunction } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
 import { Settings } from '@sdk/settings'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import GrokTool from '@sdk/tools/grok'
 import OpenRouterTool from '@sdk/tools/openrouter'
 import ChatterboxONNXTool from '@sdk/tools/chatterbox_onnx'
@@ -74,7 +75,7 @@ export const run: ActionFunction = async function (
       data: { topic }
     })
 
-    const grok = new GrokTool()
+    const grok = await ToolManager.initTool(GrokTool)
     if (grokApiKey) {
       grok.setApiKey(grokApiKey)
     }
@@ -108,7 +109,7 @@ export const run: ActionFunction = async function (
     // Step 2: Generate podcast script using OpenRouter with structured output
     leon.answer({ key: 'generating_script' })
 
-    const openrouter = new OpenRouterTool()
+    const openrouter = await ToolManager.initTool(OpenRouterTool)
     if (openrouterApiKey) {
       openrouter.setApiKey(openrouterApiKey)
     }
@@ -200,7 +201,7 @@ Generate the script as a JSON object with this structure:
     // Step 3: Synthesize audio using ChatterboxONNX (batch processing!)
     leon.answer({ key: 'synthesizing_audio' })
 
-    const chatterbox = new ChatterboxONNXTool()
+    const chatterbox = await ToolManager.initTool(ChatterboxONNXTool)
 
     // Create output directory
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'podcast_'))
@@ -238,8 +239,8 @@ Generate the script as a JSON object with this structure:
       await chatterbox.synthesizeSpeechToFiles(synthesisTasks)
 
     // Step 4: Merge all audio segments into final podcast
-    const ffmpeg = new FfmpegTool()
-    const ffprobe = new FfprobeTool()
+    const ffmpeg = await ToolManager.initTool(FfmpegTool)
+    const ffprobe = await ToolManager.initTool(FfprobeTool)
 
     // Get all generated segment paths (including auto-split parts)
     const segmentPaths = processedTasks.map((task) => task.audio_path)
@@ -279,6 +280,9 @@ Generate the script as a JSON object with this structure:
       }
     })
   } catch (error: unknown) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     leon.answer({
       key: 'error',
       data: { error: (error as Error).message }

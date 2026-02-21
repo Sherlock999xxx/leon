@@ -4,6 +4,9 @@ from ...base_tool import BaseTool
 from ...toolkit_config import ToolkitConfig
 from ...network import Network, NetworkError
 
+DEFAULT_SETTINGS = {}
+REQUIRED_SETTINGS = []
+
 
 WMO_CODE_DESCRIPTIONS: Dict[int, str] = {
     0: "Clear sky",
@@ -78,6 +81,11 @@ class OpenMeteoTool(BaseTool):
             self.__class__.__name__.lower().replace("tool", "").replace("-", "")
         )
         self.config = ToolkitConfig.load(self.TOOLKIT, tool_config_name)
+        self.settings = ToolkitConfig.load_tool_settings(
+            self.TOOLKIT, tool_config_name, DEFAULT_SETTINGS
+        )
+        self.required_settings = REQUIRED_SETTINGS
+        self._check_required_settings(tool_config_name)
         self.geocoding_network = Network(
             {"base_url": "https://geocoding-api.open-meteo.com"}
         )

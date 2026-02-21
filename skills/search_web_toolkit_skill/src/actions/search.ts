@@ -2,6 +2,7 @@ import type { ActionFunction, ActionParams } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
 import { Settings } from '@sdk/settings'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import GrokTool from '@sdk/tools/grok'
 
 interface SearchSkillSettings extends Record<string, unknown> {
@@ -62,7 +63,7 @@ export const run: ActionFunction = async function (
     const grokApiKey = (await settings.get('grok_api_key')) as
       | string
       | undefined
-    const grok = new GrokTool()
+    const grok = await ToolManager.initTool(GrokTool)
     if (grokApiKey) {
       grok.setApiKey(grokApiKey)
     }
@@ -238,6 +239,9 @@ export const run: ActionFunction = async function (
       })
     }
   } catch (error: unknown) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     leon.answer({
       key: 'search_error',
       data: {

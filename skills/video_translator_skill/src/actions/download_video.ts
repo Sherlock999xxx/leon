@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import type { ActionFunction, ActionParams } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import YtdlpTool from '@sdk/tools/ytdlp'
 import { formatFilePath } from '@sdk/utils'
 
@@ -35,7 +36,7 @@ export const run: ActionFunction = async function (
 
   try {
     // Initialize yt-dlp tool
-    const ytdlpTool = new YtdlpTool()
+    const ytdlpTool = await ToolManager.initTool(YtdlpTool)
 
     // Create temporary directory for downloads
     const tempDir = path.join(
@@ -177,6 +178,9 @@ export const run: ActionFunction = async function (
       }
     })
   } catch (error) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     leon.answer({
       key: 'download_error',
       data: {

@@ -6,6 +6,7 @@ import type { TranscriptionOutput } from '@sdk/tools/transcription-schema'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
 import { Settings } from '@sdk/settings'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import OpenRouterTool from '@sdk/tools/openrouter'
 import { formatFilePath } from '@sdk/utils'
 
@@ -95,9 +96,10 @@ export const run: ActionFunction = async function (
     })
 
     // Initialize OpenRouter tool
-    const tool = openrouterApiKey
-      ? new OpenRouterTool(openrouterApiKey)
-      : new OpenRouterTool()
+    const tool = await ToolManager.initTool(OpenRouterTool)
+    if (openrouterApiKey) {
+      tool.setApiKey(openrouterApiKey)
+    }
 
     // Prepare translated segments array
     const translatedSegments = [...transcription.segments]
@@ -250,6 +252,9 @@ Do not include any explanations or additional text.`
       }
     })
   } catch (error) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     leon.answer({
       key: 'translation_error',
       data: { error: (error as Error).message }

@@ -7,29 +7,39 @@ from ...network import Network
 from .schemas import TranscriptionOutput, TranscriptionSegment
 
 # Hardcoded default settings for OpenAI audio tool
-# These can be overridden by toolkit settings.json per toolkit.
 OPENAI_AUDIO_API_KEY = None
-OPENAI_AUDIO_MODEL = 'whisper-1'
+OPENAI_AUDIO_MODEL = "whisper-1"
+DEFAULT_SETTINGS = {
+    "OPENAI_AUDIO_API_KEY": OPENAI_AUDIO_API_KEY,
+    "OPENAI_AUDIO_MODEL": OPENAI_AUDIO_MODEL,
+}
+REQUIRED_SETTINGS = ["OPENAI_AUDIO_API_KEY"]
+
 
 class OpenAIAudioTool(BaseTool):
-    TOOLKIT = 'music_audio'
+    TOOLKIT = "music_audio"
 
     def __init__(self):
         super().__init__()
         self.config = ToolkitConfig.load(self.TOOLKIT, self.tool_name)
 
-        tool_settings = ToolkitConfig.load_tool_settings(self.TOOLKIT, self.tool_name)
+        tool_settings = ToolkitConfig.load_tool_settings(
+            self.TOOLKIT, self.tool_name, DEFAULT_SETTINGS
+        )
+        self.settings = tool_settings
+        self.required_settings = REQUIRED_SETTINGS
+        self._check_required_settings(self.tool_name)
 
         # Priority: toolkit settings > hardcoded default
-        self.api_key = tool_settings.get('OPENAI_AUDIO_API_KEY', OPENAI_AUDIO_API_KEY)
-        self.model = tool_settings.get('OPENAI_AUDIO_MODEL', OPENAI_AUDIO_MODEL)
+        self.api_key = self.settings.get("OPENAI_AUDIO_API_KEY", OPENAI_AUDIO_API_KEY)
+        self.model = self.settings.get("OPENAI_AUDIO_MODEL", OPENAI_AUDIO_MODEL)
 
-        self.network = Network({'base_url': 'https://api.openai.com'})
+        self.network = Network({"base_url": "https://api.openai.com"})
 
     @property
     def tool_name(self) -> str:
         # Use the actual config name for toolkit lookup
-        return 'openai_audio'
+        return "openai_audio"
 
     @property
     def toolkit(self) -> str:
@@ -37,14 +47,14 @@ class OpenAIAudioTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return self.config['description']
+        return self.config["description"]
 
     def transcribe_to_file(
         self,
         input_path: str,
         output_path: str,
         api_key: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
     ) -> str:
         """
         Transcribe audio to a file using OpenAI's audio transcription API via SDK Network
@@ -62,67 +72,62 @@ class OpenAIAudioTool(BaseTool):
         api_key = api_key or self.api_key
         model = model or self.model
         if not api_key:
-            raise Exception('OpenAI API key is missing')
+            raise Exception("OpenAI API key is missing")
 
         try:
-            files: dict = {
-                'file': open(input_path, 'rb')
-            }
+            files: dict = {"file": open(input_path, "rb")}
             data: dict = {
-                'model': model,
-                'chunking_strategy': 'auto',
-                'response_format': 'diarized_json'
+                "model": model,
+                "chunking_strategy": "auto",
+                "response_format": "diarized_json",
             }
 
-            response = self.network.request({
-                'url': '/v1/audio/transcriptions',
-                'method': 'POST',
-                'headers': {
-                    'Authorization': f'Bearer {api_key}'
-                },
-                'data': data,
-                'files': files,
-                'use_json': True
-            })
+            response = self.network.request(
+                {
+                    "url": "/v1/audio/transcriptions",
+                    "method": "POST",
+                    "headers": {"Authorization": f"Bearer {api_key}"},
+                    "data": data,
+                    "files": files,
+                    "use_json": True,
+                }
+            )
 
-            parsed_output = self._parse_transcription(response['data'])
+            parsed_output = self._parse_transcription(response["data"])
 
-            with open(output_path, 'w', encoding='utf-8') as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(parsed_output, f, indent=2, ensure_ascii=False)
 
             return output_path
         except Exception as e:
-            raise Exception(f'OpenAI transcription failed: {str(e)}')
+            raise Exception(f"OpenAI transcription failed: {str(e)}")
 
-    def _parse_transcription(
-        self,
-        raw_output: Dict[str, Any]
-    ) -> TranscriptionOutput:
-        segments_data = raw_output.get('segments', [])
-        unique_speakers = list(set(
-            seg.get('speaker') for seg in segments_data if seg.get('speaker')
-        ))
+    def _parse_transcription(self, raw_output: Dict[str, Any]) -> TranscriptionOutput:
+        segments_data = raw_output.get("segments", [])
+        unique_speakers = list(
+            set(seg.get("speaker") for seg in segments_data if seg.get("speaker"))
+        )
 
         segments: List[TranscriptionSegment] = []
         for segment in segments_data:
-            segments.append({
-                'from': float(segment.get('start', 0)),
-                'to': float(segment.get('end', 0)),
-                'text': segment.get('text', ''),
-                'speaker': segment.get('speaker') or None
-            })
+            segments.append(
+                {
+                    "from": float(segment.get("start", 0)),
+                    "to": float(segment.get("end", 0)),
+                    "text": segment.get("text", ""),
+                    "speaker": segment.get("speaker") or None,
+                }
+            )
 
         # If duration is not found, use the "to" property from the last segment
-        duration = raw_output.get('duration')
+        duration = raw_output.get("duration")
         if not duration and len(segments) > 0:
-            duration = segments[-1]['to'] or 0.0
+            duration = segments[-1]["to"] or 0.0
 
         return {
-            'duration': float(duration) if duration else 0.0,
-            'speakers': unique_speakers,
-            'speaker_count': len(unique_speakers),
-            'segments': segments,
-            'metadata': {
-                'tool': self.tool_name
-            }
+            "duration": float(duration) if duration else 0.0,
+            "speakers": unique_speakers,
+            "speaker_count": len(unique_speakers),
+            "segments": segments,
+            "metadata": {"tool": self.tool_name},
         }

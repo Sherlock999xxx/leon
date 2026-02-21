@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import type { ActionFunction, ActionParams } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import FfmpegTool from '@sdk/tools/ffmpeg'
 import YtdlpTool from '@sdk/tools/ytdlp'
 import { formatFilePath } from '@sdk/utils'
@@ -59,7 +60,7 @@ export const run: ActionFunction = async function (
     let audioPath: string
 
     if (isHttpUrl(videoSource)) {
-      const ytdlpTool = new YtdlpTool()
+      const ytdlpTool = await ToolManager.initTool(YtdlpTool)
       const tempDir = path.join(
         tmpdir(),
         'video_summarizer',
@@ -96,7 +97,7 @@ export const run: ActionFunction = async function (
       if (AUDIO_EXTENSIONS.has(extension)) {
         audioPath = videoSource
       } else {
-        const ffmpegTool = new FfmpegTool()
+        const ffmpegTool = await ToolManager.initTool(FfmpegTool)
         const tempDir = path.join(
           tmpdir(),
           'video_summarizer',
@@ -141,6 +142,9 @@ export const run: ActionFunction = async function (
       }
     })
   } catch (error) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     const errorMessage = (error as Error).message
     leon.answer({
       key: isHttpUrl(videoSource)

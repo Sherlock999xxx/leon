@@ -4,6 +4,8 @@ import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 
 const MODEL_NAME = 'ecapa-voice_gender_classifier'
+const DEFAULT_SETTINGS: Record<string, unknown> = {}
+const REQUIRED_SETTINGS: string[] = []
 
 export default class ECAPATool extends Tool {
   private static readonly TOOLKIT = 'music_audio'
@@ -13,6 +15,14 @@ export default class ECAPATool extends Tool {
     super()
     // Load configuration from central toolkits directory
     this.config = ToolkitConfig.load(ECAPATool.TOOLKIT, this.toolName)
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      ECAPATool.TOOLKIT,
+      this.toolName,
+      DEFAULT_SETTINGS
+    )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(this.toolName)
   }
 
   get toolName(): string {

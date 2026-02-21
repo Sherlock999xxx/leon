@@ -8,9 +8,13 @@ import { ToolkitConfig } from '@sdk/toolkit-config'
 import { Network } from '@sdk/network'
 
 // Hardcoded default settings for OpenAI audio tool
-// These can be overridden by toolkit settings.json per toolkit.
 const OPENAI_AUDIO_API_KEY: string | null = null
 const OPENAI_AUDIO_MODEL = 'whisper-1'
+const DEFAULT_SETTINGS: Record<string, unknown> = {
+  OPENAI_AUDIO_API_KEY,
+  OPENAI_AUDIO_MODEL
+}
+const REQUIRED_SETTINGS = ['OPENAI_AUDIO_API_KEY']
 
 interface OpenAITranscriptionOutput {
   task: string
@@ -42,14 +46,18 @@ export default class OpenAIAudioTool extends Tool {
 
     const toolSettings = ToolkitConfig.loadToolSettings(
       OpenAIAudioTool.TOOLKIT,
-      this.toolName
+      this.toolName,
+      DEFAULT_SETTINGS
     )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(this.toolName)
 
     // Priority: toolkit settings > hardcoded default
     this.apiKey =
-      (toolSettings['OPENAI_AUDIO_API_KEY'] as string) || OPENAI_AUDIO_API_KEY
+      (this.settings['OPENAI_AUDIO_API_KEY'] as string) || OPENAI_AUDIO_API_KEY
     this.model =
-      (toolSettings['OPENAI_AUDIO_MODEL'] as string) || OPENAI_AUDIO_MODEL
+      (this.settings['OPENAI_AUDIO_MODEL'] as string) || OPENAI_AUDIO_MODEL
   }
 
   get toolName(): string {

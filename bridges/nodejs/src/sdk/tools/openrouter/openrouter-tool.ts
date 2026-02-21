@@ -3,9 +3,13 @@ import { ToolkitConfig } from '@sdk/toolkit-config'
 import { Network, NetworkError } from '@sdk/network'
 
 // Hardcoded default settings for OpenRouter tool
-// These can be overridden by toolkit settings.json per toolkit.
 const OPENROUTER_API_KEY: string | null = null
 const OPENROUTER_MODEL = 'google/gemini-3-flash-preview'
+const DEFAULT_SETTINGS: Record<string, unknown> = {
+  OPENROUTER_API_KEY,
+  OPENROUTER_MODEL
+}
+const REQUIRED_SETTINGS = ['OPENROUTER_API_KEY']
 
 interface ChatMessage {
   role: string
@@ -70,18 +74,22 @@ export default class OpenRouterTool extends Tool {
 
     const toolSettings = ToolkitConfig.loadToolSettings(
       OpenRouterTool.TOOLKIT,
-      toolConfigName
+      toolConfigName,
+      DEFAULT_SETTINGS
     )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(toolConfigName)
 
     // Priority: skill-provided apiKey > toolkit settings > hardcoded default
     this.api_key =
       apiKey ||
-      (toolSettings['OPENROUTER_API_KEY'] as string) ||
+      (this.settings['OPENROUTER_API_KEY'] as string) ||
       OPENROUTER_API_KEY
 
     // Load model from toolkit settings or hardcoded default
     this.model =
-      (toolSettings['OPENROUTER_MODEL'] as string) || OPENROUTER_MODEL
+      (this.settings['OPENROUTER_MODEL'] as string) || OPENROUTER_MODEL
 
     this.network = new Network({ baseURL: 'https://openrouter.ai/api' })
   }

@@ -8,9 +8,13 @@ import { ToolkitConfig } from '@sdk/toolkit-config'
 import { Network } from '@sdk/network'
 
 // Hardcoded default settings for ElevenLabs audio tool
-// These can be overridden by toolkit settings.json per toolkit.
 const ELEVENLABS_AUDIO_API_KEY: string | null = null
 const ELEVENLABS_AUDIO_MODEL = 'scribe_v1'
+const DEFAULT_SETTINGS: Record<string, unknown> = {
+  ELEVENLABS_AUDIO_API_KEY,
+  ELEVENLABS_AUDIO_MODEL
+}
+const REQUIRED_SETTINGS = ['ELEVENLABS_AUDIO_API_KEY']
 
 interface ElevenLabsWord {
   text: string
@@ -54,15 +58,19 @@ export default class ElevenLabsAudioTool extends Tool {
 
     const toolSettings = ToolkitConfig.loadToolSettings(
       ElevenLabsAudioTool.TOOLKIT,
-      this.toolName
+      this.toolName,
+      DEFAULT_SETTINGS
     )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(this.toolName)
 
     // Priority: toolkit settings > hardcoded default
     this.apiKey =
-      (toolSettings['ELEVENLABS_AUDIO_API_KEY'] as string) ||
+      (this.settings['ELEVENLABS_AUDIO_API_KEY'] as string) ||
       ELEVENLABS_AUDIO_API_KEY
     this.model =
-      (toolSettings['ELEVENLABS_AUDIO_MODEL'] as string) ||
+      (this.settings['ELEVENLABS_AUDIO_MODEL'] as string) ||
       ELEVENLABS_AUDIO_MODEL
   }
 

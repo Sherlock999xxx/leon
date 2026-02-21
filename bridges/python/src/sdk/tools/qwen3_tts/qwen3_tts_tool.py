@@ -22,6 +22,8 @@ from ....constants import NVIDIA_LIBS_PATH, PYTORCH_TORCH_PATH
 MODEL_BASE_NAME = "Qwen3-TTS-12Hz-1.7B-Base"
 MODEL_DESIGN_NAME = "Qwen3-TTS-12Hz-1.7B-VoiceDesign"
 MODEL_CUSTOM_NAME = "Qwen3-TTS-12Hz-1.7B-CustomVoice"
+DEFAULT_SETTINGS = {}
+REQUIRED_SETTINGS = []
 
 SupportedLanguage = Literal[
     "Auto",
@@ -156,6 +158,11 @@ class Qwen3TTSTool(BaseTool):
         super().__init__()
         # Load configuration from central toolkits directory
         self.config = ToolkitConfig.load(self.TOOLKIT, self.tool_name)
+        self.settings = ToolkitConfig.load_tool_settings(
+            self.TOOLKIT, self.tool_name, DEFAULT_SETTINGS
+        )
+        self.required_settings = REQUIRED_SETTINGS
+        self._check_required_settings(self.tool_name)
 
     @property
     def tool_name(self) -> str:

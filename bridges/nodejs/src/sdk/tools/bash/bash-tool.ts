@@ -1,6 +1,9 @@
 import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 
+const DEFAULT_SETTINGS: Record<string, unknown> = {}
+const REQUIRED_SETTINGS: string[] = []
+
 interface BashResult {
   success: boolean
   stdout: string
@@ -26,6 +29,14 @@ export default class BashTool extends Tool {
       .toLowerCase()
       .replace('tool', '')
     this.config = ToolkitConfig.load(BashTool.TOOLKIT, toolConfigName)
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      BashTool.TOOLKIT,
+      toolConfigName,
+      DEFAULT_SETTINGS
+    )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(toolConfigName)
   }
 
   get toolName(): string {

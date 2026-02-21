@@ -9,6 +9,8 @@ import { getPlatformName } from '@sdk/utils'
 
 const MODEL_NAME = 'chatterbox-multilingual-onnx'
 const DEFAULT_MAX_CHARS = 272 // Character limit to avoid hallucination
+const DEFAULT_SETTINGS: Record<string, unknown> = {}
+const REQUIRED_SETTINGS: string[] = []
 
 interface SynthesisTask {
   text: string
@@ -93,6 +95,14 @@ export default class ChatterboxONNXTool extends Tool {
     super()
     // Load configuration from central toolkits directory
     this.config = ToolkitConfig.load(ChatterboxONNXTool.TOOLKIT, this.toolName)
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      ChatterboxONNXTool.TOOLKIT,
+      this.toolName,
+      DEFAULT_SETTINGS
+    )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(this.toolName)
   }
 
   get toolName(): string {

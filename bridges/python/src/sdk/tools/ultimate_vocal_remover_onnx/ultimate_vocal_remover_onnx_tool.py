@@ -9,6 +9,8 @@ from ...utils import get_platform_name
 from ....constants import NVIDIA_LIBS_PATH
 
 MODEL_NAME = "ultimate-vocal-remover-onnx"
+DEFAULT_SETTINGS = {}
+REQUIRED_SETTINGS = []
 
 
 class VocalSeparationTask(TypedDict, total=False):
@@ -31,6 +33,11 @@ class UltimateVocalRemoverONNXTool(BaseTool):
         super().__init__()
         # Load configuration from central toolkits directory
         self.config = ToolkitConfig.load(self.TOOLKIT, self.tool_name)
+        self.settings = ToolkitConfig.load_tool_settings(
+            self.TOOLKIT, self.tool_name, DEFAULT_SETTINGS
+        )
+        self.required_settings = REQUIRED_SETTINGS
+        self._check_required_settings(self.tool_name)
 
     @property
     def tool_name(self) -> str:

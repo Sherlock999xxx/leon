@@ -6,9 +6,13 @@ import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 
 // Hardcoded default settings for OpenCode tool
-// These can be overridden by toolkit settings.json per toolkit.
 const OPENCODE_OPENROUTER_API_KEY: string | null = null
 const OPENCODE_OPENROUTER_MODEL = 'openrouter/openai/gpt-5.2-codex'
+const DEFAULT_SETTINGS: Record<string, unknown> = {
+  OPENCODE_OPENROUTER_API_KEY,
+  OPENCODE_OPENROUTER_MODEL
+}
+const REQUIRED_SETTINGS = ['OPENCODE_OPENROUTER_API_KEY']
 
 interface OpenCodeProvider {
   name: string
@@ -59,11 +63,15 @@ export default class OpenCodeTool extends Tool {
 
     const toolSettings = ToolkitConfig.loadToolSettings(
       OpenCodeTool.TOOLKIT,
-      this.toolName
+      this.toolName,
+      DEFAULT_SETTINGS
     )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(this.toolName)
 
     // Auto-configure providers from toolkit settings
-    this.loadProvidersFromSettings(toolSettings)
+    this.loadProvidersFromSettings(this.settings)
   }
 
   /**

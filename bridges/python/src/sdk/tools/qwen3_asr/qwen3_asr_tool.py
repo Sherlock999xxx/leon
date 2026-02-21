@@ -11,6 +11,8 @@ from ....constants import NVIDIA_LIBS_PATH, PYTORCH_TORCH_PATH
 
 MODEL_NAME = "qwen3-asr-1.7b"
 FORCED_ALIGNER_MODEL_NAME = "qwen3-forcedaligner-0.6b"
+DEFAULT_SETTINGS = {}
+REQUIRED_SETTINGS = []
 
 
 class Qwen3ASRTool(BaseTool):
@@ -28,6 +30,11 @@ class Qwen3ASRTool(BaseTool):
         super().__init__()
         # Load configuration from central toolkits directory
         self.config = ToolkitConfig.load(self.TOOLKIT, self.tool_name)
+        self.settings = ToolkitConfig.load_tool_settings(
+            self.TOOLKIT, self.tool_name, DEFAULT_SETTINGS
+        )
+        self.required_settings = REQUIRED_SETTINGS
+        self._check_required_settings(self.tool_name)
 
     @property
     def tool_name(self) -> str:

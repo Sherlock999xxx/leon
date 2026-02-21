@@ -5,6 +5,7 @@ import type { ActionFunction, ActionParams } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
 import { Settings } from '@sdk/settings'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import FasterWhisperTool from '@sdk/tools/faster_whisper'
 import Qwen3ASRTool from '@sdk/tools/qwen3_asr'
 import OpenAIAudioTool from '@sdk/tools/openai_audio'
@@ -110,7 +111,7 @@ export const run: ActionFunction = async function (
     })
 
     if (provider === 'faster_whisper') {
-      const tool = new FasterWhisperTool()
+      const tool = await ToolManager.initTool(FasterWhisperTool)
       await tool.transcribeToFile(
         audioPath,
         transcriptionPath,
@@ -118,10 +119,10 @@ export const run: ActionFunction = async function (
         fasterWhisperCPUThreads
       )
     } else if (provider === 'qwen3_asr') {
-      const tool = new Qwen3ASRTool()
+      const tool = await ToolManager.initTool(Qwen3ASRTool)
       await tool.transcribeToFile(audioPath, transcriptionPath, qwen3ASRDevice)
     } else if (provider === 'openai_audio') {
-      const tool = new OpenAIAudioTool()
+      const tool = await ToolManager.initTool(OpenAIAudioTool)
       const resolvedApiKey = openaiAPIKey || tool.apiKey
       if (!resolvedApiKey) {
         leon.answer({ key: 'missing_api_key' })
@@ -135,7 +136,7 @@ export const run: ActionFunction = async function (
         openaiModel
       )
     } else if (provider === 'assemblyai_audio') {
-      const tool = new AssemblyAIAudioTool()
+      const tool = await ToolManager.initTool(AssemblyAIAudioTool)
       const resolvedApiKey = assemblyaiAPIKey || tool.apiKey
       if (!resolvedApiKey) {
         leon.answer({ key: 'missing_api_key' })
@@ -144,7 +145,7 @@ export const run: ActionFunction = async function (
 
       await tool.transcribeToFile(audioPath, transcriptionPath, resolvedApiKey)
     } else if (provider === 'elevenlabs_audio') {
-      const tool = new ElevenLabsAudioTool()
+      const tool = await ToolManager.initTool(ElevenLabsAudioTool)
       const resolvedApiKey = elevenlabsAPIKey || tool.apiKey
       if (!resolvedApiKey) {
         leon.answer({ key: 'missing_api_key' })
@@ -183,6 +184,9 @@ export const run: ActionFunction = async function (
       }
     })
   } catch (error) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
     leon.answer({
       key: 'transcription_error',
       data: { error: (error as Error).message }

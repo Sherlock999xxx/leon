@@ -1,6 +1,9 @@
 import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 
+const DEFAULT_SETTINGS: Record<string, unknown> = {}
+const REQUIRED_SETTINGS: string[] = []
+
 /**
  * Represents the overall format information of a media file.
  */
@@ -64,6 +67,14 @@ export default class FfprobeTool extends Tool {
       .toLowerCase()
       .replace('tool', '')
     this.config = ToolkitConfig.load(FfprobeTool.TOOLKIT, toolConfigName)
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      FfprobeTool.TOOLKIT,
+      toolConfigName,
+      DEFAULT_SETTINGS
+    )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(toolConfigName)
   }
 
   get toolName(): string {

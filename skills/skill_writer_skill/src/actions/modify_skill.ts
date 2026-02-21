@@ -5,6 +5,7 @@ import type { ActionFunction, ActionParams } from '@sdk/types'
 import { leon } from '@sdk/leon'
 import { ParamsHelper } from '@sdk/params-helper'
 import { Settings } from '@sdk/settings'
+import ToolManager, { isMissingToolSettingsError } from '@sdk/tool-manager'
 import OpenCodeTool from '@sdk/tools/opencode'
 import { buildSkillPrompt, getContextFiles } from '../lib/skill-prompt'
 
@@ -17,63 +18,70 @@ export const run: ActionFunction = async function (
   _params: ActionParams,
   _paramsHelper: ParamsHelper
 ) {
-  const description = _params.utterance
-  const targetPath = process.cwd()
-  const skillsRoot = path.join(targetPath, 'skills')
-  const bridge = await inferBridgeFromExistingSkill(description, skillsRoot)
+  try {
+    const description = _params.utterance
+    const targetPath = process.cwd()
+    const skillsRoot = path.join(targetPath, 'skills')
+    const bridge = await inferBridgeFromExistingSkill(description, skillsRoot)
 
-  const settings = new Settings<SkillWriterSettings>()
-  const provider = 'openrouter'
-  const apiKey = (await settings.get('opencode_openrouter_api_key')) as
-    | string
-    | undefined
-  const model = (await settings.get('opencode_openrouter_model')) as
-    | string
-    | undefined
+    const settings = new Settings<SkillWriterSettings>()
+    const provider = 'openrouter'
+    const apiKey = (await settings.get('opencode_openrouter_api_key')) as
+      | string
+      | undefined
+    const model = (await settings.get('opencode_openrouter_model')) as
+      | string
+      | undefined
 
-  leon.answer({ key: 'modifying_skill', data: { provider } })
+    leon.answer({ key: 'modifying_skill', data: { provider } })
 
-  // Context files for OpenCode to learn from (choose based on bridge)
-  const contextFiles = getContextFiles(bridge)
+    // Context files for OpenCode to learn from (choose based on bridge)
+    const contextFiles = getContextFiles(bridge)
 
-  // Enhanced description with tool guidance
-  const enhancedDescription = buildSkillPrompt(description, 'modify')
+    // Enhanced description with tool guidance
+    const enhancedDescription = buildSkillPrompt(description, 'modify')
 
-  const opencodeTool = new OpenCodeTool()
+    const opencodeTool = await ToolManager.initTool(OpenCodeTool)
 
-  const skillOptions: Parameters<typeof opencodeTool.generateSkill>[0] = {
-    description: enhancedDescription,
-    provider,
-    target_path: targetPath,
-    context_files: contextFiles,
-    bridge
-  }
-
-  if (model) {
-    skillOptions.model = model
-  }
-
-  if (apiKey) {
-    skillOptions.api_key = apiKey
-  }
-
-  const response = await opencodeTool.generateSkill(skillOptions)
-
-  if (!response.success) {
-    leon.answer({
-      key: 'generation_failed',
-      data: { error: response.error || 'Unknown error' }
-    })
-    return
-  }
-
-  leon.answer({
-    key: 'skill_modified',
-    data: {
-      provider: response.provider_used || provider,
-      model: response.model_used || model || 'default'
+    const skillOptions: Parameters<typeof opencodeTool.generateSkill>[0] = {
+      description: enhancedDescription,
+      provider,
+      target_path: targetPath,
+      context_files: contextFiles,
+      bridge
     }
-  })
+
+    if (model) {
+      skillOptions.model = model
+    }
+
+    if (apiKey) {
+      skillOptions.api_key = apiKey
+    }
+
+    const response = await opencodeTool.generateSkill(skillOptions)
+
+    if (!response.success) {
+      leon.answer({
+        key: 'generation_failed',
+        data: { error: response.error || 'Unknown error' }
+      })
+      return
+    }
+
+    leon.answer({
+      key: 'skill_modified',
+      data: {
+        provider: response.provider_used || provider,
+        model: response.model_used || model || 'default'
+      }
+    })
+  } catch (error: unknown) {
+    if (isMissingToolSettingsError(error)) {
+      return
+    }
+    throw error
+  }
 }
 
 const inferBridgeFromExistingSkill = async (

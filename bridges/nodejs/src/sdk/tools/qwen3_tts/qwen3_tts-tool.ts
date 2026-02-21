@@ -9,6 +9,8 @@ import { NVIDIA_LIBS_PATH, PYTORCH_TORCH_PATH } from '@bridge/constants'
 const MODEL_BASE_NAME = 'Qwen3-TTS-12Hz-1.7B-Base'
 const MODEL_DESIGN_NAME = 'Qwen3-TTS-12Hz-1.7B-VoiceDesign'
 const MODEL_CUSTOM_NAME = 'Qwen3-TTS-12Hz-1.7B-CustomVoice'
+const DEFAULT_SETTINGS: Record<string, unknown> = {}
+const REQUIRED_SETTINGS: string[] = []
 
 type SupportedLanguage =
   | 'Auto'
@@ -139,6 +141,14 @@ export default class Qwen3TTSTool extends Tool {
     super()
     // Load configuration from central toolkits directory
     this.config = ToolkitConfig.load(Qwen3TTSTool.TOOLKIT, this.toolName)
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      Qwen3TTSTool.TOOLKIT,
+      this.toolName,
+      DEFAULT_SETTINGS
+    )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(this.toolName)
   }
 
   get toolName(): string {

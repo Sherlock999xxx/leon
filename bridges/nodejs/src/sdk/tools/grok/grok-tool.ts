@@ -8,9 +8,13 @@ import { ToolkitConfig } from '@sdk/toolkit-config'
  */
 
 // Hardcoded default settings for Grok tool
-// These can be overridden by toolkit settings.json per toolkit.
 const GROK_API_KEY: string | null = null
 const GROK_MODEL = 'grok-4-1-fast-reasoning'
+const DEFAULT_SETTINGS: Record<string, unknown> = {
+  GROK_API_KEY,
+  GROK_MODEL
+}
+const REQUIRED_SETTINGS = ['GROK_API_KEY']
 
 interface GrokMessage {
   role: 'system' | 'user' | 'assistant'
@@ -116,12 +120,16 @@ export default class GrokTool extends Tool {
 
     const toolSettings = ToolkitConfig.loadToolSettings(
       GrokTool.TOOLKIT,
-      toolConfigName
+      toolConfigName,
+      DEFAULT_SETTINGS
     )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(toolConfigName)
 
     // Priority: toolkit settings > hardcoded default
-    this.apiKey = (toolSettings['GROK_API_KEY'] as string) || GROK_API_KEY
-    this.model = (toolSettings['GROK_MODEL'] as string) || GROK_MODEL
+    this.apiKey = (this.settings['GROK_API_KEY'] as string) || GROK_API_KEY
+    this.model = (this.settings['GROK_MODEL'] as string) || GROK_MODEL
   }
 
   get toolName(): string {

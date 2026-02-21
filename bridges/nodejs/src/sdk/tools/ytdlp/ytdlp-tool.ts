@@ -4,6 +4,9 @@ import { join } from 'node:path'
 import { Tool, type ProgressCallback } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 
+const DEFAULT_SETTINGS: Record<string, unknown> = {}
+const REQUIRED_SETTINGS: string[] = []
+
 export default class YtdlpTool extends Tool {
   private static readonly TOOLKIT = 'video_streaming'
   private readonly config: ReturnType<typeof ToolkitConfig.load>
@@ -16,6 +19,14 @@ export default class YtdlpTool extends Tool {
       .toLowerCase()
       .replace('tool', '')
     this.config = ToolkitConfig.load(YtdlpTool.TOOLKIT, toolConfigName)
+    const toolSettings = ToolkitConfig.loadToolSettings(
+      YtdlpTool.TOOLKIT,
+      toolConfigName,
+      DEFAULT_SETTINGS
+    )
+    this.settings = toolSettings
+    this.requiredSettings = REQUIRED_SETTINGS
+    this.checkRequiredSettings(toolConfigName)
   }
 
   get toolName(): string {
