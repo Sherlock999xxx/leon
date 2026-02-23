@@ -134,15 +134,14 @@ export class ReActLLMDuty extends LLMDuty {
     LogHelper.info('Executing...')
 
     try {
-      const historyForRemoteProvider =
+      const history =
         LLM_PROVIDER_NAME !== LLMProviders.Local
           ? await CONVERSATION_LOGGER.load({
-              nbOfLogsToLoad:
-                LLM_PROVIDER_NAME === LLMProviders.Local
-                  ? REACT_LOCAL_PROVIDER_HISTORY_LOGS
-                  : REACT_REMOTE_PROVIDER_HISTORY_LOGS
+              nbOfLogsToLoad: REACT_REMOTE_PROVIDER_HISTORY_LOGS
             })
-          : null
+          : await CONVERSATION_LOGGER.load({
+              nbOfLogsToLoad: REACT_LOCAL_PROVIDER_HISTORY_LOGS
+            })
       const flattenedTools = TOOLKIT_REGISTRY.getFlattenedTools()
       const toolkitsMap = new Map<
         string,
@@ -339,11 +338,12 @@ export class ReActLLMDuty extends LLMDuty {
         if (LLM_PROVIDER_NAME === LLMProviders.Local) {
           completionResult = await LLM_PROVIDER.prompt(prompt, {
             ...completionParams,
+            history,
             session: ReActLLMDuty.session
           })
         } else {
-          const completionParamsWithHistory = historyForRemoteProvider
-            ? { ...completionParams, history: historyForRemoteProvider }
+          const completionParamsWithHistory = history
+            ? { ...completionParams, history }
             : completionParams
           completionResult = await LLM_PROVIDER.prompt(
             prompt,

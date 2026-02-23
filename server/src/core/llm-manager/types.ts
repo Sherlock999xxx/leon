@@ -29,7 +29,8 @@ export enum LLMDuties {
 export enum LLMProviders {
   Local = 'local',
   Groq = 'groq',
-  OpenRouter = 'openrouter'
+  OpenRouter = 'openrouter',
+  Cerebras = 'cerebras'
 }
 
 export enum ActionCallingStatus {

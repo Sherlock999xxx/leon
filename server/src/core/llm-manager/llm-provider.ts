@@ -14,6 +14,7 @@ import { FileHelper } from '@/helpers/file-helper'
 import LocalLLMProvider from '@/core/llm-manager/llm-providers/local-llm-provider'
 import GroqLLMProvider from '@/core/llm-manager/llm-providers/groq-llm-provider'
 import OpenRouterLLMProvider from '@/core/llm-manager/llm-providers/openrouter-llm-provider'
+import CerebrasLLMProvider from '@/core/llm-manager/llm-providers/cerebras-llm-provider'
 import { LLM_MANAGER } from '@/core'
 
 interface CompletionResult {
@@ -38,12 +39,14 @@ type Provider =
   | LocalLLMProvider
   | GroqLLMProvider
   | OpenRouterLLMProvider
+  | CerebrasLLMProvider
   | undefined
 
 const LLM_PROVIDERS_MAP = {
   [LLMProviders.Local]: 'local-llm-provider',
   [LLMProviders.Groq]: 'groq-llm-provider',
-  [LLMProviders.OpenRouter]: 'openrouter-llm-provider'
+  [LLMProviders.OpenRouter]: 'openrouter-llm-provider',
+  [LLMProviders.Cerebras]: 'cerebras-llm-provider'
 }
 const DEFAULT_MAX_EXECUTION_TIMOUT =
   LLM_PROVIDER === LLMProviders.Local ? 32_000 : 120_000
@@ -144,6 +147,18 @@ export default class LLMProvider {
   }
 
   private normalizeCompletionResultForOpenRouterProvider(
+    rawResult: AxiosResponse
+  ): NormalizedCompletionResult {
+    const parsedCompletionResult = rawResult.data
+
+    return {
+      rawResult: parsedCompletionResult.choices[0].message.content,
+      usedInputTokens: parsedCompletionResult.usage.prompt_tokens,
+      usedOutputTokens: parsedCompletionResult.usage.completion_tokens
+    }
+  }
+
+  private normalizeCompletionResultForCerebrasProvider(
     rawResult: AxiosResponse
   ): NormalizedCompletionResult {
     const parsedCompletionResult = rawResult.data
@@ -291,6 +306,18 @@ export default class LLMProvider {
         usedInputTokens: inputTokens,
         usedOutputTokens: outputTokens
       } = this.normalizeCompletionResultForOpenRouterProvider(
+        rawResult as AxiosResponse
+      )
+
+      rawResult = result
+      usedInputTokens = inputTokens
+      usedOutputTokens = outputTokens
+    } else if (LLM_PROVIDER === LLMProviders.Cerebras) {
+      const {
+        rawResult: result,
+        usedInputTokens: inputTokens,
+        usedOutputTokens: outputTokens
+      } = this.normalizeCompletionResultForCerebrasProvider(
         rawResult as AxiosResponse
       )
 
