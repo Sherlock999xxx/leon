@@ -392,6 +392,20 @@ usedOutputTokens: ${completionResult?.usedOutputTokens}`)
         > | null
         const responseValidation =
           this.validateResponseShape(parsedOutputRecord)
+        if (!responseValidation.isValid && typeof rawOutput === 'string') {
+          const onlyInvalidResponses = steps.length
+            ? steps.every((step) => step.action === 'invalid_response')
+            : false
+          if (!parsedOutput && onlyInvalidResponses) {
+            return {
+              dutyType: LLMDuties.ReAct,
+              systemPrompt: this.systemPrompt,
+              input: this.input,
+              output: rawOutput.trim(),
+              data: {}
+            } as unknown as LLMDutyResult
+          }
+        }
         if (!responseValidation.isValid) {
           invalidResponseCount += 1
           if (invalidResponseCount >= 2) {
