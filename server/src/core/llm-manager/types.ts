@@ -62,6 +62,7 @@ export interface OpenAITool {
 export type OpenAIToolChoice =
   | 'none'
   | 'auto'
+  | 'required'
   | {
       type: 'function'
       function: {

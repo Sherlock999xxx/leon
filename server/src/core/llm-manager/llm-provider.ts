@@ -430,14 +430,25 @@ export default class LLMProvider {
 
         try {
           return JSON.parse(rawResultString)
-        } catch (error) {
-          LogHelper.title('LLM Provider')
-          LogHelper.warning(
-            `Failed to parse JSON output for ${completionParams.dutyType}: ${
-              (error as Error).message
-            }`
-          )
-          return rawResultString
+        } catch {
+          // Some models wrap JSON in markdown code fences (```json ... ```).
+          // Strip them and retry.
+          const stripped = rawResultString
+            .replace(/^```(?:json)?\s*\n?/i, '')
+            .replace(/\n?```\s*$/i, '')
+            .trim()
+
+          try {
+            return JSON.parse(stripped)
+          } catch (innerError) {
+            LogHelper.title('LLM Provider')
+            LogHelper.warning(
+              `Failed to parse JSON output for ${completionParams.dutyType}: ${
+                (innerError as Error).message
+              }`
+            )
+            return rawResultString
+          }
         }
       })(),
       data: completionParams.data,

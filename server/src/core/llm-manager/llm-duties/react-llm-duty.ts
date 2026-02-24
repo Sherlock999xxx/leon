@@ -16,7 +16,8 @@ import {
   TOOLKIT_REGISTRY,
   TOOL_EXECUTOR,
   CONVERSATION_LOGGER,
-  BRAIN
+  BRAIN,
+  SOCKET_SERVER
 } from '@/core'
 import {
   LLMDuties,
@@ -60,11 +61,12 @@ You must always consider other tools before using the operating_system_control t
 If your answers include a file path, wrap it as [FILE_PATH]/the_path_here[/FILE_PATH].
 
 Return ONLY one of the following JSON shapes:
-- {"type":"plan","steps":[{"function":"toolkit_id.tool_id.function_name"},...],"summary":"..."}
+- {"type":"plan","steps":[{"function":"toolkit_id.tool_id.function_name","label":"Short verb-starting task description"}],"summary":"..."}
 - {"type":"final","answer":"..."}
 
-"steps" is an ordered array of functions to call. Each step has a "function" field with the fully qualified name (toolkit_id.tool_id.function_name).
-If the catalog only lists tools (without functions), use the format toolkit_id.tool_id in the "function" field.
+"steps" is an ordered array of functions to call. Each step has:
+  - "function": the fully qualified name (toolkit_id.tool_id.function_name). If the catalog only lists tools, use toolkit_id.tool_id.
+  - "label": a very short user-facing description of what this step does. Must start with a verb (e.g. "Search for video files", "Download the page", "List matching items"). Keep it under 8 words.
 "summary" is a short natural language description of the plan for the user.
 
 No other keys, no null values.`
@@ -75,6 +77,8 @@ You are now executing a specific function. You are given the function signature 
 Fill in the tool_input based on the user request and any observations from previous steps.
 
 When chaining tools, reuse fields from the latest observation to fill the next tool_input whenever possible.
+
+IMPORTANT: Only provide required parameters. Do NOT fill in optional parameters unless the user explicitly provided values for them. Never guess or infer optional parameter values such as file paths, configurations, or system-specific settings.
 
 When the next action is based on uncertainty, assumptions, ambiguous selection, or could be irreversible, ask for confirmation before executing the tool.
 
@@ -93,6 +97,8 @@ const RESOLVE_FUNCTION_SYSTEM_PROMPT = `You are selecting a function from a tool
 
 You are given the available functions for a specific tool. Choose the most appropriate function for the current step and provide the tool_input.
 
+IMPORTANT: Only provide required parameters. Do NOT fill in optional parameters unless the user explicitly provided values for them.
+
 tool_input must be a JSON string.
 
 If your answers include a file path, wrap it as [FILE_PATH]/the_path_here[/FILE_PATH].
@@ -108,17 +114,115 @@ const MAX_EXECUTIONS = 20
 const MAX_REPLANS = 3
 const MAX_RETRIES_PER_FUNCTION = 2
 const REACT_TEMPERATURE = 0.2
+const MAX_OBSERVATION_LENGTH = 1_000
 const REACT_LOCAL_PROVIDER_HISTORY_LOGS = 8
 const REACT_REMOTE_PROVIDER_HISTORY_LOGS = 16
 
 interface PlanStep {
   function: string
+  label: string
 }
 
 interface ExecutionRecord {
   function: string
   status: string
   observation: string
+}
+
+type PlanStepStatus = 'pending' | 'in_progress' | 'completed'
+
+interface TrackedPlanStep {
+  label: string
+  status: PlanStepStatus
+}
+
+/**
+ * Helper to generate a short random ID for widget component IDs.
+ */
+const widgetId = (prefix: string): string =>
+  `${prefix}-${Math.random().toString(36).substring(2, 7)}`
+
+/**
+ * Builds a serialized Aurora component tree for the plan widget.
+ * This produces the exact JSON shape the client renderer expects.
+ */
+function buildPlanComponentTree(
+  steps: TrackedPlanStep[],
+  justCompletedIndex: number | null
+): Record<string, unknown> {
+  const listItems = steps.map((step, i) => {
+    let child: Record<string, unknown>
+
+    if (step.status === 'in_progress') {
+      // Loader + Text
+      child = {
+        component: 'Flexbox',
+        id: widgetId('flexbox'),
+        props: {
+          alignItems: 'center',
+          flexDirection: 'row',
+          gap: 'sm',
+          children: [
+            {
+              component: 'Loader',
+              id: widgetId('loader'),
+              props: {},
+              events: []
+            },
+            {
+              component: 'Text',
+              id: widgetId('text'),
+              props: { children: step.label },
+              events: []
+            }
+          ]
+        },
+        events: []
+      }
+    } else {
+      // Checkbox
+      const isCompleted = step.status === 'completed'
+      const isJustCompleted = justCompletedIndex === i
+      child = {
+        component: 'Checkbox',
+        id: widgetId('checkbox'),
+        props: {
+          name: `step-${i}`,
+          label: step.label,
+          checked: isCompleted,
+          disabled: isCompleted && !isJustCompleted
+        },
+        events: []
+      }
+    }
+
+    return {
+      component: 'ListItem',
+      id: widgetId('listitem'),
+      props: {
+        align: 'left',
+        children: [child]
+      },
+      events: []
+    }
+  })
+
+  return {
+    component: 'WidgetWrapper',
+    id: widgetId('widgetwrapper'),
+    props: {
+      noPadding: true,
+      children: [
+        {
+          component: 'List',
+          id: widgetId('list'),
+          props: { children: listItems },
+          events: []
+        }
+      ]
+    },
+    events: []
+  }
 }
 
 /**
@@ -238,9 +342,29 @@ export class ReActLLMDuty extends LLMDuty {
       let replanCount = 0
       let executionCount = 0
 
+      // --- Plan widget state ---
+      const planWidgetId = widgetId('plan')
+      let trackedSteps: TrackedPlanStep[] = pendingSteps.map((s) => ({
+        label: s.label,
+        status: 'pending' as PlanStepStatus
+      }))
+
+      // Mark first step as in_progress and emit initial widget
+      if (trackedSteps.length > 0) {
+        trackedSteps[0]!.status = 'in_progress'
+      }
+
+      // Emit plan summary as text, then show the widget
+      if (planResult.summary) {
+        await this.emitProgress(planResult.summary)
+      }
+      this.emitPlanWidget(trackedSteps, null, planWidgetId, false)
+
       // --- Phase 2: Execution loop ---
       LogHelper.title(this.name)
       LogHelper.debug('Phase 2: Execution loop...')
+
+      let currentStepIndex = 0
 
       while (pendingSteps.length > 0 && executionCount < MAX_EXECUTIONS) {
         const currentStep = pendingSteps.shift()!
@@ -260,6 +384,13 @@ export class ReActLLMDuty extends LLMDuty {
         if (stepResult.type === 'final') {
           LogHelper.title(this.name)
           LogHelper.debug(`Execution returned final answer: "${(stepResult.answer).slice(0, 200)}"`)
+
+          // Mark all remaining steps as completed in the widget
+          for (const ts of trackedSteps) {
+            ts.status = 'completed'
+          }
+          this.emitPlanWidget(trackedSteps, null, planWidgetId, true)
+
           return this.makeDutyResult(stepResult.answer)
         }
 
@@ -276,10 +407,23 @@ export class ReActLLMDuty extends LLMDuty {
             break
           }
 
-          await this.emitProgress(
-            `Adjusting plan: ${stepResult.reason}. New steps: ${stepResult.functions.join(', ')}`
+          pendingSteps = stepResult.functions.map((f) => ({ function: f, label: f }))
+
+          // Rebuild tracked steps: keep completed ones, replace remaining
+          const completedSteps = trackedSteps.filter(
+            (s) => s.status === 'completed'
           )
-          pendingSteps = stepResult.functions.map((f) => ({ function: f }))
+          const newSteps: TrackedPlanStep[] = pendingSteps.map((s) => ({
+            label: s.label,
+            status: 'pending' as PlanStepStatus
+          }))
+          if (newSteps.length > 0) {
+            newSteps[0]!.status = 'in_progress'
+          }
+          trackedSteps = [...completedSteps, ...newSteps]
+          currentStepIndex = completedSteps.length
+
+          this.emitPlanWidget(trackedSteps, null, planWidgetId, true)
           continue
         }
 
@@ -291,17 +435,28 @@ export class ReActLLMDuty extends LLMDuty {
           `Execution result: ${stepResult.execution.function} [${stepResult.execution.status}] | Observation: ${stepResult.execution.observation.slice(0, 300)}`
         )
 
-        // Emit progress
-        const nextStep = pendingSteps[0]
-        const progressMsg = nextStep
-          ? `Completed: ${stepResult.execution.function}. Next: ${nextStep.function}`
-          : `Completed: ${stepResult.execution.function}. Preparing final answer...`
-        await this.emitProgress(progressMsg)
+        // Update plan widget: mark current step as completed, next as in_progress
+        if (currentStepIndex < trackedSteps.length) {
+          trackedSteps[currentStepIndex]!.status = 'completed'
+        }
+        const nextTrackedIndex = currentStepIndex + 1
+        if (nextTrackedIndex < trackedSteps.length) {
+          trackedSteps[nextTrackedIndex]!.status = 'in_progress'
+        }
+        this.emitPlanWidget(trackedSteps, currentStepIndex, planWidgetId, true)
+        currentStepIndex = nextTrackedIndex
 
         // Check for short-circuit final answer from tool result
         if (stepResult.finalAnswer) {
           LogHelper.title(this.name)
           LogHelper.debug(`Tool returned final_answer, short-circuiting: "${stepResult.finalAnswer.slice(0, 200)}"`)
+
+          // Mark all remaining as completed
+          for (const ts of trackedSteps) {
+            ts.status = 'completed'
+          }
+          this.emitPlanWidget(trackedSteps, null, planWidgetId, true)
+
           return this.makeDutyResult(stepResult.finalAnswer)
         }
 
@@ -316,6 +471,12 @@ export class ReActLLMDuty extends LLMDuty {
       // --- Phase 3: Final answer synthesis ---
       LogHelper.title(this.name)
       LogHelper.debug(`Phase 3: Final answer synthesis (${executionHistory.length} execution(s) completed)`)
+
+      // Mark all steps as completed in the widget
+      for (const ts of trackedSteps) {
+        ts.status = 'completed'
+      }
+      this.emitPlanWidget(trackedSteps, null, planWidgetId, true)
 
       if (executionHistory.length === 0) {
         LogHelper.debug('No executions completed, returning fallback')
@@ -417,9 +578,10 @@ export class ReActLLMDuty extends LLMDuty {
               items: {
                 type: 'object',
                 properties: {
-                  function: { type: 'string' }
+                  function: { type: 'string' },
+                  label: { type: 'string' }
                 },
-                required: ['function'],
+                required: ['function', 'label'],
                 additionalProperties: false
               }
             },
@@ -448,86 +610,199 @@ export class ReActLLMDuty extends LLMDuty {
       history
     }
 
-    let completionResult
-    if (LLM_PROVIDER_NAME === LLMProviders.Local) {
-      completionResult = await LLM_PROVIDER.prompt(prompt, {
-        ...completionParams,
-        session: ReActLLMDuty.session
-      })
-    } else {
-      completionResult = await LLM_PROVIDER.prompt(prompt, completionParams)
+    let completionResult = undefined
+
+    // --- Remote providers: use native tool calling to force structured output ---
+    if (this.supportsNativeTools) {
+      const planTools: OpenAITool[] = [
+        {
+          type: 'function',
+          function: {
+            name: 'create_plan',
+            description:
+              'Create an execution plan with ordered steps to solve the user request.',
+            parameters: {
+              type: 'object',
+              properties: {
+                steps: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      function: {
+                        type: 'string',
+                        description:
+                          'Fully qualified function name: toolkit_id.tool_id.function_name'
+                      },
+                      label: {
+                        type: 'string',
+                        description:
+                          'Short user-facing task description starting with a verb, under 8 words'
+                      }
+                    },
+                    required: ['function', 'label']
+                  }
+                },
+                summary: {
+                  type: 'string',
+                  description:
+                    'Short natural language summary of the plan for the user'
+                }
+              },
+              required: ['steps', 'summary']
+            }
+          }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'direct_answer',
+            description:
+              'Provide a direct answer when no tools are needed to fulfill the request.',
+            parameters: {
+              type: 'object',
+              properties: {
+                answer: {
+                  type: 'string',
+                  description: 'The answer to the user request'
+                }
+              },
+              required: ['answer']
+            }
+          }
+        }
+      ]
+
+      const toolResult = await this.callLLMWithTools(
+        prompt,
+        planSystemPrompt,
+        planTools,
+        'auto',
+        history
+      )
+
+      LogHelper.title(this.name)
+      LogHelper.debug(`Planning prompt: "${prompt.slice(0, 300)}..."`)
+      LogHelper.debug(
+        `Planning tool result: ${JSON.stringify(toolResult).slice(0, 500)}`
+      )
+
+      if (toolResult?.toolCall) {
+        const { functionName, arguments: args } = toolResult.toolCall
+        try {
+          const parsedArgs = JSON.parse(args)
+
+          if (functionName === 'direct_answer' && parsedArgs.answer) {
+            return {
+              type: 'final',
+              answer: (parsedArgs.answer as string).trim()
+            }
+          }
+
+          if (functionName === 'create_plan' && Array.isArray(parsedArgs.steps)) {
+            const steps = this.parseStepsFromArgs(parsedArgs.steps)
+            if (steps.length > 0) {
+              const summary =
+                typeof parsedArgs.summary === 'string'
+                  ? (parsedArgs.summary as string)
+                  : ''
+              return { type: 'plan', steps, summary }
+            }
+          }
+        } catch {
+          LogHelper.debug('Planning: failed to parse tool call arguments')
+        }
+      }
+
+      // Fallback: try parsing text content if model didn't use tools
+      if (toolResult?.textContent) {
+        const parsed = this.parseOutput(toolResult.textContent)
+        const fallbackResult = this.extractPlanFromParsed(parsed)
+        if (fallbackResult) {
+          return fallbackResult
+        }
+
+        // Check if the text contains function references from the catalog,
+        // which means the model tried to use tools via text instead of the
+        // native tools API. Retry with tool_choice='required' to force it.
+        const hasFunctionReferences =
+          /[a-z_]+\.[a-z_]+\.[a-zA-Z_]+/.test(toolResult.textContent)
+        if (hasFunctionReferences) {
+          LogHelper.title(this.name)
+          LogHelper.debug(
+            'Planning: model responded with text containing function references, retrying with tool_choice=required'
+          )
+
+          const retryResult = await this.callLLMWithTools(
+            prompt,
+            planSystemPrompt,
+            planTools,
+            'required',
+            history
+          )
+
+          if (retryResult?.toolCall) {
+            const { functionName, arguments: args } = retryResult.toolCall
+            try {
+              const parsedArgs = JSON.parse(args)
+
+              if (functionName === 'direct_answer' && parsedArgs.answer) {
+                return {
+                  type: 'final',
+                  answer: (parsedArgs.answer as string).trim()
+                }
+              }
+
+              if (
+                functionName === 'create_plan' &&
+                Array.isArray(parsedArgs.steps)
+              ) {
+                const steps = this.parseStepsFromArgs(parsedArgs.steps)
+                if (steps.length > 0) {
+                  const summary =
+                    typeof parsedArgs.summary === 'string'
+                      ? (parsedArgs.summary as string)
+                      : ''
+                  return { type: 'plan', steps, summary }
+                }
+              }
+            } catch {
+              LogHelper.debug('Planning retry: failed to parse tool call arguments')
+            }
+          }
+        }
+
+        // Pure conversational response — return as final answer
+        return {
+          type: 'final',
+          answer:
+            toolResult.textContent.trim() ||
+            'I could not understand how to help with that request.'
+        }
+      }
+
+      return {
+        type: 'final',
+        answer: 'I could not determine what to do.'
+      }
     }
+
+    // --- Local provider: use grammar-constrained JSON mode ---
+    completionResult = await LLM_PROVIDER.prompt(prompt, {
+      ...completionParams,
+      session: ReActLLMDuty.session
+    })
 
     LogHelper.title(this.name)
     LogHelper.debug(`Planning prompt: "${prompt.slice(0, 300)}..."`)
-    LogHelper.debug(`Planning raw output: ${JSON.stringify(completionResult?.output).slice(0, 500)}`)
+    LogHelper.debug(
+      `Planning raw output: ${JSON.stringify(completionResult?.output).slice(0, 500)}`
+    )
 
     const parsed = this.parseOutput(completionResult?.output)
-    if (!parsed) {
-      // If the LLM couldn't produce structured output, treat raw as final answer
-      LogHelper.title(this.name)
-      LogHelper.debug('Planning: failed to parse structured output, treating as final answer')
-      const raw =
-        typeof completionResult?.output === 'string'
-          ? completionResult.output.trim()
-          : ''
-      return { type: 'final', answer: raw || 'I could not understand how to help with that request.' }
-    }
-
-    if (parsed['type'] === 'final' && parsed['answer']) {
-      LogHelper.title(this.name)
-      LogHelper.debug('Planning: LLM chose to answer directly (no tools needed)')
-      return { type: 'final', answer: parsed['answer'] as string }
-    }
-
-    if (parsed['type'] === 'plan') {
-      let steps: PlanStep[] = []
-
-      if (
-        Array.isArray(parsed['steps']) &&
-        (parsed['steps'] as unknown[]).length > 0
-      ) {
-        const rawSteps = parsed['steps'] as Record<string, unknown>[]
-        steps = rawSteps
-          .filter(
-            (s) =>
-              typeof s['function'] === 'string' && (s['function'] as string).trim()
-          )
-          .map((s) => ({
-            function: (s['function'] as string).trim()
-          }))
-      }
-
-      // If steps array is empty but the summary mentions function references
-      // (common with local/smaller models), extract them from the summary
-      if (steps.length === 0) {
-        const summary =
-          typeof parsed['summary'] === 'string' ? (parsed['summary'] as string) : ''
-
-        if (summary) {
-          LogHelper.title(this.name)
-          LogHelper.debug(
-            'Planning: steps array is empty, attempting to extract functions from summary'
-          )
-
-          // Match fully-qualified function names (toolkit.tool.function)
-          const functionPattern = /([a-z_]+\.[a-z_]+\.[a-zA-Z_]+)/g
-          const matches = summary.match(functionPattern)
-          if (matches) {
-            steps = [...new Set(matches)].map((fn) => ({ function: fn }))
-            LogHelper.debug(`Extracted ${steps.length} function(s) from summary: ${steps.map((s) => s.function).join(', ')}`)
-          }
-        }
-      }
-
-      if (steps.length > 0) {
-        const summary =
-          typeof parsed['summary'] === 'string' ? (parsed['summary'] as string) : ''
-        if (summary) {
-          await this.emitProgress(summary)
-        }
-        return { type: 'plan', steps, summary }
-      }
+    const planResult = this.extractPlanFromParsed(parsed)
+    if (planResult) {
+      return planResult
     }
 
     // Fallback
@@ -1450,7 +1725,28 @@ export class ReActLLMDuty extends LLMDuty {
         return parsed['answer'] as string
       }
       if (typeof completionResult.output === 'string') {
+        // Try to extract answer from a JSON string the parser may have missed
+        try {
+          const jsonParsed = JSON.parse(completionResult.output)
+          if (typeof jsonParsed === 'object' && jsonParsed?.answer) {
+            return (jsonParsed.answer as string).trim()
+          }
+        } catch {
+          // Not JSON, return as-is
+        }
         return completionResult.output.trim()
+      }
+      // If output is an object but parseOutput didn't extract answer,
+      // check directly
+      if (
+        typeof completionResult.output === 'object' &&
+        (completionResult.output as Record<string, unknown>)['answer']
+      ) {
+        return (
+          (completionResult.output as Record<string, unknown>)[
+            'answer'
+          ] as string
+        ).trim()
       }
     }
 
@@ -1482,7 +1778,8 @@ export class ReActLLMDuty extends LLMDuty {
   private async callLLM(
     prompt: string,
     systemPrompt: string,
-    schema: Record<string, unknown>
+    schema: Record<string, unknown>,
+    history?: MessageLog[]
   ): Promise<{
     output: unknown
     usedInputTokens?: number
@@ -1492,7 +1789,8 @@ export class ReActLLMDuty extends LLMDuty {
       dutyType: LLMDuties.ReAct,
       systemPrompt,
       data: schema,
-      temperature: REACT_TEMPERATURE
+      temperature: REACT_TEMPERATURE,
+      ...(history ? { history } : {})
     }
 
     if (LLM_PROVIDER_NAME === LLMProviders.Local) {
@@ -1514,7 +1812,8 @@ export class ReActLLMDuty extends LLMDuty {
     prompt: string,
     systemPrompt: string,
     tools: OpenAITool[],
-    toolChoice: OpenAIToolChoice
+    toolChoice: OpenAIToolChoice,
+    history?: MessageLog[]
   ): Promise<{
     toolCall?: { functionName: string, arguments: string }
     textContent?: string
@@ -1537,7 +1836,8 @@ export class ReActLLMDuty extends LLMDuty {
       systemPrompt,
       temperature: REACT_TEMPERATURE,
       tools,
-      toolChoice
+      toolChoice,
+      ...(history ? { history } : {})
     })
 
     if (!completionResult) {
@@ -1587,10 +1887,105 @@ export class ReActLLMDuty extends LLMDuty {
     }
     return `Previous Executions:\n${history
       .map(
-        (exec, i) =>
-          `Step ${i + 1}: ${exec.function} [${exec.status}]\n  Observation: ${exec.observation}`
+        (exec, i) => {
+          const observation =
+            exec.observation.length > MAX_OBSERVATION_LENGTH
+              ? exec.observation.slice(0, MAX_OBSERVATION_LENGTH) + '...(truncated)'
+              : exec.observation
+          return `Step ${i + 1}: ${exec.function} [${exec.status}]\n  Observation: ${observation}`
+        }
       )
       .join('\n')}`
+  }
+
+  /**
+   * Parses plan steps from raw tool call arguments (array of objects).
+   * Handles missing labels gracefully.
+   */
+  private parseStepsFromArgs(
+    rawSteps: Record<string, unknown>[]
+  ): PlanStep[] {
+    return rawSteps
+      .filter(
+        (s) =>
+          typeof s['function'] === 'string' &&
+          (s['function'] as string).trim()
+      )
+      .map((s) => ({
+        function: (s['function'] as string).trim(),
+        label:
+          typeof s['label'] === 'string' && (s['label'] as string).trim()
+            ? (s['label'] as string).trim()
+            : (s['function'] as string).trim()
+      }))
+  }
+
+  /**
+   * Extracts a plan or final answer from a parsed output object.
+   * Handles the common patterns: type=plan with steps, type=final with answer,
+   * and the fallback of extracting function references from the summary.
+   */
+  private extractPlanFromParsed(
+    parsed: Record<string, unknown> | null
+  ): { type: 'plan', steps: PlanStep[], summary: string } | { type: 'final', answer: string } | null {
+    if (!parsed) {
+      return null
+    }
+
+    if (parsed['type'] === 'final' && parsed['answer']) {
+      return { type: 'final', answer: parsed['answer'] as string }
+    }
+
+    if (parsed['type'] === 'plan') {
+      let steps: PlanStep[] = []
+
+      if (
+        Array.isArray(parsed['steps']) &&
+        (parsed['steps'] as unknown[]).length > 0
+      ) {
+        steps = this.parseStepsFromArgs(
+          parsed['steps'] as Record<string, unknown>[]
+        )
+      }
+
+      // If steps array is empty but the summary mentions function references
+      // (common with local/smaller models), extract them from the summary
+      if (steps.length === 0) {
+        const summary =
+          typeof parsed['summary'] === 'string'
+            ? (parsed['summary'] as string)
+            : ''
+
+        if (summary) {
+          LogHelper.title(this.name)
+          LogHelper.debug(
+            'Planning: steps array is empty, attempting to extract functions from summary'
+          )
+
+          const functionPattern = /([a-z_]+\.[a-z_]+\.[a-zA-Z_]+)/g
+          const matches = summary.match(functionPattern)
+          if (matches) {
+            steps = [...new Set(matches)].map((fn) => ({
+              function: fn,
+              label: fn
+            }))
+            LogHelper.debug(
+              `Extracted ${steps.length} function(s) from summary: ${steps.map((s) => s.function).join(', ')}`
+            )
+          }
+        }
+      }
+
+      if (steps.length > 0) {
+        const summary =
+          typeof parsed['summary'] === 'string'
+            ? (parsed['summary'] as string)
+            : ''
+        return { type: 'plan', steps, summary }
+      }
+    }
+
+    return null
   }
 
   private async emitProgress(message: string): Promise<void> {
@@ -1598,6 +1993,32 @@ export class ReActLLMDuty extends LLMDuty {
       return
     }
     await BRAIN.talk(message)
+  }
+
+  /**
+   * Emits or updates the plan widget via socket. On first call it creates
+   * a new message; subsequent calls replace the same message using
+   * replaceMessageId so the plan list updates in-place.
+   */
+  private emitPlanWidget(
+    steps: TrackedPlanStep[],
+    justCompletedIndex: number | null,
+    planWidgetId: string,
+    isUpdate: boolean
+  ): void {
+    const componentTree = buildPlanComponentTree(steps, justCompletedIndex)
+    const widgetData: Record<string, unknown> = {
+      id: planWidgetId,
+      widget: 'PlanWidget',
+      componentTree,
+      supportedEvents: []
+    }
+
+    if (isUpdate) {
+      widgetData['replaceMessageId'] = planWidgetId
+    }
+
+    SOCKET_SERVER.socket?.emit('answer', widgetData)
   }
 
   private makeDutyResult(output: string): LLMDutyResult {
