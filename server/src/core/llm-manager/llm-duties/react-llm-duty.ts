@@ -480,20 +480,45 @@ export class ReActLLMDuty extends LLMDuty {
       return { type: 'final', answer: parsed['answer'] as string }
     }
 
-    if (
-      parsed['type'] === 'plan' &&
-      Array.isArray(parsed['steps']) &&
-      (parsed['steps'] as unknown[]).length > 0
-    ) {
-      const rawSteps = parsed['steps'] as Record<string, unknown>[]
-      const steps = rawSteps
-        .filter(
-          (s) =>
-            typeof s['function'] === 'string' && (s['function'] as string).trim()
-        )
-        .map((s) => ({
-          function: (s['function'] as string).trim()
-        }))
+    if (parsed['type'] === 'plan') {
+      let steps: PlanStep[] = []
+
+      if (
+        Array.isArray(parsed['steps']) &&
+        (parsed['steps'] as unknown[]).length > 0
+      ) {
+        const rawSteps = parsed['steps'] as Record<string, unknown>[]
+        steps = rawSteps
+          .filter(
+            (s) =>
+              typeof s['function'] === 'string' && (s['function'] as string).trim()
+          )
+          .map((s) => ({
+            function: (s['function'] as string).trim()
+          }))
+      }
+
+      // If steps array is empty but the summary mentions function references
+      // (common with local/smaller models), extract them from the summary
+      if (steps.length === 0) {
+        const summary =
+          typeof parsed['summary'] === 'string' ? (parsed['summary'] as string) : ''
+
+        if (summary) {
+          LogHelper.title(this.name)
+          LogHelper.debug(
+            'Planning: steps array is empty, attempting to extract functions from summary'
+          )
+
+          // Match fully-qualified function names (toolkit.tool.function)
+          const functionPattern = /([a-z_]+\.[a-z_]+\.[a-zA-Z_]+)/g
+          const matches = summary.match(functionPattern)
+          if (matches) {
+            steps = [...new Set(matches)].map((fn) => ({ function: fn }))
+            LogHelper.debug(`Extracted ${steps.length} function(s) from summary: ${steps.map((s) => s.function).join(', ')}`)
+          }
+        }
+      }
 
       if (steps.length > 0) {
         const summary =
