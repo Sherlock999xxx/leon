@@ -1,6 +1,6 @@
 # Create New Tool for Leon AI
 
-I'm developing Leon AI, an open-source personal AI assistant. It has a granular structure: skills > actions > tools > functions > binaries.
+I'm developing Leon AI, an open-source personal AI assistant. It has a granular structure: skills > actions > tools > functions (> binaries).
 
 ## Goal
 
@@ -21,7 +21,7 @@ You must create a new tool for `{TOOL_ALIAS_NAME}`. {TOOL_DESCRIPTION}
 
 - Tools are located under `bridges/nodejs/src/sdk/tools` and `bridges/python/src/sdk/tools`.
 - The tool must belong to the `{TOOL_TOOLKIT_NAME}` toolkit.
-- Fill the `toolkit.json` file. You must provide the description, binaries, resources, etc. This file is located under `bridges/toolkits/{TOOL_TOOLKIT_NAME}`.
+- Fill the `bridges/toolkits/{TOOL_TOOLKIT_NAME}/tools/{TOOL_NAME}.tool.json` file. You must provide the description, binaries, resources, function definitions by following the OpenAI function-calling standard, etc. Create the file is not created yet.
 - You must create the tool with the TypeScript SDK and the Python SDK. The business logic must literally be the same. Start by writting the TypeScript code and then translate/convert to Python for the Python tool.
 - Tool file names must be `{TOOL_TS_FILE_NAME}` and `{TOOL_PYTHON_FILE_NAME}`.
 - You must reuse the classes and functions provided by the SDK (network, settings, etc.). You will find them in the SDK folder.

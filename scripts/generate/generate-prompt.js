@@ -13,8 +13,9 @@ const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
 const TOOL_ALIAS_NAME = 'Qwen3-TTS'
-const TOOL_TS_FILE_NAME = 'qwen3_tts-tool.ts'
-const TOOL_PYTHON_FILE_NAME = 'qwen3_tts_tool.py'
+const TOOL_NAME = 'qwen3_tts'
+const TOOL_TS_FILE_NAME = `${TOOL_NAME}-tool.ts`
+const TOOL_PYTHON_FILE_NAME = `${TOOL_NAME}_tool.py`
 const TOOL_TOOLKIT_NAME = 'music_audio'
 const TOOL_DESCRIPTION = `${TOOL_ALIAS_NAME} is a tool designed to facilitate text-to-speech (TTS) and voice design using the Qwen3-TTS model. This tool allows owners to convert text into natural-sounding speech, with the option to clone voices for personalized voice design.`
 const TOOL_PURPOSE_REQUIREMENT = `The goal of this tool is to bind the functions of the CLI:
@@ -30,6 +31,7 @@ const TEMPLATE_CONFIGS = {
     templateFile: 'create-tool-template.md',
     replacements: {
       '{TOOL_ALIAS_NAME}': TOOL_ALIAS_NAME,
+      '{TOOL_NAME}': TOOL_NAME,
       '{TOOL_TS_FILE_NAME}': TOOL_TS_FILE_NAME,
       '{TOOL_PYTHON_FILE_NAME}': TOOL_PYTHON_FILE_NAME,
       '{TOOL_TOOLKIT_NAME}': TOOL_TOOLKIT_NAME,

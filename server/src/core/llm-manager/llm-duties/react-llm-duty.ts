@@ -42,7 +42,7 @@ const formatFilePath = (filePath: string): string => {
  * ~4 chars per token is a conservative estimate that works across model
  * tokenizers.
  */
-const CATALOG_TOKEN_BUDGET = 2000
+const CATALOG_TOKEN_BUDGET = 2_000
 const CHARS_PER_TOKEN = 4
 
 const PLAN_SYSTEM_PROMPT = `You are an autonomous planning and acting agent. Your goal is to solve the user's request.
