@@ -33,6 +33,9 @@ import {
   REACT_TEMPERATURE,
   REACT_INFERENCE_TIMEOUT_MS,
   REACT_TIMEOUT_MAX_RETRIES,
+  CHARS_PER_TOKEN,
+  TOOL_CALL_WAIT_NOTICE_DELAY_MS,
+  TOOL_CALL_DIAGNOSIS_DELAY_MS,
   REACT_LOCAL_PROVIDER_HISTORY_LOGS,
   REACT_REMOTE_PROVIDER_HISTORY_LOGS,
   MAX_EXECUTIONS,
@@ -491,16 +494,66 @@ export class ReActLLMDuty extends LLMDuty {
       `callLLMWithTools: tools=[${toolNames}] | choice=${choiceLabel}`
     )
 
-    const completionResult = await LLM_PROVIDER.prompt(prompt, {
-      dutyType: LLMDuties.ReAct,
+    let completionResult: Awaited<ReturnType<typeof LLM_PROVIDER.prompt>>
+    let completed = false
+    let waitNoticeTimer: NodeJS.Timeout | null = null
+    let diagnosisTimer: NodeJS.Timeout | null = null
+
+    const delayReason = this.buildLongToolCallReason(
+      prompt,
       systemPrompt,
-      temperature: REACT_TEMPERATURE,
-      timeout: REACT_INFERENCE_TIMEOUT_MS,
-      maxRetries: REACT_TIMEOUT_MAX_RETRIES,
       tools,
-      toolChoice,
-      ...(history ? { history } : {})
-    })
+      history
+    )
+
+    waitNoticeTimer = setTimeout(() => {
+      if (completed) {
+        return
+      }
+      LogHelper.title(this.name)
+      LogHelper.warning(
+        `callLLMWithTools: pending > ${TOOL_CALL_WAIT_NOTICE_DELAY_MS}ms`
+      )
+      void this.emitProgress(
+        BRAIN.wernicke('react.tool_call.waiting', '', {
+          '{{ reason }}': delayReason
+        })
+      )
+    }, TOOL_CALL_WAIT_NOTICE_DELAY_MS)
+
+    diagnosisTimer = setTimeout(() => {
+      if (completed) {
+        return
+      }
+      void this.runLongToolCallDiagnosis(
+        prompt,
+        systemPrompt,
+        tools,
+        toolChoice,
+        history
+      )
+    }, TOOL_CALL_DIAGNOSIS_DELAY_MS)
+
+    try {
+      completionResult = await LLM_PROVIDER.prompt(prompt, {
+        dutyType: LLMDuties.ReAct,
+        systemPrompt,
+        temperature: REACT_TEMPERATURE,
+        timeout: REACT_INFERENCE_TIMEOUT_MS,
+        maxRetries: REACT_TIMEOUT_MAX_RETRIES,
+        tools,
+        toolChoice,
+        ...(history ? { history } : {})
+      })
+    } finally {
+      completed = true
+      if (waitNoticeTimer) {
+        clearTimeout(waitNoticeTimer)
+      }
+      if (diagnosisTimer) {
+        clearTimeout(diagnosisTimer)
+      }
+    }
 
     if (!completionResult) {
       LogHelper.debug('callLLMWithTools: no completion result returned')
@@ -574,6 +627,90 @@ export class ReActLLMDuty extends LLMDuty {
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  private estimateTokensFromText(text: string): number {
+    if (!text) {
+      return 0
+    }
+
+    return Math.ceil(text.length / CHARS_PER_TOKEN)
+  }
+
+  private estimateHistoryTokens(history?: MessageLog[]): number {
+    if (!history || history.length === 0) {
+      return 0
+    }
+
+    const historyChars = history.reduce((total, log) => {
+      return total + (log?.message?.length || 0)
+    }, 0)
+
+    return Math.ceil(historyChars / CHARS_PER_TOKEN)
+  }
+
+  private buildLongToolCallReason(
+    prompt: string,
+    systemPrompt: string,
+    tools: OpenAITool[],
+    history?: MessageLog[]
+  ): string {
+    const estimatedPromptTokens =
+      this.estimateTokensFromText(prompt) +
+      this.estimateTokensFromText(systemPrompt) +
+      this.estimateTokensFromText(JSON.stringify(tools)) +
+      this.estimateHistoryTokens(history)
+
+    if (estimatedPromptTokens > 4_500) {
+      return BRAIN.wernicke('react.tool_call.reason.large_prompt', '', {
+        '{{ estimated_tokens }}': String(estimatedPromptTokens)
+      })
+    }
+
+    if (tools.length > 1) {
+      return BRAIN.wernicke('react.tool_call.reason.multi_tools', '', {
+        '{{ tool_count }}': String(tools.length)
+      })
+    }
+
+    return BRAIN.wernicke('react.tool_call.reason.provider_latency')
+  }
+
+  private async runLongToolCallDiagnosis(
+    prompt: string,
+    systemPrompt: string,
+    tools: OpenAITool[],
+    toolChoice: OpenAIToolChoice,
+    history?: MessageLog[]
+  ): Promise<void> {
+    const promptTokens =
+      this.estimateTokensFromText(prompt) +
+      this.estimateTokensFromText(systemPrompt)
+    const toolSchemaTokens = this.estimateTokensFromText(JSON.stringify(tools))
+    const historyTokens = this.estimateHistoryTokens(history)
+    const totalEstimatedTokens =
+      promptTokens + toolSchemaTokens + historyTokens
+    const forcedChoice =
+      typeof toolChoice === 'string'
+        ? toolChoice
+        : `forced:${toolChoice.function.name}`
+
+    const diagnosisMessage = BRAIN.wernicke('react.tool_call.diagnosis', '', {
+      '{{ provider }}': LLM_PROVIDER_NAME,
+      '{{ tool_choice }}': forcedChoice,
+      '{{ tool_count }}': String(tools.length),
+      '{{ total_tokens }}': String(totalEstimatedTokens),
+      '{{ prompt_tokens }}': String(promptTokens),
+      '{{ tool_tokens }}': String(toolSchemaTokens),
+      '{{ history_tokens }}': String(historyTokens)
+    })
+
+    LogHelper.title(this.name)
+    LogHelper.warning(
+      `Long tool-call diagnosis (> ${TOOL_CALL_DIAGNOSIS_DELAY_MS}ms): ${diagnosisMessage}`
+    )
+
+    await this.emitProgress(diagnosisMessage)
+  }
 
   private async emitProgress(message: string): Promise<void> {
     if (!message) {
