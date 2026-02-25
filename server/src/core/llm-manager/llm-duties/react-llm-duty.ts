@@ -154,7 +154,7 @@ export class ReActLLMDuty extends LLMDuty {
 
       if (planResult.type === 'final') {
         LogHelper.title(this.name)
-        LogHelper.debug(`Planning returned final answer directly: "${planResult.answer.slice(0, 200)}"`)
+        LogHelper.debug(`Planning returned final answer directly: "${planResult.answer}"`)
         return this.makeDutyResult(planResult.answer)
       }
 
@@ -213,7 +213,7 @@ export class ReActLLMDuty extends LLMDuty {
 
         if (stepResult.type === 'final') {
           LogHelper.title(this.name)
-          LogHelper.debug(`Execution returned final answer: "${(stepResult.answer).slice(0, 200)}"`)
+          LogHelper.debug(`Execution returned final answer: "${(stepResult.answer)}"`)
 
           // Mark all remaining steps as completed in the widget
           for (const ts of trackedSteps) {
@@ -280,7 +280,7 @@ export class ReActLLMDuty extends LLMDuty {
         // Check for short-circuit final answer from tool result
         if (stepResult.finalAnswer) {
           LogHelper.title(this.name)
-          LogHelper.debug(`Tool returned final_answer, short-circuiting: "${stepResult.finalAnswer.slice(0, 200)}"`)
+          LogHelper.debug(`Tool returned final_answer, short-circuiting: "${stepResult.finalAnswer}"`)
 
           // Mark all remaining as completed
           for (const ts of trackedSteps) {
@@ -473,7 +473,7 @@ export class ReActLLMDuty extends LLMDuty {
       }
       LogHelper.title(this.name)
       LogHelper.debug(
-        `callLLMWithTools: tool call received — ${firstCall.function.name}(${firstCall.function.arguments.slice(0, 200)})`
+        `callLLMWithTools: tool call received — ${firstCall.function.name}(${firstCall.function.arguments})`
       )
       return {
         toolCall: {
@@ -492,7 +492,7 @@ export class ReActLLMDuty extends LLMDuty {
         : ''
     LogHelper.title(this.name)
     LogHelper.debug(
-      `callLLMWithTools: no tool call, text response: "${textContent.slice(0, 200)}"`
+      `callLLMWithTools: no tool call, text response: "${textContent}"`
     )
     return {
       textContent,

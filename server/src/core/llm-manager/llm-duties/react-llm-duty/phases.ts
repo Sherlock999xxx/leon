@@ -9,7 +9,7 @@ import {
   TOOL_EXECUTOR,
   CONTEXT_MANAGER
 } from '@/core'
-import type { OpenAITool } from '@/core/llm-manager/types'
+import type { OpenAITool, OpenAIToolChoice } from '@/core/llm-manager/types'
 import type { MessageLog } from '@/types'
 
 import {
@@ -216,6 +216,19 @@ function buildToolkitContextSection(
   return `Toolkit Context:\n${toolkitContext}`
 }
 
+function stripInlineToolMarkup(text: string): string {
+  if (!text) {
+    return ''
+  }
+
+  return text
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, '')
+    .replace(/<function=[^>]+>/gi, '')
+    .replace(/<\/function>/gi, '')
+    .replace(/<parameter=[^>]+>[\s\S]*?<\/parameter>/gi, '')
+    .trim()
+}
+
 // ---------------------------------------------------------------------------
 // Catalog building
 // ---------------------------------------------------------------------------
@@ -385,28 +398,58 @@ export async function runPlanningPhase(
       }
     ]
 
-    // First attempt: force create_plan to get a proper multi-step plan
-    const toolResult = await caller.callLLMWithTools(
-      prompt,
-      planSystemPrompt,
-      planTools,
-      { type: 'function', function: { name: 'create_plan' } },
-      history
-    )
+    const planToolChoice: OpenAIToolChoice = {
+      type: 'function',
+      function: { name: 'create_plan' }
+    }
+    const maxStructuredPlanAttempts = 3
+    let lastTextFallback = ''
 
-    LogHelper.title(DUTY_NAME)
-    LogHelper.debug(`Planning prompt: "${prompt}"`)
-    LogHelper.debug(
-      `Planning tool result: ${JSON.stringify(toolResult)}`
-    )
+    for (
+      let planAttempt = 1;
+      planAttempt <= maxStructuredPlanAttempts;
+      planAttempt += 1
+    ) {
+      const retryInstruction =
+        planAttempt > 1
+          ? '\n\nIMPORTANT: You must call the "create_plan" function now. Do not answer with plain text.'
+          : ''
+      const planningPrompt = `${prompt}${retryInstruction}`
 
-    if (toolResult?.toolCall) {
+      const toolResult = await caller.callLLMWithTools(
+        planningPrompt,
+        planSystemPrompt,
+        planTools,
+        planToolChoice,
+        history
+      )
+
+      LogHelper.title(DUTY_NAME)
+      LogHelper.debug(
+        `Planning attempt ${planAttempt}/${maxStructuredPlanAttempts} result: ${JSON.stringify(toolResult).slice(0, 500)}`
+      )
+
+      if (!toolResult) {
+        continue
+      }
+
+      if (toolResult.textContent?.trim()) {
+        lastTextFallback = toolResult.textContent.trim()
+      }
+
+      if (!toolResult.toolCall) {
+        LogHelper.debug('Planning: no tool call returned')
+        continue
+      }
+
+      if (toolResult.toolCall.functionName !== 'create_plan') {
+        LogHelper.debug(
+          `Planning: unexpected tool call "${toolResult.toolCall.functionName}" (expected "create_plan")`
+        )
+        continue
+      }
+
       try {
-        if (toolResult.toolCall.functionName !== 'create_plan') {
-          LogHelper.debug(
-            `Planning: unexpected tool call "${toolResult.toolCall.functionName}", falling back to JSON mode`
-          )
-        } else {
         const parsedArgs = JSON.parse(toolResult.toolCall.arguments)
         if (Array.isArray(parsedArgs.steps)) {
           const steps = parseStepsFromArgs(parsedArgs.steps)
@@ -427,25 +470,8 @@ export async function runPlanningPhase(
             answer: (parsedArgs.summary as string).trim()
           }
         }
-        }
       } catch {
         LogHelper.debug('Planning: failed to parse create_plan arguments')
-      }
-    }
-
-    // Fallback: if the model returned text instead of a tool call
-    if (toolResult?.textContent) {
-      const parsed = parseOutput(toolResult.textContent)
-      const fallbackResult = extractPlanFromParsed(parsed)
-      if (fallbackResult) {
-        return fallbackResult
-      }
-
-      return {
-        type: 'final',
-        answer:
-          toolResult.textContent.trim() ||
-          'I could not understand how to help with that request.'
       }
     }
 
@@ -462,10 +488,31 @@ export async function runPlanningPhase(
       return planResult
     }
 
+    const textFallbackParsed = parseOutput(lastTextFallback)
+    const textFallbackPlan = extractPlanFromParsed(textFallbackParsed)
+    if (textFallbackPlan) {
+      LogHelper.debug('Planning: recovered structured output from text fallback')
+      return textFallbackPlan
+    }
+
     const raw =
       typeof jsonModeResult?.output === 'string'
         ? jsonModeResult.output.trim()
         : ''
+    if (raw) {
+      return { type: 'final', answer: stripInlineToolMarkup(raw) || raw }
+    }
+
+    if (lastTextFallback) {
+      const sanitizedTextFallback = stripInlineToolMarkup(lastTextFallback)
+      return {
+        type: 'final',
+        answer:
+          sanitizedTextFallback ||
+          'I could not produce a structured plan. Please rephrase your request.'
+      }
+    }
+
     return { type: 'final', answer: raw || 'I could not determine what to do.' }
   }
 
