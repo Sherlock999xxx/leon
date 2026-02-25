@@ -428,7 +428,7 @@ export async function runPlanningPhase(
 
     LogHelper.title(DUTY_NAME)
     LogHelper.debug(
-      `Planning tool result: ${JSON.stringify(toolResult).slice(0, 500)}`
+      `Planning tool result: ${JSON.stringify(toolResult)}`
     )
 
     let textFallback = toolResult?.textContent?.trim() || ''
@@ -480,7 +480,7 @@ export async function runPlanningPhase(
       )
 
       LogHelper.debug(
-        `Planning forced result: ${JSON.stringify(forcedPlanResult).slice(0, 500)}`
+        `Planning forced result: ${JSON.stringify(forcedPlanResult)}`
       )
 
       if (forcedPlanResult?.textContent?.trim()) {
@@ -744,7 +744,7 @@ Create a revised plan from this point to complete the user request.`
 
     LogHelper.title(DUTY_NAME)
     LogHelper.debug(
-      `Recovery planning tool result: ${JSON.stringify(toolResult).slice(0, 500)}`
+      `Recovery planning tool result: ${JSON.stringify(toolResult)}`
     )
 
     if (toolResult?.toolCall?.functionName === 'create_plan') {
