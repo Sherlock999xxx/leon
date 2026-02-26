@@ -8,6 +8,7 @@
  */
 export const CATALOG_TOKEN_BUDGET = 2_000
 export const CHARS_PER_TOKEN = 4
+export const DUTY_NAME = 'ReAct LLM Duty'
 
 export const FORMATTING_RULES = `FORMATTING RULES for all user-facing text:
 - Do NOT use markdown (no **, ##, \`\`\`, etc.).
