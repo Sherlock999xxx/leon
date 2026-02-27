@@ -13,8 +13,11 @@ export const widgetId = (prefix: string): string =>
  * This produces the exact JSON shape the client renderer expects.
  */
 export function buildPlanComponentTree(
-  steps: TrackedPlanStep[]
+  steps: TrackedPlanStep[],
+  _justCompletedIndex: number | null
 ): Record<string, unknown> {
+  void _justCompletedIndex
+
   const listItems = steps.map((step, i) => {
     let child: Record<string, unknown>
 
