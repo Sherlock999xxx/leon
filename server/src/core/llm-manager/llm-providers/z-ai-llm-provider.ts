@@ -24,7 +24,8 @@ type ZAICompletionParams = Omit<CompletionParams, ''>
 export default class ZAILLMProvider {
   protected readonly name = 'Z-AI LLM Provider'
   protected readonly apiKey = process.env['LEON_ZAI_API_KEY']
-  protected readonly model = process.env['LEON_ZAI_MODEL'] || 'glm-5'
+  protected readonly model =
+    process.env['LEON_ZAI_AGENT_LLM'] || process.env['LEON_ZAI_MODEL'] || 'glm-5'
   private readonly client = new OpenAI({
     apiKey: this.apiKey,
     baseURL: 'https://api.z.ai/api/paas/v4',
@@ -37,6 +38,10 @@ export default class ZAILLMProvider {
     LogHelper.success('New instance')
 
     this.checkAPIKey()
+  }
+
+  public get modelName(): string {
+    return this.model
   }
 
   private checkAPIKey(): void {

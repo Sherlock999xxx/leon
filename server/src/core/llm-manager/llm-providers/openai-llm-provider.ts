@@ -23,7 +23,10 @@ type OpenAICompletionParams = Omit<CompletionParams, ''>
 export default class OpenAILLMProvider {
   protected readonly name = 'OpenAI LLM Provider'
   protected readonly apiKey = process.env['LEON_OPENAI_API_KEY']
-  protected readonly model = process.env['LEON_OPENAI_MODEL'] || 'gpt-4o-mini'
+  protected readonly model =
+    process.env['LEON_OPENAI_AGENT_LLM'] ||
+    process.env['LEON_OPENAI_MODEL'] ||
+    'gpt-4o-mini'
   private readonly client = new OpenAI({
     apiKey: this.apiKey,
     baseURL: 'https://api.openai.com/v1',
@@ -36,6 +39,10 @@ export default class OpenAILLMProvider {
     LogHelper.success('New instance')
 
     this.checkAPIKey()
+  }
+
+  public get modelName(): string {
+    return this.model
   }
 
   private checkAPIKey(): void {

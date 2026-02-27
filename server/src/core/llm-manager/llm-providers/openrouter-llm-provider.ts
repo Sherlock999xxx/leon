@@ -25,7 +25,9 @@ export default class OpenRouterLLMProvider {
   protected readonly name = 'OpenRouter LLM Provider'
   protected readonly apiKey = process.env['LEON_OPENROUTER_API_KEY']
   protected readonly model =
-    process.env['LEON_OPENROUTER_MODEL'] || 'openrouter/auto'
+    process.env['LEON_OPENROUTER_AGENT_LLM'] ||
+    process.env['LEON_OPENROUTER_MODEL'] ||
+    'openrouter/auto'
   private readonly client = new OpenRouter({
     apiKey: this.apiKey,
     timeoutMs: 120_000,
@@ -46,6 +48,10 @@ export default class OpenRouterLLMProvider {
     LogHelper.success('New instance')
 
     this.checkAPIKey()
+  }
+
+  public get modelName(): string {
+    return this.model
   }
 
   private checkAPIKey(): void {

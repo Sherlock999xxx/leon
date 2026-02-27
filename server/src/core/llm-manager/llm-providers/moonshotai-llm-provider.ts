@@ -22,7 +22,9 @@ export default class MoonshotAILLMProvider {
   protected readonly name = 'MoonshotAI LLM Provider'
   protected readonly apiKey = process.env['LEON_MOONSHOTAI_API_KEY']
   protected readonly model =
-    process.env['LEON_MOONSHOTAI_MODEL'] || 'moonshot-v1-8k'
+    process.env['LEON_MOONSHOTAI_AGENT_LLM'] ||
+    process.env['LEON_MOONSHOTAI_MODEL'] ||
+    'moonshot-v1-8k'
   private readonly client = new OpenAI({
     apiKey: this.apiKey,
     baseURL: 'https://api.moonshot.ai/v1',
@@ -35,6 +37,10 @@ export default class MoonshotAILLMProvider {
     LogHelper.success('New instance')
 
     this.checkAPIKey()
+  }
+
+  public get modelName(): string {
+    return this.model
   }
 
   private checkAPIKey(): void {

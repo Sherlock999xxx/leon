@@ -25,6 +25,7 @@ export default class HuggingFaceLLMProvider {
   protected readonly name = 'HuggingFace LLM Provider'
   protected readonly apiKey = process.env['LEON_HUGGINGFACE_API_KEY']
   protected readonly model =
+    process.env['LEON_HUGGINGFACE_AGENT_LLM'] ||
     process.env['LEON_HUGGINGFACE_MODEL'] ||
     'meta-llama/Meta-Llama-3.1-8B-Instruct'
   private readonly client = new OpenAI({
@@ -39,6 +40,10 @@ export default class HuggingFaceLLMProvider {
     LogHelper.success('New instance')
 
     this.checkAPIKey()
+  }
+
+  public get modelName(): string {
+    return this.model
   }
 
   private checkAPIKey(): void {

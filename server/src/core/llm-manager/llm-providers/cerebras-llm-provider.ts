@@ -36,7 +36,9 @@ export default class CerebrasLLMProvider {
   protected readonly name = 'Cerebras LLM Provider'
   protected readonly apiKey = process.env['LEON_CEREBRAS_API_KEY']
   protected readonly model =
-    process.env['LEON_CEREBRAS_MODEL'] || 'gpt-oss-120b'
+    process.env['LEON_CEREBRAS_AGENT_LLM'] ||
+    process.env['LEON_CEREBRAS_MODEL'] ||
+    'gpt-oss-120b'
   private readonly axios = axios.create({
     baseURL: 'https://api.cerebras.ai/v1',
     timeout: 120_000
@@ -47,6 +49,10 @@ export default class CerebrasLLMProvider {
     LogHelper.success('New instance')
 
     this.checkAPIKey()
+  }
+
+  public get modelName(): string {
+    return this.model
   }
 
   private checkAPIKey(): void {

@@ -11,7 +11,7 @@ import {
   type PromptOrChatHistory,
   LLMProviders
 } from '@/core/llm-manager/types'
-import { LLM_PROVIDER, SERVER_CORE_PATH } from '@/constants'
+import { LLM_NAME_WITH_VERSION, LLM_PROVIDER, SERVER_CORE_PATH } from '@/constants'
 import { LogHelper } from '@/helpers/log-helper'
 import { FileHelper } from '@/helpers/file-helper'
 import LocalLLMProvider from '@/core/llm-manager/llm-providers/local-llm-provider'
@@ -101,6 +101,18 @@ export default class LLMProvider {
 
   public get isLLMProviderReady(): boolean {
     return !!this.llmProvider
+  }
+
+  public get agentLLMName(): string {
+    if (!this.llmProvider) {
+      return 'unknown'
+    }
+
+    return this.llmProvider.modelName || 'unknown'
+  }
+
+  public get localLLMName(): string {
+    return LLM_NAME_WITH_VERSION
   }
 
   public consumeLastProviderErrorMessage(): string | null {

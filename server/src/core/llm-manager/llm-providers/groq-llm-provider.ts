@@ -38,7 +38,9 @@ export default class GroqLLMProvider {
   protected readonly name = 'Groq LLM Provider'
   protected readonly apiKey = process.env['LEON_GROQ_API_KEY']
   protected readonly model =
-    process.env['LEON_GROQ_MODEL'] || 'llama-3.1-8b-instant'
+    process.env['LEON_GROQ_AGENT_LLM'] ||
+    process.env['LEON_GROQ_MODEL'] ||
+    'llama-3.1-8b-instant'
   private readonly axios = axios.create({
     baseURL: 'https://api.groq.com/openai/v1',
     timeout: 7_000
@@ -49,6 +51,10 @@ export default class GroqLLMProvider {
     LogHelper.success('New instance')
 
     this.checkAPIKey()
+  }
+
+  public get modelName(): string {
+    return this.model
   }
 
   private checkAPIKey(): void {

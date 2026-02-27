@@ -22,7 +22,9 @@ export default class AnthropicLLMProvider {
   protected readonly name = 'Anthropic LLM Provider'
   protected readonly apiKey = process.env['LEON_ANTHROPIC_API_KEY']
   protected readonly model =
-    process.env['LEON_ANTHROPIC_MODEL'] || 'claude-3-5-sonnet-latest'
+    process.env['LEON_ANTHROPIC_AGENT_LLM'] ||
+    process.env['LEON_ANTHROPIC_MODEL'] ||
+    'claude-3-5-sonnet-latest'
   private readonly client = new OpenAI({
     apiKey: this.apiKey || 'anthropic',
     baseURL: 'https://api.anthropic.com/v1',
@@ -39,6 +41,10 @@ export default class AnthropicLLMProvider {
     LogHelper.success('New instance')
 
     this.checkAPIKey()
+  }
+
+  public get modelName(): string {
+    return this.model
   }
 
   private checkAPIKey(): void {
