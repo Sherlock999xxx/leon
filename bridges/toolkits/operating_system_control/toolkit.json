@@ -8,8 +8,7 @@
     "HOST_SYSTEM.md",
     "ACTIVITY.md",
     "SYSTEM_RESOURCES.md",
-    "STORAGE.md",
-    "NETWORK.md"
+    "STORAGE.md"
   ],
   "tools": ["bash"]
 }

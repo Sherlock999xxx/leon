@@ -2,6 +2,10 @@
   "$schema": "../../../schemas/toolkit-schemas/toolkit.json",
   "name": "Communication",
   "description": "Tools for communication and language model interactions.",
-  "context_files": ["LEON.md", "ARCHITECTURE.md", "LEON_RUNTIME.md"],
+  "context_files": [
+    "LEON.md",
+    "ARCHITECTURE.md",
+    "MEDIA_PROFILE.md"
+  ],
   "tools": ["openrouter", "cerebras"]
 }
