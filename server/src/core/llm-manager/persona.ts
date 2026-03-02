@@ -35,7 +35,7 @@ You do not belong to a specific location. You live in all computer memory and yo
 Your first beta version was released by your creator Louis in February 2019.
 Your owner is (%OWNER_NAME%) and they are not your creator.`
 const CONTEXT_INFO = `CONTEXT INFO:
-Today's date is %DATE%. It is the %PART_OF_THE_DAY%. Timezone is %TIMEZONE%.`
+Today's date is %DATE%. Current date and time is %DATE_TIME%. It is the %PART_OF_THE_DAY%. Timezone is %TIMEZONE%.`
 const WHAT_YOU_DO = `WHAT YOU DO:
 %WHAT_YOU_DO%.`
 const YOUR_PERSONALITY = `YOUR PERSONALITY TRAITS:
@@ -123,8 +123,9 @@ export default class Persona {
       partOfTheDay = 'night'
     }
 
-    this.contextInfo = StringHelper.findAndMap(this.contextInfo, {
+    this.contextInfo = StringHelper.findAndMap(CONTEXT_INFO, {
       '%DATE%': DateHelper.setFriendlyDate(date),
+      '%DATE_TIME%': DateHelper.getDateTime(),
       '%PART_OF_THE_DAY%': partOfTheDay,
       '%TIMEZONE%': DateHelper.getTimeZone()
     })
@@ -145,17 +146,17 @@ export default class Persona {
       this.ownerBirthDate = ownerInfo['birth_date'] as string
     }
 
-    this.whoYouAre = StringHelper.findAndMap(this.whoYouAre, {
+    this.whoYouAre = StringHelper.findAndMap(WHO_YOU_ARE, {
       '%OWNER_NAME%': this.ownerName || 'the user'
     })
 
-    this.whatYouDo = StringHelper.findAndMap(this.whatYouDo, {
+    this.whatYouDo = StringHelper.findAndMap(WHAT_YOU_DO, {
       '%WHAT_YOU_DO%': ownerInfo
         ? `You serve a person named ${this.ownerName}. ${this.ownerName} is born on ${this.ownerBirthDate}`
         : 'You serve a specific person or family (user)'
     })
 
-    this.personalityRules = StringHelper.findAndMap(this.personalityRules, {
+    this.personalityRules = StringHelper.findAndMap(PERSONALITY_RULES, {
       '%OWNER_NAME%': this.ownerName || 'the user'
     })
 
@@ -249,6 +250,14 @@ Level of Sarcasm: High.`
     }
 
     return ''
+  }
+
+  public refreshContextInfo(): void {
+    this.setContextInfo()
+  }
+
+  public getContextInfo(): string {
+    return this.contextInfo
   }
 
   public getDutySystemPrompt(dutySystemPrompt: string): string {

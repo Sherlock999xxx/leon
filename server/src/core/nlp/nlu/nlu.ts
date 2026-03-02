@@ -19,7 +19,8 @@ import {
   BRAIN,
   CONVERSATION_LOGGER,
   SOCKET_SERVER,
-  MEMORY_MANAGER
+  MEMORY_MANAGER,
+  PERSONA
 } from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
 import Conversation from '@/core/nlp/conversation'
@@ -1057,6 +1058,7 @@ export default class NLU {
           `Routing decision: mode=${routingDecision.mode} route=${routingDecision.route} reason=${routingDecision.reason}`
         )
 
+        PERSONA.refreshContextInfo()
         if (routingDecision.route === this.routingRoutes.react) {
           this.conversation.cleanActiveState()
           await NLUProcessResultUpdater.update(DEFAULT_NLU_PROCESS_RESULT)
