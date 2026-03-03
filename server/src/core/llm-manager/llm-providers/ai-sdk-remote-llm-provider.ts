@@ -319,7 +319,8 @@ export default class AISDKRemoteLLMProvider {
       ...(typeof completionParams.maxTokens === 'number'
         ? { maxOutputTokens: completionParams.maxTokens }
         : {}),
-      ...(typeof completionParams.temperature === 'number'
+      ...(this.config.flavor !== 'moonshotai' &&
+        typeof completionParams.temperature === 'number'
         ? { temperature: completionParams.temperature }
         : {})
     }
