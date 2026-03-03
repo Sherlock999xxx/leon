@@ -50,6 +50,8 @@ const BOOT_REFRESH_PRIORITY_FILENAMES = [
 ]
 const BOOT_REFRESH_TIMER_LABEL = 'Context files boot refresh total'
 const PERIODIC_REFRESH_TIMER_LABEL = 'Context files periodic refresh total'
+const MANIFEST_REFRESH_TIMER_LABEL = 'Context files manifest refresh total'
+const MANIFEST_REFRESH_CHECK_INTERVAL_MS = 5_000
 const RETIRED_CONTEXT_FILES = [
   'LOCAL_ECOSYSTEM.md',
   'NETWORK.md',
@@ -69,6 +71,8 @@ export default class ContextManager {
   private manifest = ''
   private refreshIntervalId: NodeJS.Timeout | null = null
   private isBootRefreshInProgress = false
+  private isBackgroundRefreshInProgress = false
+  private lastManifestRefreshCheckAt = 0
   private readonly metadata = new Map<string, ContextFileMetadata>()
   private readonly probeHelper = new ContextProbeHelper()
   private readonly allContextFiles: ContextFile[] = [
@@ -213,11 +217,11 @@ export default class ContextManager {
       return ''
     }
 
-    for (const definition of this.contextFiles) {
-      this.refreshContextFile(definition)
+    if (!this.manifest) {
+      this.manifest = this.buildManifest()
     }
 
-    this.manifest = this.buildManifest()
+    this.maybeQueueManifestRefresh()
     return this.manifest
   }
 
@@ -426,6 +430,86 @@ export default class ContextManager {
     return this.getNormalizedLoadRatio() >= BOOT_REFRESH_DEFER_LOAD_RATIO
   }
 
+  private maybeQueueManifestRefresh(): void {
+    const now = Date.now()
+    if (now - this.lastManifestRefreshCheckAt < MANIFEST_REFRESH_CHECK_INTERVAL_MS) {
+      return
+    }
+
+    this.lastManifestRefreshCheckAt = now
+    this.queueRefresh('manifest')
+  }
+
+  private queueRefresh(reason: 'manifest' | 'periodic'): void {
+    if (!this._isLoaded) {
+      return
+    }
+
+    if (this.isBootRefreshInProgress || this.isBackgroundRefreshInProgress) {
+      return
+    }
+
+    const definitions = this.getStaleContextFiles()
+    if (definitions.length === 0) {
+      return
+    }
+
+    this.isBackgroundRefreshInProgress = true
+    void this.runBackgroundRefresh(reason, definitions)
+  }
+
+  private async runBackgroundRefresh(
+    reason: 'manifest' | 'periodic',
+    definitions: ContextFile[]
+  ): Promise<void> {
+    const timerLabel =
+      reason === 'periodic'
+        ? PERIODIC_REFRESH_TIMER_LABEL
+        : MANIFEST_REFRESH_TIMER_LABEL
+    LogHelper.time(timerLabel)
+
+    const updatedFilenames: string[] = []
+    try {
+      for (const definition of definitions) {
+        if (this.refreshContextFile(definition)) {
+          updatedFilenames.push(definition.filename)
+        }
+
+        await this.yieldToEventLoop()
+      }
+
+      this.logContextFilesUpdated(reason, updatedFilenames)
+      this.manifest = this.buildManifest()
+    } finally {
+      LogHelper.title('Context Manager')
+      LogHelper.timeEnd(timerLabel)
+      this.isBackgroundRefreshInProgress = false
+    }
+  }
+
+  private getStaleContextFiles(): ContextFile[] {
+    return [...this.contextFiles]
+      .filter((definition) => this.isContextFileStale(definition))
+      .sort((definitionA, definitionB) => {
+        const priorityA = this.getBootRefreshPriority(definitionA.filename)
+        const priorityB = this.getBootRefreshPriority(definitionB.filename)
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB
+        }
+
+        return definitionA.filename.localeCompare(definitionB.filename)
+      })
+  }
+
+  private async yieldToEventLoop(): Promise<void> {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, 0)
+      if (typeof timer.unref === 'function') {
+        timer.unref()
+      }
+    })
+  }
+
   private logContextFilesUpdated(reason: string, filenames: string[]): void {
     const uniqueFilenames = [...new Set(filenames)]
     if (uniqueFilenames.length === 0) {
@@ -543,18 +627,7 @@ export default class ContextManager {
 
     this.refreshIntervalId = setInterval(
       () => {
-        LogHelper.time(PERIODIC_REFRESH_TIMER_LABEL)
-        const updatedFilenames: string[] = []
-        for (const definition of this.contextFiles) {
-          if (this.refreshContextFile(definition)) {
-            updatedFilenames.push(definition.filename)
-          }
-        }
-
-        this.logContextFilesUpdated('periodic', updatedFilenames)
-        this.manifest = this.buildManifest()
-        LogHelper.title('Context Manager')
-        LogHelper.timeEnd(PERIODIC_REFRESH_TIMER_LABEL)
+        this.queueRefresh('periodic')
       },
       CONTEXT_REFRESH_TTL_MS
     )
