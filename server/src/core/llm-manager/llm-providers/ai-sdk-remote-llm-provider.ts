@@ -348,7 +348,7 @@ export default class AISDKRemoteLLMProvider {
     if (this.config.flavor === 'openai-responses') {
       if (completionParams.disableThinking === true) {
         providerOptions['openai'] = {
-          reasoningEffort: 'high'
+          reasoningEffort: 'low'
         }
       } else {
         // For Responses API models (OpenAI/OpenRouter via createOpenAI), request
@@ -600,8 +600,20 @@ export default class AISDKRemoteLLMProvider {
     for await (const part of result.stream) {
       const type = typeof part['type'] === 'string' ? (part['type'] as string) : ''
 
-      if (type === 'text-delta' && typeof part['delta'] === 'string') {
-        const delta = part['delta'] as string
+      const readString = (...values: unknown[]): string => {
+        for (const value of values) {
+          if (typeof value === 'string') {
+            return value
+          }
+        }
+        return ''
+      }
+
+      if (type === 'text-delta' || type === 'text') {
+        const delta = readString(part['delta'], part['textDelta'], part['text'])
+        if (!delta) {
+          continue
+        }
         const mergedDelta = this.mergeStreamingChunk(state.text, delta)
         if (!mergedDelta) {
           continue
@@ -611,8 +623,11 @@ export default class AISDKRemoteLLMProvider {
         continue
       }
 
-      if (type === 'reasoning-delta' && typeof part['delta'] === 'string') {
-        const delta = part['delta'] as string
+      if (type === 'reasoning-delta' || type === 'reasoning') {
+        const delta = readString(part['delta'], part['textDelta'], part['text'])
+        if (!delta) {
+          continue
+        }
         const mergedDelta = this.mergeStreamingChunk(state.reasoning, delta)
         if (!mergedDelta) {
           continue
@@ -622,28 +637,25 @@ export default class AISDKRemoteLLMProvider {
         continue
       }
 
-      if (type === 'reasoning' && typeof part['text'] === 'string') {
-        const text = part['text'] as string
-        const mergedText = this.mergeStreamingChunk(state.reasoning, text)
-        if (!mergedText) {
-          continue
-        }
-        state.reasoning += mergedText
-        completionParams.onReasoningToken?.(mergedText)
-        continue
-      }
-
       if (type === 'tool-call') {
         const toolCallId =
           typeof part['toolCallId'] === 'string'
             ? (part['toolCallId'] as string)
-            : `tool_call_${state.toolCallOrder.length}`
+            : typeof part['id'] === 'string'
+              ? (part['id'] as string)
+              : `tool_call_${state.toolCallOrder.length}`
         const toolName =
-          typeof part['toolName'] === 'string' ? (part['toolName'] as string) : ''
+          readString(part['toolName'], part['name'])
+        const rawInput = part['input']
         const input =
-          typeof part['input'] === 'string'
-            ? (part['input'] as string)
-            : JSON.stringify(part['input'] ?? {})
+          typeof rawInput === 'string'
+            ? rawInput
+            : JSON.stringify(
+                rawInput ??
+                  (typeof part['arguments'] === 'string'
+                    ? part['arguments']
+                    : {})
+              )
 
         this.ensureToolCall(state, toolCallId)
         state.toolCallsById[toolCallId]!.functionName = toolName
@@ -671,7 +683,11 @@ export default class AISDKRemoteLLMProvider {
           typeof part['id'] === 'string'
             ? (part['id'] as string)
             : `tool_call_${state.toolCallOrder.length}`
-        const delta = typeof part['delta'] === 'string' ? (part['delta'] as string) : ''
+        const delta = readString(
+          part['delta'],
+          part['inputTextDelta'],
+          part['argsTextDelta']
+        )
 
         this.ensureToolCall(state, toolCallId)
         state.toolCallsById[toolCallId]!.arguments += delta
@@ -685,14 +701,9 @@ export default class AISDKRemoteLLMProvider {
             : typeof part['id'] === 'string'
               ? (part['id'] as string)
               : `tool_call_${state.toolCallOrder.length}`
-        const toolName =
-          typeof part['toolName'] === 'string' ? (part['toolName'] as string) : ''
+        const toolName = readString(part['toolName'], part['name'])
         const delta =
-          typeof part['argsTextDelta'] === 'string'
-            ? (part['argsTextDelta'] as string)
-            : typeof part['delta'] === 'string'
-              ? (part['delta'] as string)
-              : ''
+          readString(part['argsTextDelta'], part['inputTextDelta'], part['delta'])
 
         this.ensureToolCall(state, toolCallId)
         if (toolName) {
@@ -704,7 +715,7 @@ export default class AISDKRemoteLLMProvider {
         continue
       }
 
-      if (type === 'finish') {
+      if (type === 'finish' || type === 'finish-step') {
         this.appendUsageFromUnknown(state, part['usage'])
         continue
       }

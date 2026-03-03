@@ -757,11 +757,13 @@ export class ReActLLMDuty extends LLMDuty {
   } | null> {
     const reasoningGenerationId =
       this.reasoningGenerationId || StringHelper.random(6, { onlyLetters: true })
+    const shouldStream = LLM_PROVIDER_NAME !== LLMProviders.Local
 
     this.logPromptDispatch({
       channel: 'json',
       prompt,
       systemPrompt,
+      shouldStream,
       schema,
       ...(promptSections ? { promptSections } : {}),
       ...(history ? { history } : {})
@@ -774,7 +776,7 @@ export class ReActLLMDuty extends LLMDuty {
       temperature: REACT_TEMPERATURE,
       timeout: REACT_INFERENCE_TIMEOUT_MS,
       maxRetries: REACT_TIMEOUT_MAX_RETRIES,
-      shouldStream: LLM_PROVIDER_NAME !== LLMProviders.Local,
+      shouldStream,
       onReasoningToken: (reasoningChunk: string): void => {
         this.emitReasoningToken(reasoningChunk, reasoningGenerationId)
       },
@@ -819,11 +821,14 @@ export class ReActLLMDuty extends LLMDuty {
     usedOutputTokens?: number
     reasoning?: string
   } | null> {
+    const shouldStreamEffective =
+      shouldStream || LLM_PROVIDER_NAME !== LLMProviders.Local
+
     this.logPromptDispatch({
       channel: 'text',
       prompt,
       systemPrompt,
-      shouldStream,
+      shouldStream: shouldStreamEffective,
       ...(promptSections ? { promptSections } : {}),
       ...(history ? { history } : {})
     })
@@ -842,8 +847,7 @@ export class ReActLLMDuty extends LLMDuty {
       temperature: REACT_TEMPERATURE,
       timeout: REACT_INFERENCE_TIMEOUT_MS,
       maxRetries: REACT_TIMEOUT_MAX_RETRIES,
-      shouldStream:
-        shouldStream || LLM_PROVIDER_NAME !== LLMProviders.Local,
+      shouldStream: shouldStreamEffective,
       onReasoningToken: (reasoningChunk: string): void => {
         this.emitReasoningToken(reasoningChunk, reasoningGenerationId)
       },
@@ -933,6 +937,9 @@ export class ReActLLMDuty extends LLMDuty {
     usedOutputTokens?: number
     reasoning?: string
   } | null> {
+    const shouldStreamEffective =
+      shouldStreamToUser || LLM_PROVIDER_NAME !== LLMProviders.Local
+
     const effectiveToolChoice: OpenAIToolChoice | undefined =
       tools.length <= 1
         ? undefined
@@ -965,7 +972,7 @@ export class ReActLLMDuty extends LLMDuty {
       ...(effectiveToolChoice !== undefined
         ? { toolChoice: effectiveToolChoice }
         : {}),
-      shouldStream: shouldStreamToUser,
+      shouldStream: shouldStreamEffective,
       ...(promptSections ? { promptSections } : {}),
       ...(history ? { history } : {})
     })
@@ -1017,8 +1024,7 @@ export class ReActLLMDuty extends LLMDuty {
         temperature: REACT_TEMPERATURE,
         timeout: REACT_INFERENCE_TIMEOUT_MS,
         maxRetries: REACT_TIMEOUT_MAX_RETRIES,
-        shouldStream:
-          shouldStreamToUser || LLM_PROVIDER_NAME !== LLMProviders.Local,
+        shouldStream: shouldStreamEffective,
         onReasoningToken: (reasoningChunk: string): void => {
           this.emitReasoningToken(reasoningChunk, reasoningGenerationId)
         },
