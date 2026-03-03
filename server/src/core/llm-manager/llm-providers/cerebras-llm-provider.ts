@@ -13,7 +13,7 @@ export default class CerebrasLLMProvider extends AISDKRemoteLLMProvider {
       modelEnv: 'LEON_CEREBRAS_MODEL',
       defaultModel: 'gpt-oss-120b',
       baseURL: 'https://api.cerebras.ai/v1',
-      flavor: 'openai-compatible'
+      flavor: 'cerebras'
     })
   }
 }

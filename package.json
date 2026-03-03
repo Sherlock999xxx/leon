@@ -77,6 +77,11 @@
     "kill": "pkill -f node && pkill -f leon-tcp-server && pkill -f pt_main_thread"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "3.0.53",
+    "@ai-sdk/cerebras": "2.0.37",
+    "@ai-sdk/groq": "3.0.27",
+    "@ai-sdk/huggingface": "1.0.35",
+    "@ai-sdk/moonshotai": "2.0.8",
     "@ai-sdk/openai": "3.0.39",
     "@ai-sdk/openai-compatible": "2.0.33",
     "@aws-sdk/client-polly": "3.18.0",

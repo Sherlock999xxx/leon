@@ -10,7 +10,7 @@ export default class MoonshotAILLMProvider extends AISDKRemoteLLMProvider {
       modelEnv: 'LEON_MOONSHOTAI_MODEL',
       defaultModel: 'moonshot-v1-8k',
       baseURL: 'https://api.moonshot.ai/v1',
-      flavor: 'openai-compatible'
+      flavor: 'moonshotai'
     })
   }
 }

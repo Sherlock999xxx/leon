@@ -27,6 +27,7 @@ import {
   type OpenAIToolCall,
   type OpenAIToolChoice
 } from '@/core/llm-manager/types'
+import { ContextStateStore } from '@/core/context-manager/context-state-store'
 import { LLM_PROVIDER as LLM_PROVIDER_NAME } from '@/constants'
 import type { MessageLog } from '@/types'
 
@@ -46,6 +47,7 @@ import {
 import type {
   ReactLLMDutyParams,
   ExecutionRecord,
+  PlanStep,
   TrackedPlanStep,
   PlanStepStatus,
   LLMCaller,
@@ -60,11 +62,34 @@ import {
   runFinalAnswerPhase
 } from './react-llm-duty/phases'
 
+const REACT_CONTINUATION_STATE_FILENAME = '.react-execution-continuation-state.json'
+const REACT_CONTINUATION_MAX_AGE_MS = 30 * 60 * 1_000
+
+interface ReactExecutionContinuationState {
+  version: 1
+  phase: 'execution'
+  planWidgetId: string
+  originalInput: string
+  clarificationQuestion: string
+  pendingSteps: PlanStep[]
+  executionHistory: ExecutionRecord[]
+  trackedSteps: TrackedPlanStep[]
+  currentStepIndex: number
+  replanCount: number
+  executionCount: number
+  createdAt: number
+}
+
 export class ReActLLMDuty extends LLMDuty {
   private static instance: ReActLLMDuty
   private static context: LlamaContext = null as unknown as LlamaContext
   private static session: LlamaChatSession =
     null as unknown as LlamaChatSession
+  private static readonly continuationStateStore =
+    new ContextStateStore<ReactExecutionContinuationState | null>(
+      REACT_CONTINUATION_STATE_FILENAME,
+      null
+    )
   protected systemPrompt: LLMDutyParams['systemPrompt'] = null
   protected readonly name = 'ReAct LLM Duty'
   protected input: LLMDutyParams['input'] = null
@@ -155,107 +180,156 @@ export class ReActLLMDuty extends LLMDuty {
               nbOfLogsToLoad: REACT_LOCAL_PROVIDER_HISTORY_LOGS
             })
 
+      const ownerInputText = this.getInputAsText(this.input)
+      const continuation = this.consumeExecutionContinuation(ownerInputText)
+      const effectiveInput = continuation
+        ? continuation.resumedInput
+        : this.input
+
       // --- Build adaptive catalog ---
       const catalog = buildCatalog()
 
       LogHelper.title(this.name)
       LogHelper.debug(`Catalog mode: ${catalog.mode} | Catalog length: ${catalog.text.length} chars (~${Math.ceil(catalog.text.length / 4)} tokens) | Input: "${this.input}"`)
       LogHelper.debug(`Native tools supported: ${this.supportsNativeTools} (provider: ${LLM_PROVIDER_NAME})`)
+      if (continuation) {
+        LogHelper.debug(
+          `Resuming paused execution from clarification: "${continuation.state.clarificationQuestion}"`
+        )
+      }
 
-      // --- Phase 1: Planning ---
-      LogHelper.title(this.name)
-      LogHelper.debug('Phase 1: Planning...')
-
-      const caller = this.createLLMCaller(history)
-      const planWidgetIdValue = widgetId('plan')
+      const caller = this.createLLMCaller(history, effectiveInput)
+      const planWidgetIdValue = continuation?.state.planWidgetId || widgetId('plan')
       let hasPlanningWidget = false
-      let planningUiSteps: TrackedPlanStep[] = [
-        { label: 'Thinking...', status: 'in_progress' }
-      ]
-      emitPlanWidget(
-        planningUiSteps,
-        null,
-        planWidgetIdValue,
-        false
-      )
-      hasPlanningWidget = true
-
-      const updatePlanningStage = (): void => {
-        planningUiSteps = [
-          { label: 'Thinking...', status: 'in_progress' }
-        ]
-        if (hasPlanningWidget) {
-          emitPlanWidget(
-            planningUiSteps,
-            null,
-            planWidgetIdValue,
-            true
-          )
-        }
-      }
-
-      const planResult = await runPlanningPhase(
-        caller,
-        catalog,
-        history,
-        updatePlanningStage
-      )
-
-      if (planResult.type === 'final') {
-        if (hasPlanningWidget) {
-          emitPlanWidget(
-            planningUiSteps.map((step) => ({ ...step, status: 'completed' })),
-            null,
-            planWidgetIdValue,
-            true
-          )
-        }
-        LogHelper.title(this.name)
-        LogHelper.debug(`Planning returned final answer directly: "${planResult.answer}"`)
-        return this.makeDutyResult(planResult.answer)
-      }
-
-      LogHelper.title(this.name)
-      LogHelper.debug(
-        `Plan created with ${planResult.steps.length} step(s): ${planResult.steps.map((s) => s.function).join(' -> ')}`
-      )
-      if (planResult.summary) {
-        LogHelper.debug(`Plan summary: "${planResult.summary}"`)
-      }
-
-      let pendingSteps = [...planResult.steps]
       const executionHistory: ExecutionRecord[] = []
       let replanCount = 0
       let executionCount = 0
+      let pendingSteps: PlanStep[] = []
+      let trackedSteps: TrackedPlanStep[] = []
+      let currentStepIndex = 0
 
-      // --- Plan widget state ---
-      let trackedSteps: TrackedPlanStep[] = pendingSteps.map((s) => ({
-        label: s.label,
-        status: 'pending' as PlanStepStatus
-      }))
+      if (continuation) {
+        pendingSteps = continuation.state.pendingSteps.map((step) => ({
+          function: step.function,
+          label: step.label
+        }))
+        executionHistory.push(
+          ...continuation.state.executionHistory.map((item) => ({ ...item }))
+        )
+        replanCount = continuation.state.replanCount
+        executionCount = continuation.state.executionCount
+        trackedSteps = continuation.state.trackedSteps.map((step) => ({
+          label: step.label,
+          status: step.status
+        }))
 
-      // Mark first step as in_progress and emit initial widget
-      if (trackedSteps.length > 0) {
-        trackedSteps[0]!.status = 'in_progress'
+        if (trackedSteps.length === 0) {
+          trackedSteps = pendingSteps.map((step, index) => ({
+            label: step.label,
+            status: index === 0 ? 'in_progress' : 'pending'
+          }))
+          currentStepIndex = 0
+        } else {
+          currentStepIndex = Math.min(
+            Math.max(continuation.state.currentStepIndex, 0),
+            Math.max(trackedSteps.length - 1, 0)
+          )
+          trackedSteps = this.buildPausedTrackedSteps(
+            trackedSteps,
+            currentStepIndex
+          )
+        }
+
+        emitPlanWidget(trackedSteps, null, planWidgetIdValue, true)
+        hasPlanningWidget = true
+      } else {
+        // --- Phase 1: Planning ---
+        LogHelper.title(this.name)
+        LogHelper.debug('Phase 1: Planning...')
+
+        let planningUiSteps: TrackedPlanStep[] = [
+          { label: 'Thinking...', status: 'in_progress' }
+        ]
+        emitPlanWidget(
+          planningUiSteps,
+          null,
+          planWidgetIdValue,
+          false
+        )
+        hasPlanningWidget = true
+
+        const updatePlanningStage = (): void => {
+          planningUiSteps = [
+            { label: 'Thinking...', status: 'in_progress' }
+          ]
+          if (hasPlanningWidget) {
+            emitPlanWidget(
+              planningUiSteps,
+              null,
+              planWidgetIdValue,
+              true
+            )
+          }
+        }
+
+        const planResult = await runPlanningPhase(
+          caller,
+          catalog,
+          history,
+          updatePlanningStage
+        )
+
+        if (planResult.type === 'final') {
+          if (hasPlanningWidget) {
+            emitPlanWidget(
+              planningUiSteps.map((step) => ({ ...step, status: 'completed' })),
+              null,
+              planWidgetIdValue,
+              true
+            )
+          }
+          LogHelper.title(this.name)
+          LogHelper.debug(`Planning returned final answer directly: "${planResult.answer}"`)
+          return this.makeDutyResult(planResult.answer)
+        }
+
+        LogHelper.title(this.name)
+        LogHelper.debug(
+          `Plan created with ${planResult.steps.length} step(s): ${planResult.steps.map((s) => s.function).join(' -> ')}`
+        )
+        if (planResult.summary) {
+          LogHelper.debug(`Plan summary: "${planResult.summary}"`)
+        }
+
+        pendingSteps = [...planResult.steps]
+
+        // --- Plan widget state ---
+        trackedSteps = pendingSteps.map((s) => ({
+          label: s.label,
+          status: 'pending' as PlanStepStatus
+        }))
+
+        // Mark first step as in_progress and emit initial widget
+        if (trackedSteps.length > 0) {
+          trackedSteps[0]!.status = 'in_progress'
+        }
+
+        // Emit plan summary as text, then show the widget
+        if (planResult.summary) {
+          await this.emitProgress(this.toProgressiveMessage(planResult.summary))
+        }
+        emitPlanWidget(
+          trackedSteps,
+          null,
+          planWidgetIdValue,
+          hasPlanningWidget
+        )
+        hasPlanningWidget = true
       }
-
-      // Emit plan summary as text, then show the widget
-      if (planResult.summary) {
-        await this.emitProgress(this.toProgressiveMessage(planResult.summary))
-      }
-      emitPlanWidget(
-        trackedSteps,
-        null,
-        planWidgetIdValue,
-        hasPlanningWidget
-      )
-      hasPlanningWidget = true
 
       // --- Phase 2: Execution loop ---
       LogHelper.title(this.name)
       LogHelper.debug('Phase 2: Execution loop...')
-
-      let currentStepIndex = 0
 
       while (pendingSteps.length > 0 && executionCount < MAX_EXECUTIONS) {
         const currentStep = pendingSteps.shift()!
@@ -276,6 +350,43 @@ export class ReActLLMDuty extends LLMDuty {
         if (stepResult.type === 'final') {
           LogHelper.title(this.name)
           LogHelper.debug(`Execution returned final answer: "${(stepResult.answer)}"`)
+
+          if (this.isLikelyClarificationRequest(stepResult.answer)) {
+            const pausedTrackedSteps =
+              trackedSteps.length > 0
+                ? this.buildPausedTrackedSteps(trackedSteps, currentStepIndex)
+                : [
+                    {
+                      label: currentStep.label,
+                      status: 'in_progress' as PlanStepStatus
+                    }
+                  ]
+            const pendingWithCurrent: PlanStep[] = [currentStep, ...pendingSteps]
+
+            this.saveExecutionContinuation({
+              version: 1,
+              phase: 'execution',
+              planWidgetId: planWidgetIdValue,
+              originalInput: continuation?.state.originalInput || ownerInputText,
+              clarificationQuestion: stepResult.answer,
+              pendingSteps: pendingWithCurrent,
+              executionHistory,
+              trackedSteps: pausedTrackedSteps,
+              currentStepIndex:
+                pausedTrackedSteps.length > 0
+                  ? Math.min(currentStepIndex, pausedTrackedSteps.length - 1)
+                  : 0,
+              replanCount,
+              executionCount,
+              createdAt: Date.now()
+            })
+            emitPlanWidget(pausedTrackedSteps, null, planWidgetIdValue, true)
+
+            LogHelper.debug(
+              `Execution paused for clarification at step "${currentStep.label}"`
+            )
+            return this.makeDutyResult(stepResult.answer)
+          }
 
           // Mark all remaining steps as completed in the widget
           for (const ts of trackedSteps) {
@@ -391,6 +502,46 @@ export class ReActLLMDuty extends LLMDuty {
             LogHelper.debug(
               `Recovery planning returned final answer: "${recoveryPlanResult.answer}"`
             )
+
+            if (this.isLikelyClarificationRequest(recoveryPlanResult.answer)) {
+              const retryStepIndex = Math.max(0, currentStepIndex - 1)
+              const pausedTrackedSteps =
+                trackedSteps.length > 0
+                  ? this.buildPausedTrackedSteps(trackedSteps, retryStepIndex)
+                  : [
+                      {
+                        label: currentStep.label,
+                        status: 'in_progress' as PlanStepStatus
+                      }
+                    ]
+              const pendingWithCurrent: PlanStep[] = [currentStep, ...pendingSteps]
+
+              this.saveExecutionContinuation({
+                version: 1,
+                phase: 'execution',
+                planWidgetId: planWidgetIdValue,
+                originalInput:
+                  continuation?.state.originalInput || ownerInputText,
+                clarificationQuestion: recoveryPlanResult.answer,
+                pendingSteps: pendingWithCurrent,
+                executionHistory,
+                trackedSteps: pausedTrackedSteps,
+                currentStepIndex:
+                  pausedTrackedSteps.length > 0
+                    ? Math.min(retryStepIndex, pausedTrackedSteps.length - 1)
+                    : 0,
+                replanCount,
+                executionCount,
+                createdAt: Date.now()
+              })
+              emitPlanWidget(pausedTrackedSteps, null, planWidgetIdValue, true)
+
+              LogHelper.debug(
+                `Recovery execution paused for clarification at step "${currentStep.label}"`
+              )
+              return this.makeDutyResult(recoveryPlanResult.answer)
+            }
+
             return this.makeDutyResult(recoveryPlanResult.answer)
           }
 
@@ -464,6 +615,96 @@ export class ReActLLMDuty extends LLMDuty {
     return null
   }
 
+  private getInputAsText(input: string | object | null): string {
+    if (typeof input === 'string') {
+      return input
+    }
+
+    if (input === null || input === undefined) {
+      return ''
+    }
+
+    return this.safeJSONStringify(input)
+  }
+
+  private loadExecutionContinuation(): ReactExecutionContinuationState | null {
+    const state = ReActLLMDuty.continuationStateStore.load()
+    if (!state) {
+      return null
+    }
+
+    const isExpired =
+      !state.createdAt || Date.now() - state.createdAt > REACT_CONTINUATION_MAX_AGE_MS
+    if (isExpired) {
+      this.clearExecutionContinuation()
+      return null
+    }
+
+    if (state.phase !== 'execution' || !Array.isArray(state.pendingSteps)) {
+      this.clearExecutionContinuation()
+      return null
+    }
+
+    return state
+  }
+
+  private saveExecutionContinuation(state: ReactExecutionContinuationState): void {
+    ReActLLMDuty.continuationStateStore.save(state)
+  }
+
+  private clearExecutionContinuation(): void {
+    ReActLLMDuty.continuationStateStore.save(null)
+  }
+
+  private consumeExecutionContinuation(
+    ownerReply: string
+  ): { state: ReactExecutionContinuationState, resumedInput: string } | null {
+    const state = this.loadExecutionContinuation()
+    if (!state) {
+      return null
+    }
+
+    this.clearExecutionContinuation()
+
+    const resumedInput = `${state.originalInput}\n\nPrevious clarification request: "${state.clarificationQuestion}"\nClarification reply: "${ownerReply}"`
+
+    return { state, resumedInput }
+  }
+
+  private buildPausedTrackedSteps(
+    trackedSteps: TrackedPlanStep[],
+    inProgressIndex: number
+  ): TrackedPlanStep[] {
+    if (trackedSteps.length === 0) {
+      return []
+    }
+
+    const normalizedIndex = Math.min(
+      Math.max(inProgressIndex, 0),
+      trackedSteps.length - 1
+    )
+
+    return trackedSteps.map((step, index) => {
+      if (index < normalizedIndex) {
+        return { ...step, status: 'completed' as PlanStepStatus }
+      }
+      if (index === normalizedIndex) {
+        return { ...step, status: 'in_progress' as PlanStepStatus }
+      }
+
+      return { ...step, status: 'pending' as PlanStepStatus }
+    })
+  }
+
+  private isLikelyClarificationRequest(answer: string): boolean {
+    const normalized = String(answer || '').trim()
+    if (!normalized) {
+      return false
+    }
+
+    return normalized.includes('?')
+  }
+
   // ---------------------------------------------------------------------------
   // LLM calling helpers
   // ---------------------------------------------------------------------------
@@ -482,13 +723,16 @@ export class ReActLLMDuty extends LLMDuty {
    * Creates an LLMCaller interface that phase functions use to call the LLM
    * without needing a direct reference to this class instance.
    */
-  private createLLMCaller(history: MessageLog[]): LLMCaller {
+  private createLLMCaller(
+    history: MessageLog[],
+    inputOverride?: string | object | null
+  ): LLMCaller {
     return {
       callLLM: this.callLLM.bind(this),
       callLLMText: this.callLLMText.bind(this),
       callLLMWithTools: this.callLLMWithTools.bind(this),
       supportsNativeTools: this.supportsNativeTools,
-      input: this.input,
+      input: inputOverride ?? this.input,
       history,
       getContextFileContent: CONTEXT_MANAGER.getContextFileContent.bind(
         CONTEXT_MANAGER

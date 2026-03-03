@@ -1,6 +1,11 @@
 import type { AxiosResponse } from 'axios'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
+import { createAnthropic } from '@ai-sdk/anthropic'
+import { createMoonshotAI } from '@ai-sdk/moonshotai'
+import { createHuggingFace } from '@ai-sdk/huggingface'
+import { createCerebras } from '@ai-sdk/cerebras'
+import { createGroq } from '@ai-sdk/groq'
 
 import type {
   CompletionParams,
@@ -11,7 +16,14 @@ import type {
 } from '@/core/llm-manager/types'
 import { LogHelper } from '@/helpers/log-helper'
 
-type AISDKFlavor = 'openai-responses' | 'openai-compatible'
+type AISDKFlavor =
+  | 'openai-responses'
+  | 'openai-compatible'
+  | 'anthropic'
+  | 'moonshotai'
+  | 'huggingface'
+  | 'cerebras'
+  | 'groq'
 
 interface AISDKRemoteProviderConfig {
   name: string
@@ -94,14 +106,69 @@ export default class AISDKRemoteLLMProvider {
       return provider.responses(this.model)
     }
 
-    const provider = createOpenAICompatible({
-      name: this.config.providerName,
-      baseURL: this.config.baseURL,
-      ...(this.config.sendApiKeyAsBearer === false ? {} : { apiKey }),
-      ...(headers && Object.keys(headers).length > 0 ? { headers } : {})
-    })
+    if (this.config.flavor === 'openai-compatible') {
+      const provider = createOpenAICompatible({
+        name: this.config.providerName,
+        baseURL: this.config.baseURL,
+        includeUsage: true,
+        ...(this.config.sendApiKeyAsBearer === false ? {} : { apiKey }),
+        ...(headers && Object.keys(headers).length > 0 ? { headers } : {})
+      })
 
-    return provider(this.model)
+      return provider(this.model)
+    }
+
+    if (this.config.flavor === 'anthropic') {
+      const provider = createAnthropic({
+        apiKey,
+        baseURL: this.config.baseURL,
+        ...(headers && Object.keys(headers).length > 0 ? { headers } : {})
+      })
+
+      return provider(this.model)
+    }
+
+    if (this.config.flavor === 'moonshotai') {
+      const provider = createMoonshotAI({
+        apiKey,
+        baseURL: this.config.baseURL,
+        ...(headers && Object.keys(headers).length > 0 ? { headers } : {})
+      })
+
+      return provider(this.model)
+    }
+
+    if (this.config.flavor === 'huggingface') {
+      const provider = createHuggingFace({
+        apiKey,
+        baseURL: this.config.baseURL,
+        ...(headers && Object.keys(headers).length > 0 ? { headers } : {})
+      })
+
+      return provider(this.model)
+    }
+
+    if (this.config.flavor === 'cerebras') {
+      const provider = createCerebras({
+        apiKey,
+        baseURL: this.config.baseURL,
+        ...(headers && Object.keys(headers).length > 0 ? { headers } : {})
+      })
+
+      return provider(this.model)
+    }
+
+    if (this.config.flavor === 'groq') {
+      const provider = createGroq({
+        apiKey,
+        baseURL: this.config.baseURL,
+        ...(headers && Object.keys(headers).length > 0 ? { headers } : {})
+      })
+
+      return provider(this.model)
+    }
+
+    throw new Error(`Unsupported AI SDK flavor: ${this.config.flavor}`)
   }
 
   private toTextPrompt(
@@ -278,28 +345,73 @@ export default class AISDKRemoteLLMProvider {
 
     const providerOptions: Record<string, unknown> = {}
 
-    if (completionParams.disableThinking === true) {
-      providerOptions['openai'] = {
-        reasoningEffort: 'low'
+    if (this.config.flavor === 'openai-responses') {
+      if (completionParams.disableThinking === true) {
+        providerOptions['openai'] = {
+          reasoningEffort: 'high'
+        }
+      } else {
+        // For Responses API models (OpenAI/OpenRouter via createOpenAI), request
+        // reasoning summaries so planning/recovery reasoning is visible in stream.
+        providerOptions['openai'] = {
+          reasoningSummary: 'detailed'
+        }
       }
-      providerOptions['openrouter'] = {
-        reasoning: { enabled: false }
+    } else if (this.config.flavor === 'openai-compatible') {
+      if (completionParams.disableThinking === true) {
+        providerOptions['openaiCompatible'] = {
+          reasoningEffort: 'low'
+        }
+      } else {
+        providerOptions['openaiCompatible'] = {
+          reasoningEffort: 'medium'
+        }
       }
-      providerOptions['anthropic'] = {
-        thinking: { type: 'disabled' }
-      }
-      providerOptions['groq'] = {
-        thinking: { type: 'disabled' }
-      }
-      providerOptions['cerebras'] = {
-        thinking: { type: 'disabled' }
-      }
-    } else if (this.config.flavor === 'openai-responses') {
-      // For Responses API models (OpenAI/OpenRouter via createOpenAI), request
-      // reasoning summaries so planning/recovery reasoning is visible in stream.
-      providerOptions['openai'] = {
-        reasoningSummary: 'detailed'
-      }
+    } else if (this.config.flavor === 'anthropic') {
+      providerOptions['anthropic'] = completionParams.disableThinking === true
+        ? {
+            thinking: { type: 'disabled' },
+            sendReasoning: true
+          }
+        : {
+            thinking: { type: 'enabled', budgetTokens: 1024 },
+            sendReasoning: true
+          }
+    } else if (this.config.flavor === 'moonshotai') {
+      providerOptions['moonshotai'] = completionParams.disableThinking === true
+        ? {
+            thinking: { type: 'disabled' }
+          }
+        : {
+            thinking: { type: 'enabled', budgetTokens: 1024 },
+            reasoningHistory: 'interleaved'
+          }
+    } else if (this.config.flavor === 'huggingface') {
+      providerOptions['huggingface'] = completionParams.disableThinking === true
+        ? {
+            reasoningEffort: 'low'
+          }
+        : {
+            reasoningEffort: 'medium'
+          }
+    } else if (this.config.flavor === 'cerebras') {
+      providerOptions['cerebras'] = completionParams.disableThinking === true
+        ? {
+            reasoningEffort: 'low'
+          }
+        : {
+            reasoningEffort: 'medium'
+          }
+    } else if (this.config.flavor === 'groq') {
+      providerOptions['groq'] = completionParams.disableThinking === true
+        ? {
+            reasoningEffort: 'none',
+            reasoningFormat: 'hidden'
+          }
+        : {
+            reasoningEffort: 'medium',
+            reasoningFormat: 'parsed'
+          }
     }
 
     if (Object.keys(providerOptions).length > 0) {

@@ -13,7 +13,7 @@ export default class HuggingFaceLLMProvider extends AISDKRemoteLLMProvider {
       modelEnv: 'LEON_HUGGINGFACE_MODEL',
       defaultModel: 'meta-llama/Meta-Llama-3.1-8B-Instruct',
       baseURL: 'https://router.huggingface.co/v1',
-      flavor: 'openai-compatible'
+      flavor: 'huggingface'
     })
   }
 }

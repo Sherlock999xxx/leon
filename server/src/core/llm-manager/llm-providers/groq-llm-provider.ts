@@ -13,7 +13,7 @@ export default class GroqLLMProvider extends AISDKRemoteLLMProvider {
       modelEnv: 'LEON_GROQ_MODEL',
       defaultModel: 'llama-3.1-8b-instant',
       baseURL: 'https://api.groq.com/openai/v1',
-      flavor: 'openai-compatible'
+      flavor: 'groq'
     })
   }
 }

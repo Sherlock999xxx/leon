@@ -10,12 +10,7 @@ export default class AnthropicLLMProvider extends AISDKRemoteLLMProvider {
       modelEnv: 'LEON_ANTHROPIC_MODEL',
       defaultModel: 'claude-3-5-sonnet-latest',
       baseURL: 'https://api.anthropic.com/v1',
-      flavor: 'openai-compatible',
-      sendApiKeyAsBearer: false,
-      headers: (apiKey) => ({
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      })
+      flavor: 'anthropic'
     })
   }
 }
