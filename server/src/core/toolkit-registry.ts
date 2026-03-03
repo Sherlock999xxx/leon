@@ -46,6 +46,14 @@ interface ToolkitDefinition {
   tools?: Record<string, ToolkitToolDefinition>
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+
+  return value as Record<string, unknown>
+}
+
 export default class ToolkitRegistry {
   private static instance: ToolkitRegistry
   private _toolkits: ToolkitDefinition[] = []
@@ -188,6 +196,38 @@ export default class ToolkitRegistry {
   public getToolkitContextFiles(toolkitId: string): string[] {
     const toolkit = this._toolkits.find((item) => item.id === toolkitId)
     return toolkit?.contextFiles || []
+  }
+
+  public setFunctionParameterEnum(
+    toolkitId: string,
+    toolId: string,
+    functionName: string,
+    parameterName: string,
+    enumValues: string[]
+  ): boolean {
+    const functions = this.getToolFunctions(toolkitId, toolId)
+    const functionConfig = functions?.[functionName]
+    if (!functionConfig) {
+      return false
+    }
+
+    const parameters = asRecord(functionConfig.parameters)
+    const properties = asRecord(parameters?.['properties'])
+    const parameterSchema = asRecord(properties?.[parameterName])
+    if (!parameterSchema) {
+      return false
+    }
+
+    const normalizedValues = [...new Set(
+      enumValues
+        .filter((value) => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+    )]
+
+    parameterSchema['enum'] = normalizedValues
+
+    return true
   }
 
   public async load(): Promise<void> {

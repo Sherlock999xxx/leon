@@ -106,6 +106,8 @@ export default class ContextManager {
         this.refreshContextFile(definition)
       }
 
+      await this.syncContextReadFilenameEnum()
+
       this.manifest = this.buildManifest()
       this._isLoaded = true
       this.schedulePeriodicRefresh()
@@ -292,6 +294,38 @@ export default class ContextManager {
 
   private getContextSourceBasename(filename: string): string {
     return `${path.basename(filename, '.md').toLowerCase().replaceAll('_', '-')}-context-file`
+  }
+
+  private async syncContextReadFilenameEnum(): Promise<void> {
+    try {
+      if (!TOOLKIT_REGISTRY.isLoaded) {
+        await TOOLKIT_REGISTRY.load()
+      }
+
+      const filenames = this.contextFiles
+        .map((definition) => definition.filename)
+        .sort((a, b) => a.localeCompare(b))
+
+      const isUpdated = TOOLKIT_REGISTRY.setFunctionParameterEnum(
+        'structured_knowledge',
+        'context',
+        'readContextFile',
+        'filename',
+        filenames
+      )
+
+      if (isUpdated) {
+        LogHelper.title('Context Manager')
+        LogHelper.info(
+          `Synced readContextFile.filename enum with ${filenames.length} context file(s)`
+        )
+      }
+    } catch (error) {
+      LogHelper.title('Context Manager')
+      LogHelper.warning(
+        `Failed to sync readContextFile.filename enum: ${String(error)}`
+      )
+    }
   }
 
   private refreshContextFile(definition: ContextFile, force = false): void {

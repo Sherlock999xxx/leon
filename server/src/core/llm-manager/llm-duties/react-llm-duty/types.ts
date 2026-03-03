@@ -77,7 +77,8 @@ export interface LLMCaller {
     systemPrompt: string,
     schema: Record<string, unknown>,
     history?: MessageLog[],
-    promptSections?: PromptLogSection[]
+    promptSections?: PromptLogSection[],
+    options?: { disableThinking?: boolean }
   ): Promise<{
     output: unknown
     usedInputTokens?: number
@@ -90,7 +91,8 @@ export interface LLMCaller {
     systemPrompt: string,
     history?: MessageLog[],
     shouldStream?: boolean,
-    promptSections?: PromptLogSection[]
+    promptSections?: PromptLogSection[],
+    options?: { disableThinking?: boolean }
   ): Promise<{
     output: string
     usedInputTokens?: number
@@ -105,7 +107,8 @@ export interface LLMCaller {
     toolChoice: OpenAIToolChoice,
     history?: MessageLog[],
     shouldStreamToUser?: boolean,
-    promptSections?: PromptLogSection[]
+    promptSections?: PromptLogSection[],
+    options?: { disableThinking?: boolean }
   ): Promise<{
     toolCall?: { functionName: string, arguments: string }
     unexpectedToolCall?: { functionName: string, arguments: string }

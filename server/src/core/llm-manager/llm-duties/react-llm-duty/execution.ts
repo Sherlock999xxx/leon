@@ -346,7 +346,10 @@ async function resolveToolFunctionWithNativeTools(
       systemPromptSource:
         'server/src/core/llm-manager/llm-duties/react-llm-duty/constants.ts',
       tools
-    })
+    }),
+    {
+      disableThinking: true
+    }
   )
 
   if (!result) {
@@ -546,7 +549,10 @@ async function resolveToolFunctionWithJSONMode(
       systemPromptSource:
         'server/src/core/llm-manager/llm-duties/react-llm-duty/constants.ts',
       schema: resolveSchema
-    })
+    }),
+    {
+      disableThinking: true
+    }
   )
   const parsed = parseOutput(completionResult?.output)
 
@@ -681,8 +687,8 @@ async function executeFunctionWithNativeTools(
   const executeSystemPrompt = PERSONA.getCompactDutySystemPrompt(
     EXECUTE_SYSTEM_PROMPT,
     {
-      includePersonality: true,
-      includeMood: true
+      includePersonality: false,
+      includeMood: false
     }
   )
 
@@ -802,7 +808,10 @@ async function executeFunctionWithNativeTools(
         systemPromptSource:
           'server/src/core/llm-manager/llm-duties/react-llm-duty/constants.ts',
         tools: [tool]
-      })
+      }),
+      {
+        disableThinking: true
+      }
     )
 
     if (!result) {
@@ -938,8 +947,8 @@ async function executeFunctionWithJSONMode(
   const executeSystemPrompt = PERSONA.getCompactDutySystemPrompt(
     EXECUTE_SYSTEM_PROMPT,
     {
-      includePersonality: true,
-      includeMood: true
+      includePersonality: false,
+      includeMood: false
     }
   )
 
@@ -1006,7 +1015,10 @@ async function executeFunctionWithJSONMode(
         systemPromptSource:
           'server/src/core/llm-manager/llm-duties/react-llm-duty/constants.ts',
         schema: executeSchema
-      })
+      }),
+      {
+        disableThinking: true
+      }
     )
     if (!completionResult) {
       const providerFailureObservation =

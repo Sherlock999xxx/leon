@@ -93,8 +93,8 @@ export async function runRecoveryPlanningPhase(
   const recoverySystemPrompt = PERSONA.getCompactDutySystemPrompt(
     RECOVERY_PLAN_SYSTEM_PROMPT,
     {
-      includePersonality: true,
-      includeMood: true
+      includePersonality: false,
+      includeMood: false
     }
   )
   const contextManifest = CONTEXT_MANAGER.getManifest()
@@ -198,7 +198,10 @@ Create a revised plan from this point to complete the user request.`
         prompt,
         systemPrompt: recoverySystemPrompt,
         tools: planTools
-      })
+      }),
+      {
+        disableThinking: false
+      }
     )
 
     if (!toolResult) {
@@ -287,7 +290,10 @@ Create a revised plan from this point to complete the user request.`
       prompt,
       systemPrompt: recoverySystemPrompt,
       includeSchema: true
-    })
+    }),
+    {
+      disableThinking: false
+    }
   )
   if (!jsonModeResult) {
     const providerError = caller.consumeProviderErrorMessage()

@@ -101,8 +101,8 @@ export async function runPlanningPhase(
   const planSystemPrompt = PERSONA.getCompactDutySystemPrompt(
     PLAN_SYSTEM_PROMPT,
     {
-      includePersonality: true,
-      includeMood: true
+      includePersonality: false,
+      includeMood: false
     }
   )
   const contextManifest = CONTEXT_MANAGER.getManifest()
@@ -183,7 +183,10 @@ export async function runPlanningPhase(
         systemPrompt: planSystemPrompt,
         includeTools: true,
         tools: planTools
-      })
+      }),
+      {
+        disableThinking: false
+      }
     )
 
     LogHelper.title(DUTY_NAME)
@@ -279,7 +282,10 @@ export async function runPlanningPhase(
         prompt,
         systemPrompt: planSystemPrompt,
         includeSchema: true
-      })
+      }),
+      {
+        disableThinking: false
+      }
     )
     if (!jsonModeResult) {
       const providerError = caller.consumeProviderErrorMessage()
@@ -371,7 +377,10 @@ export async function runPlanningPhase(
       prompt,
       systemPrompt: planSystemPrompt,
       includeSchema: true
-    })
+    }),
+    {
+      disableThinking: false
+    }
   )
   if (!completionResult) {
     const providerError = caller.consumeProviderErrorMessage()

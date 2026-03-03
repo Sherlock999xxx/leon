@@ -26,7 +26,26 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "filename": { "type": "string" },
+          "filename": {
+            "type": "string",
+            "enum": [
+              "ACTIVITY.md",
+              "ARCHITECTURE.md",
+              "BROWSER_HISTORY.md",
+              "GPU_COMPUTE.md",
+              "HABITS.md",
+              "HOME.md",
+              "HOST_SYSTEM.md",
+              "LEON.md",
+              "LEON_RUNTIME.md",
+              "LOCAL_INVENTORY.md",
+              "MEDIA_PROFILE.md",
+              "NETWORK_ECOSYSTEM.md",
+              "STORAGE.md",
+              "SYSTEM_RESOURCES.md",
+              "WORKSPACE_INTELLIGENCE.md"
+            ]
+          },
           "options": {
             "type": "object",
             "properties": {

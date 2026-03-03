@@ -86,8 +86,8 @@ export class ReActLLMDuty extends LLMDuty {
 
     this.input = params.input
     this.systemPrompt = PERSONA.getCompactDutySystemPrompt(PLAN_SYSTEM_PROMPT, {
-      includePersonality: true,
-      includeMood: true
+      includePersonality: false,
+      includeMood: false
     })
   }
 
@@ -503,7 +503,8 @@ export class ReActLLMDuty extends LLMDuty {
     systemPrompt: string,
     schema: Record<string, unknown>,
     history?: MessageLog[],
-    promptSections?: PromptLogSection[]
+    promptSections?: PromptLogSection[],
+    options?: { disableThinking?: boolean }
   ): Promise<{
     output: unknown
     usedInputTokens?: number
@@ -533,6 +534,7 @@ export class ReActLLMDuty extends LLMDuty {
       onReasoningToken: (reasoningChunk: string): void => {
         this.emitReasoningToken(reasoningChunk, reasoningGenerationId)
       },
+      ...(options?.disableThinking ? { disableThinking: true } : {}),
       ...(history ? { history } : {})
     }
 
@@ -565,7 +567,8 @@ export class ReActLLMDuty extends LLMDuty {
     systemPrompt: string,
     history?: MessageLog[],
     shouldStream = false,
-    promptSections?: PromptLogSection[]
+    promptSections?: PromptLogSection[],
+    options?: { disableThinking?: boolean }
   ): Promise<{
     output: string
     usedInputTokens?: number
@@ -600,6 +603,7 @@ export class ReActLLMDuty extends LLMDuty {
       onReasoningToken: (reasoningChunk: string): void => {
         this.emitReasoningToken(reasoningChunk, reasoningGenerationId)
       },
+      ...(options?.disableThinking ? { disableThinking: true } : {}),
       ...(shouldStream
         ? {
             onToken: (chunk: unknown): void => {
@@ -675,7 +679,8 @@ export class ReActLLMDuty extends LLMDuty {
     toolChoice: OpenAIToolChoice,
     history?: MessageLog[],
     shouldStreamToUser = false,
-    promptSections?: PromptLogSection[]
+    promptSections?: PromptLogSection[],
+    options?: { disableThinking?: boolean }
   ): Promise<{
     toolCall?: { functionName: string, arguments: string }
     unexpectedToolCall?: { functionName: string, arguments: string }
@@ -773,6 +778,7 @@ export class ReActLLMDuty extends LLMDuty {
         onReasoningToken: (reasoningChunk: string): void => {
           this.emitReasoningToken(reasoningChunk, reasoningGenerationId)
         },
+        ...(options?.disableThinking ? { disableThinking: true } : {}),
         ...(shouldStreamToUser
           ? {
               onToken: (chunk: unknown): void => {
