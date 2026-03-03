@@ -12,12 +12,19 @@ import { LogHelper } from '@/helpers/log-helper'
 /**
  * @see https://openrouter.ai/docs
  */
-type OpenRouterSendRequest = Parameters<OpenRouter['chat']['send']>[0]
-type OpenRouterChatGenerationParams = OpenRouterSendRequest['chatGenerationParams']
-type OpenRouterMessage = OpenRouterChatGenerationParams['messages'][number]
-type OpenRouterTool = NonNullable<OpenRouterChatGenerationParams['tools']>[number]
-type OpenRouterToolChoice = NonNullable<
-  OpenRouterChatGenerationParams['toolChoice']
+type OpenRouterResponsesSendRequest = Parameters<
+  OpenRouter['beta']['responses']['send']
+>[0]
+type OpenRouterResponsesRequest =
+  OpenRouterResponsesSendRequest['openResponsesRequest']
+type OpenRouterResponsesTool = NonNullable<
+  OpenRouterResponsesRequest['tools']
+>[number]
+type OpenRouterResponsesToolChoice = NonNullable<
+  OpenRouterResponsesRequest['toolChoice']
+>
+type OpenRouterResponsesTextFormat = NonNullable<
+  NonNullable<OpenRouterResponsesRequest['text']>['format']
 >
 type OpenRouterCompletionParams = Omit<CompletionParams, ''>
 
@@ -101,76 +108,87 @@ export default class OpenRouterLLMProvider {
     }
   }
 
-  private toTools(tools: OpenAITool[]): OpenRouterTool[] {
+  private toTools(tools: OpenAITool[]): OpenRouterResponsesTool[] {
     return tools.map((tool) => ({
       type: 'function',
-      function: {
-        name: tool.function.name,
-        ...(tool.function.description
-          ? { description: tool.function.description }
-          : {}),
-        parameters: tool.function.parameters as Record<string, unknown>,
-        strict: false
-      }
+      name: tool.function.name,
+      ...(tool.function.description
+        ? { description: tool.function.description }
+        : {}),
+      parameters: tool.function.parameters as Record<string, unknown>,
+      strict: false
     }))
   }
 
-  private toToolChoice(toolChoice: OpenAIToolChoice): OpenRouterToolChoice {
+  private toToolChoice(
+    toolChoice: OpenAIToolChoice
+  ): OpenRouterResponsesToolChoice {
     if (typeof toolChoice === 'string') {
       return toolChoice
     }
 
     return {
       type: 'function',
-      function: {
-        name: toolChoice.function.name
-      }
+      name: toolChoice.function.name
     }
   }
 
-  private toMessages(
-    prompt: PromptOrChatHistory,
-    completionParams: OpenRouterCompletionParams
-  ): OpenRouterMessage[] {
-    let { systemPrompt } = completionParams
-    if (completionParams.data !== null) {
-      systemPrompt = `${
-        completionParams.systemPrompt
-      }. Use a JSON format by following this schema: ${JSON.stringify(
-        completionParams.data
-      )}`
+  private toResponsesJSONSchema(
+    schema: Record<string, unknown> | null | undefined
+  ): OpenRouterResponsesTextFormat | null {
+    if (!schema) {
+      return null
     }
 
-    const messages: OpenRouterMessage[] = [
-      {
-        role: 'system',
-        content: systemPrompt
-      }
-    ]
+    const effectiveSchema =
+      ('type' in schema || 'oneOf' in schema)
+        ? schema
+        : {
+            type: 'object',
+            properties: schema
+          }
+
+    return {
+      type: 'json_schema',
+      name: 'structured_output',
+      schema: effectiveSchema as Record<string, unknown>,
+      strict: false
+    }
+  }
+
+  private toInputMessages(
+    prompt: PromptOrChatHistory,
+    completionParams: OpenRouterCompletionParams
+  ): OpenRouterResponsesRequest['input'] {
+    const messages: Array<{
+      role: 'assistant' | 'user'
+      content: string
+    }> = []
 
     if (completionParams.history) {
       for (const message of completionParams.history) {
         messages.push({
           role: message.who === 'leon' ? 'assistant' : 'user',
           content: message.message
-        } as OpenRouterMessage)
+        })
       }
     }
 
+    const promptText =
+      typeof prompt === 'string' ? prompt : JSON.stringify(prompt)
     const lastMessage = messages[messages.length - 1]
     if (
       messages.length === 0 ||
       !lastMessage ||
-      typeof lastMessage.content !== 'string' ||
-      lastMessage.content !== prompt
+      lastMessage.content !== promptText
     ) {
       messages.push({
         role: 'user',
-        content: prompt as string
-      } as OpenRouterMessage)
+        content: promptText
+      })
     }
 
-    return messages
+    return messages as OpenRouterResponsesRequest['input']
   }
 
   public runChatCompletion(
@@ -181,36 +199,50 @@ export default class OpenRouterLLMProvider {
       try {
         this.checkAPIKey()
 
-        const messages = this.toMessages(prompt, completionParams)
-        const shouldUseStreaming =
-          completionParams.shouldStream === true &&
-          (!completionParams.tools || completionParams.tools.length === 0)
-        const chatGenerationParams: OpenRouterChatGenerationParams = {
-          messages,
+        const openResponsesRequest: OpenRouterResponsesRequest = {
+          input: this.toInputMessages(prompt, completionParams),
           model: this.model,
+          instructions: completionParams.systemPrompt,
           ...(typeof completionParams.maxTokens === 'number'
-            ? { maxTokens: completionParams.maxTokens }
+            ? { maxOutputTokens: completionParams.maxTokens }
             : {}),
-          stream: shouldUseStreaming
+          stream: completionParams.shouldStream === true
         }
+        const providerPreferences: NonNullable<
+          OpenRouterResponsesRequest['provider']
+        > = {}
 
         if (completionParams.tools && completionParams.tools.length > 0) {
-          chatGenerationParams.tools = this.toTools(completionParams.tools)
+          openResponsesRequest.tools = this.toTools(completionParams.tools)
           if (completionParams.toolChoice !== undefined) {
-            chatGenerationParams.toolChoice = this.toToolChoice(
+            openResponsesRequest.toolChoice = this.toToolChoice(
               completionParams.toolChoice
             )
           }
-          chatGenerationParams.provider = {
-            ...(chatGenerationParams.provider || {}),
-            requireParameters: true
+          providerPreferences.requireParameters = true
+        } else if (completionParams.data !== null) {
+          const jsonSchema = this.toResponsesJSONSchema(completionParams.data)
+          if (jsonSchema) {
+            openResponsesRequest.text = {
+              format: jsonSchema
+            }
           }
         }
 
         if (!completionParams.tools || completionParams.tools.length === 0) {
-          chatGenerationParams.provider = {
-            order: ['cerebras']
+          providerPreferences.order = ['cerebras']
+        }
+
+        if (completionParams.disableThinking === true) {
+          openResponsesRequest.reasoning = {
+            enabled: false
           }
+          LogHelper.title(this.name)
+          LogHelper.debug('Thinking disabled for this request')
+        }
+
+        if (Object.keys(providerPreferences).length > 0) {
+          openResponsesRequest.provider = providerPreferences
         }
 
         const requestOptions = {
@@ -222,8 +254,10 @@ export default class OpenRouterLLMProvider {
             : {})
         }
 
-        const response = await this.client.chat.send(
-          { chatGenerationParams },
+        const response = await this.client.beta.responses.send(
+          {
+            openResponsesRequest
+          },
           requestOptions
         )
         return resolve({

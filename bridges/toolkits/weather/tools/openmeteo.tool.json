@@ -11,7 +11,7 @@
   },
   "functions": {
     "getCurrentConditions": {
-      "description": "Get weather conditions for a location with an optional date range.",
+      "description": "Get weather conditions for a location and date range.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -25,7 +25,7 @@
             "description": "End date in YYYY-MM-DD format."
           }
         },
-        "required": ["location"]
+        "required": ["location", "start_date", "end_date"]
       }
     }
   }

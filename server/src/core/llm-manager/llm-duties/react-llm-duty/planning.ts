@@ -268,6 +268,33 @@ export async function runPlanningPhase(
         `Planning: unexpected tool call "${toolResult.unexpectedToolCall.functionName}" while forcing "create_plan", falling back to JSON mode`
       )
     } else {
+      const textFallbackParsed = parseOutput(textFallback)
+      const textFallbackPlan =
+        (textFallbackParsed
+          ? extractPlanResultFromCreatePlanArgs(textFallbackParsed, {
+              allowLegacySummaryAsFinal: true
+            })
+          : null) || extractPlanFromParsed(textFallbackParsed)
+      if (textFallbackPlan) {
+        LogHelper.debug(
+          'Planning: recovered structured output from text fallback (no JSON fallback needed)'
+        )
+        return textFallbackPlan
+      }
+
+      if (
+        textFallback &&
+        shouldTreatPlanningTextAsFinalAnswer(textFallback)
+      ) {
+        LogHelper.debug(
+          'Planning: treating plain text fallback as final conversational answer (no JSON fallback)'
+        )
+        return {
+          type: 'final',
+          answer: stripInlineToolMarkup(textFallback) || textFallback
+        }
+      }
+
       LogHelper.debug('Planning: no tool call returned, falling back to JSON mode')
     }
 

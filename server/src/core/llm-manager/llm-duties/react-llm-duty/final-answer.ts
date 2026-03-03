@@ -78,7 +78,10 @@ ${FORMATTING_RULES}`,
         systemPrompt,
         caller.history,
         true,
-        buildFinalAnswerPromptSections(prompt, systemPrompt)
+        buildFinalAnswerPromptSections(prompt, systemPrompt),
+        {
+          disableThinking: true
+        }
       )
 
       if (textResult?.output?.trim()) {
@@ -120,7 +123,10 @@ ${FORMATTING_RULES}`,
                 'server/src/core/llm-manager/llm-duties/react-llm-duty/final-answer.ts',
               content: JSON.stringify([answerTool])
             }
-          ])
+          ]),
+          {
+            disableThinking: true
+          }
         )
 
         if (result?.toolCall) {
@@ -162,7 +168,10 @@ ${FORMATTING_RULES}`,
               'server/src/core/llm-manager/llm-duties/react-llm-duty/final-answer.ts',
             content: JSON.stringify(finalSchema)
           }
-        ])
+        ]),
+        {
+          disableThinking: true
+        }
       )
 
       if (completionResult?.output) {

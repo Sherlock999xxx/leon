@@ -26,6 +26,7 @@ You have access to a catalog of available tools and functions. Your job is to:
 Decision policy:
 - Only use functions/tools listed in the catalog.
 - If no tool is needed (chat/general answer), answer directly in plain text without calling any tool.
+- A direct plain-text answer is final. Do not expect or require a second planning pass.
 - Prefer dedicated tools. Use operating_system_control only as a last resort.
 - Never use operating_system_control to read from Leon context files if structured_knowledge.context can provide the data.
 
@@ -122,7 +123,7 @@ export const REACT_INFERENCE_TIMEOUT_MS = 120_000
 export const REACT_TIMEOUT_MAX_RETRIES = 1
 export const FINAL_ANSWER_RETRY_DURATION_MS = 60_000
 export const FINAL_ANSWER_MAX_RETRIES = 2
-export const TOOL_CALL_WAIT_NOTICE_DELAY_MS = 30_000
+export const TOOL_CALL_WAIT_NOTICE_DELAY_MS = 45_000
 export const TOOL_CALL_DIAGNOSIS_DELAY_MS = 90_000
 export const PLANNING_WAIT_NOTICE_DELAY_MS = 1_500
 

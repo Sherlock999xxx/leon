@@ -1068,6 +1068,135 @@ export default class MemoryManager {
     return savedCount
   }
 
+  private extractJsonSubstring(input: string): string | null {
+    const firstBrace = input.indexOf('{')
+    const firstBracket = input.indexOf('[')
+    const startIndex =
+      firstBrace !== -1 && firstBracket !== -1
+        ? Math.min(firstBrace, firstBracket)
+        : Math.max(firstBrace, firstBracket)
+
+    if (startIndex === -1) {
+      return null
+    }
+
+    const endIndex =
+      input[startIndex] === '{'
+        ? input.lastIndexOf('}')
+        : input.lastIndexOf(']')
+
+    if (endIndex <= startIndex) {
+      return null
+    }
+
+    return input.slice(startIndex, endIndex + 1)
+  }
+
+  private parsePersistentExtractionCandidates(output: unknown): string[] {
+    const normalizeItems = (payload: unknown): string[] => {
+      if (!payload || typeof payload !== 'object') {
+        return []
+      }
+
+      const payloadObject = payload as Record<string, unknown>
+      const items = Array.isArray(payloadObject['items'])
+        ? (payloadObject['items'] as unknown[])
+        : []
+
+      return [...new Set(
+        items
+          .map((item) =>
+            item && typeof item === 'object'
+              ? String((item as Record<string, unknown>)['content'] || '').trim()
+              : ''
+          )
+          .filter((content) => content.length > 0)
+      )]
+    }
+
+    const objectCandidates = normalizeItems(output)
+    if (objectCandidates.length > 0) {
+      return objectCandidates
+    }
+
+    if (typeof output !== 'string') {
+      return []
+    }
+
+    const rawOutput = output.trim()
+    if (!rawOutput) {
+      return []
+    }
+
+    const strippedCodeFence = rawOutput
+      .replace(/^```(?:json)?\s*\n?/i, '')
+      .replace(/\n?```\s*$/i, '')
+      .trim()
+    const extractedJson = this.extractJsonSubstring(strippedCodeFence)
+    const parseCandidates = [
+      rawOutput,
+      strippedCodeFence,
+      extractedJson
+    ].filter((candidate): candidate is string => Boolean(candidate))
+
+    if (
+      strippedCodeFence.startsWith('{') &&
+      !strippedCodeFence.endsWith('}')
+    ) {
+      parseCandidates.push(`${strippedCodeFence}}`)
+    }
+
+    for (const parseCandidate of parseCandidates) {
+      try {
+        const parsed = JSON.parse(parseCandidate)
+        const parsedCandidates = normalizeItems(parsed)
+        if (parsedCandidates.length > 0) {
+          return parsedCandidates
+        }
+      } catch {
+        // Continue fallback parsing
+      }
+    }
+
+    const contentFieldMatches = [...strippedCodeFence.matchAll(
+      /"content"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g
+    )]
+    const contentFieldCandidates = contentFieldMatches
+      .map((match) => {
+        const rawMatch = match[1]
+        if (!rawMatch) {
+          return ''
+        }
+        try {
+          return JSON.parse(`"${rawMatch}"`) as string
+        } catch {
+          return rawMatch
+        }
+      })
+      .map((candidate) => candidate.trim())
+      .filter((candidate) => candidate.length > 0)
+    if (contentFieldCandidates.length > 0) {
+      return [...new Set(contentFieldCandidates)]
+    }
+
+    const lineCandidates = strippedCodeFence
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) =>
+        line
+          .replace(/^[-*]\s+/, '')
+          .replace(/^\d+[.)]\s+/, '')
+          .replace(/^["'`]+|["'`,]+$/g, '')
+          .trim()
+      )
+      .filter((line) => line.length >= 8)
+      .filter((line) => !/^items?:?$/i.test(line))
+      .filter((line) => line !== '{' && line !== '}' && line !== '[' && line !== ']')
+
+    return [...new Set(lineCandidates)]
+  }
+
   public async savePersistentMemoryCandidatesFromTurn(
     userMessage: string,
     assistantMessage: string,
@@ -1128,32 +1257,14 @@ Return JSON.`
         return 0
       }
 
-      const payload =
-        typeof completion.output === 'string'
-          ? JSON.parse(completion.output)
-          : completion.output
-      if (!payload || typeof payload !== 'object') {
+      const candidates = this.parsePersistentExtractionCandidates(
+        completion.output
+      ).slice(0, 3)
+      if (candidates.length === 0) {
         LogHelper.title('Memory Manager')
         LogHelper.warning(
-          'Persistent memory extraction returned invalid payload'
+          'Persistent memory extraction returned invalid or empty payload'
         )
-        return 0
-      }
-
-      const items = Array.isArray((payload as Record<string, unknown>)['items'])
-        ? ((payload as Record<string, unknown>)['items'] as Array<unknown>)
-        : []
-
-      const candidates = items
-        .map((item) =>
-          item && typeof item === 'object'
-            ? String((item as Record<string, unknown>)['content'] || '').trim()
-            : ''
-        )
-        .filter((content) => content.length > 0)
-        .slice(0, 3)
-
-      if (candidates.length === 0) {
         return 0
       }
 

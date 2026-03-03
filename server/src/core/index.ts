@@ -62,14 +62,14 @@ export const HTTP_SERVER = new HTTPServer(String(HOST), PORT)
 
 export const SOCKET_SERVER = new SocketServer()
 
-export const PERSONA = new Persona()
-
 export const TOOLKIT_REGISTRY = new ToolkitRegistry()
+
+export const TOOL_EXECUTOR = new ToolExecutor()
+
+export const PERSONA = new Persona()
 
 export const CONTEXT_MANAGER = new ContextManager()
 export const MEMORY_MANAGER = new MemoryManager()
-
-export const TOOL_EXECUTOR = new ToolExecutor()
 
 export const STT = new SpeechToText()
 

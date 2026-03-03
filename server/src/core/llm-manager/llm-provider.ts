@@ -790,6 +790,8 @@ export default class LLMProvider {
     const id =
       typeof item['call_id'] === 'string'
         ? (item['call_id'] as string)
+        : typeof item['callId'] === 'string'
+          ? (item['callId'] as string)
         : typeof item['id'] === 'string'
           ? (item['id'] as string)
           : `tool_call_${fallbackIndex}`
@@ -809,6 +811,9 @@ export default class LLMProvider {
   ): string {
     if (typeof parsedCompletionResult['output_text'] === 'string') {
       return parsedCompletionResult['output_text'] as string
+    }
+    if (typeof parsedCompletionResult['outputText'] === 'string') {
+      return parsedCompletionResult['outputText'] as string
     }
 
     const output = Array.isArray(parsedCompletionResult['output'])
@@ -891,6 +896,7 @@ export default class LLMProvider {
     addChunk(item['text'])
     addChunk(item['reasoning'])
     addChunk(item['summary_text'])
+    addChunk(item['summaryText'])
 
     const summary = Array.isArray(item['summary']) ? (item['summary'] as unknown[]) : []
     for (const part of summary) {
@@ -901,6 +907,7 @@ export default class LLMProvider {
       const partObject = part as Record<string, unknown>
       addChunk(partObject['text'])
       addChunk(partObject['summary_text'])
+      addChunk(partObject['summaryText'])
     }
 
     const content = Array.isArray(item['content']) ? (item['content'] as unknown[]) : []
@@ -921,6 +928,7 @@ export default class LLMProvider {
       addChunk(blockObject['text'])
       addChunk(blockObject['reasoning'])
       addChunk(blockObject['summary_text'])
+      addChunk(blockObject['summaryText'])
       addChunk(blockObject['delta'])
     }
 
@@ -949,6 +957,7 @@ export default class LLMProvider {
       addChunk(parsedChunk['text'])
       addChunk(parsedChunk['reasoning'])
       addChunk(parsedChunk['summary_text'])
+      addChunk(parsedChunk['summaryText'])
     }
 
     const item =
@@ -1014,10 +1023,14 @@ export default class LLMProvider {
       usedInputTokens:
         typeof usage['input_tokens'] === 'number'
           ? (usage['input_tokens'] as number)
+          : typeof usage['inputTokens'] === 'number'
+            ? (usage['inputTokens'] as number)
           : 0,
       usedOutputTokens:
         typeof usage['output_tokens'] === 'number'
           ? (usage['output_tokens'] as number)
+          : typeof usage['outputTokens'] === 'number'
+            ? (usage['outputTokens'] as number)
           : 0
     }
 
@@ -1059,6 +1072,42 @@ export default class LLMProvider {
     )
   }
 
+  private mergeStreamingChunk(
+    accumulated: string,
+    incoming: string
+  ): string {
+    if (!incoming) {
+      return ''
+    }
+
+    if (!accumulated) {
+      return incoming
+    }
+
+    if (accumulated.endsWith(incoming)) {
+      return ''
+    }
+
+    if (incoming.startsWith(accumulated)) {
+      return incoming.slice(accumulated.length)
+    }
+
+    // If this is a long repeated chunk already present, skip it.
+    if (incoming.length >= 32 && accumulated.includes(incoming)) {
+      return ''
+    }
+
+    // Keep only the non-overlapping suffix of incoming.
+    const maxOverlap = Math.min(accumulated.length, incoming.length)
+    for (let overlap = maxOverlap; overlap >= 1; overlap -= 1) {
+      if (accumulated.slice(-overlap) === incoming.slice(0, overlap)) {
+        return incoming.slice(overlap)
+      }
+    }
+
+    return incoming
+  }
+
   private async normalizeStreamingCompletionResult(
     rawResult: AxiosResponse,
     completionParams: CompletionParams
@@ -1081,14 +1130,40 @@ export default class LLMProvider {
     const toolCallsByIndex: Record<number, OpenAIToolCall> = {}
     const toolCallsById: Record<string, OpenAIToolCall> = {}
     const toolCallOrder: string[] = []
+    const reasoningChunkCache = new Set<string>()
+    const isResponsesAPIProvider = [
+      LLMProviders.OpenAI,
+      LLMProviders.OpenRouter
+    ].includes(LLM_PROVIDER as LLMProviders)
 
     const appendReasoningChunk = (reasoningChunk: string): void => {
       if (!reasoningChunk) {
         return
       }
 
-      reasoningOutput += reasoningChunk
-      completionParams.onReasoningToken?.(reasoningChunk)
+      const trimmed = reasoningChunk.trim()
+      if (!trimmed) {
+        return
+      }
+
+      if (trimmed.length >= 16 && reasoningChunkCache.has(trimmed)) {
+        return
+      }
+
+      const mergedChunk = this.mergeStreamingChunk(reasoningOutput, reasoningChunk)
+      if (!mergedChunk || !mergedChunk.trim()) {
+        if (trimmed.length >= 16) {
+          reasoningChunkCache.add(trimmed)
+        }
+        return
+      }
+
+      reasoningOutput += mergedChunk
+      completionParams.onReasoningToken?.(mergedChunk)
+
+      if (trimmed.length >= 16) {
+        reasoningChunkCache.add(trimmed)
+      }
     }
 
     const updateTokenUsageFromObject = (
@@ -1098,11 +1173,11 @@ export default class LLMProvider {
       const inputTokens =
         type === 'chat'
           ? (usage['prompt_tokens'] ?? usage['promptTokens'])
-          : usage['input_tokens']
+          : (usage['input_tokens'] ?? usage['inputTokens'])
       const outputTokens =
         type === 'chat'
           ? (usage['completion_tokens'] ?? usage['completionTokens'])
-          : usage['output_tokens']
+          : (usage['output_tokens'] ?? usage['outputTokens'])
 
       if (typeof inputTokens === 'number' && Number.isFinite(inputTokens)) {
         usedInputTokens = inputTokens
@@ -1288,8 +1363,12 @@ export default class LLMProvider {
         const itemId =
           typeof parsedChunk['item_id'] === 'string'
             ? (parsedChunk['item_id'] as string)
+            : typeof parsedChunk['itemId'] === 'string'
+              ? (parsedChunk['itemId'] as string)
             : typeof parsedChunk['call_id'] === 'string'
               ? (parsedChunk['call_id'] as string)
+              : typeof parsedChunk['callId'] === 'string'
+                ? (parsedChunk['callId'] as string)
               : ''
         const delta =
           typeof parsedChunk['delta'] === 'string'
@@ -1309,8 +1388,35 @@ export default class LLMProvider {
         }
       }
 
+      if (type === 'response.function_call_arguments.done') {
+        const itemId =
+          typeof parsedChunk['item_id'] === 'string'
+            ? (parsedChunk['item_id'] as string)
+            : typeof parsedChunk['itemId'] === 'string'
+              ? (parsedChunk['itemId'] as string)
+              : typeof parsedChunk['call_id'] === 'string'
+                ? (parsedChunk['call_id'] as string)
+                : typeof parsedChunk['callId'] === 'string'
+                  ? (parsedChunk['callId'] as string)
+                  : ''
+        if (itemId) {
+          const toolCall = getOrCreateResponseToolCall(itemId, toolCallOrder.length)
+          if (
+            !toolCall.function.name &&
+            typeof parsedChunk['name'] === 'string'
+          ) {
+            toolCall.function.name = parsedChunk['name'] as string
+          }
+          const completedArgs = parsedChunk['arguments']
+          if (typeof completedArgs === 'string' && completedArgs.length > 0) {
+            toolCall.function.arguments = completedArgs
+          } else if (completedArgs && typeof completedArgs === 'object') {
+            toolCall.function.arguments = JSON.stringify(completedArgs)
+          }
+        }
+      }
+
       if (
-        type === 'response.function_call_arguments.done' ||
         type === 'response.output_item.added' ||
         type === 'response.output_item.done'
       ) {
@@ -1327,12 +1433,16 @@ export default class LLMProvider {
               ? (item['id'] as string)
               : typeof item['call_id'] === 'string'
                 ? (item['call_id'] as string)
+                : typeof item['callId'] === 'string'
+                  ? (item['callId'] as string)
                 : ''
 
           if (itemId) {
             const toolCall = getOrCreateResponseToolCall(itemId, toolCallOrder.length)
             if (typeof item['call_id'] === 'string' && item['call_id']) {
               toolCall.id = item['call_id'] as string
+            } else if (typeof item['callId'] === 'string' && item['callId']) {
+              toolCall.id = item['callId'] as string
             }
             if (typeof item['name'] === 'string' && item['name']) {
               toolCall.function.name = item['name'] as string
@@ -1396,7 +1506,7 @@ export default class LLMProvider {
     for await (const chunk of responseStream as AsyncIterable<unknown>) {
       if (chunk && typeof chunk === 'object' && !Buffer.isBuffer(chunk)) {
         const parsedChunk = chunk as Record<string, unknown>
-        if (LLM_PROVIDER === LLMProviders.OpenAI) {
+        if (isResponsesAPIProvider) {
           applyOpenAIResponsesStreamingChunk(parsedChunk, '')
         } else {
           applyOpenAICompatibleStreamingChunk(parsedChunk)
@@ -1427,7 +1537,7 @@ export default class LLMProvider {
           continue
         }
 
-        if (LLM_PROVIDER === LLMProviders.OpenAI) {
+        if (isResponsesAPIProvider) {
           applyOpenAIResponsesStreamingChunk(parsedChunk, parsedEvent.eventName)
         } else {
           applyOpenAICompatibleStreamingChunk(parsedChunk)
@@ -1445,7 +1555,7 @@ export default class LLMProvider {
             string,
             unknown
           >
-          if (LLM_PROVIDER === LLMProviders.OpenAI) {
+          if (isResponsesAPIProvider) {
             applyOpenAIResponsesStreamingChunk(parsedChunk, parsedEvent.eventName)
           } else {
             applyOpenAICompatibleStreamingChunk(parsedChunk)
@@ -1457,7 +1567,7 @@ export default class LLMProvider {
     }
 
     const toolCalls =
-      LLM_PROVIDER === LLMProviders.OpenAI
+      isResponsesAPIProvider
         ? toolCallOrder
             .map((key) => toolCallsById[key]!)
             .filter((toolCall) => toolCall.function.name.length > 0)
@@ -1851,7 +1961,6 @@ export default class LLMProvider {
     } else if (
       [
         LLMProviders.Groq,
-        LLMProviders.OpenRouter,
         LLMProviders.ZAI,
         LLMProviders.Anthropic,
         LLMProviders.MoonshotAI,
@@ -1868,7 +1977,11 @@ export default class LLMProvider {
       usedOutputTokens = normalized.usedOutputTokens
       toolCalls = normalized.toolCalls
       reasoning = normalized.reasoning
-    } else if (LLM_PROVIDER === LLMProviders.OpenAI) {
+    } else if (
+      [LLMProviders.OpenAI, LLMProviders.OpenRouter].includes(
+        LLM_PROVIDER as LLMProviders
+      )
+    ) {
       const normalized = this.normalizeCompletionResultForOpenAIResponsesProvider(
         rawResult as AxiosResponse
       )
