@@ -371,6 +371,16 @@ export default class AISDKRemoteLLMProvider {
           reasoningSummary: 'detailed'
         }
       }
+    } else if (this.config.flavor === 'openrouter') {
+      if (completionParams.disableThinking === true) {
+        providerOptions['openrouter'] = {
+          reasoning: {
+            enabled: false,
+            effort: 'none',
+            exclude: true
+          }
+        }
+      }
     } else if (this.config.flavor === 'openai-compatible') {
       if (completionParams.disableThinking === true) {
         providerOptions['openaiCompatible'] = {
