@@ -18,11 +18,12 @@ export default function renderAuroraComponent(
     }
 
     if (!reactComponent) {
-      console.error(`Component ${component} not found`)
+      console.error(`Component ${component.component} not found`)
+      return null
     }
 
     // Check if the browsed component has a supported event and bind it
-    if (reactComponent) {
+    if (reactComponent && Array.isArray(component.events)) {
       component.events.forEach((event) => {
         if (supportedEvents.includes(event.type)) {
           component.props[event.type] = (data) => {

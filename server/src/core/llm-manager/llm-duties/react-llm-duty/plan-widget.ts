@@ -165,6 +165,19 @@ export function buildPlanComponentTree(
           }
 
           const toolDisplay = getToolDisplay(currentExecutingFunction || '')
+          const toolStatusText = `${toolDisplay.name} • ${toolDisplay.functionName}`
+          const executionInfoChildren: Record<string, unknown>[] = [
+            {
+              component: 'Status',
+              id: widgetId('status'),
+              props: {
+                iconName: toolDisplay.iconName,
+                iconType: 'line',
+                children: toolStatusText
+              },
+              events: []
+            }
+          ]
 
           return {
             component: 'ListItem',
@@ -179,18 +192,8 @@ export function buildPlanComponentTree(
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexDirection: 'row',
-                    children: [
-                      {
-                        component: 'Status',
-                        id: widgetId('status'),
-                        props: {
-                          iconName: toolDisplay.iconName,
-                          iconType: 'line',
-                          children: `${toolDisplay.name} ⇢ ${toolDisplay.functionName}`
-                        },
-                        events: []
-                      }
-                    ]
+                    gap: 'xs',
+                    children: executionInfoChildren
                   },
                   events: []
                 }

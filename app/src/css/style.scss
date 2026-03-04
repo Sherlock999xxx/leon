@@ -169,6 +169,33 @@ body {
     'Noto Color Emoji';
   font-weight: 400;
 }
+
+@keyframes plan-tool-status-cozy-shine {
+  0% {
+    opacity: 0.4;
+    filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0));
+  }
+
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.22));
+  }
+
+  100% {
+    opacity: 0.4;
+    filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0));
+  }
+}
+
+#feed
+  .bubble-container[data-message-id^='plan-']
+  .aurora-list
+  .aurora-list-item--center:last-child
+  .aurora-status
+  .aurora-icon {
+  animation: plan-tool-status-cozy-shine 2.6s ease-in-out infinite;
+}
+
 body > * {
   transition: opacity 0.5s;
 }
