@@ -102,6 +102,10 @@ export default class Client {
     this.chatbot.init()
     this.voiceEnergy.init()
 
+    if (window.leonConfigInfo?.tcpServer?.enabled === false) {
+      this.setInitStatus('tcpServerBoot', 'success')
+    }
+
     this.socket.on('connect', () => {
       this.socket.emit('init', this.client)
     })

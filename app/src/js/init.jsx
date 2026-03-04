@@ -98,7 +98,8 @@ function Init() {
   const [config, setConfig] = useState(() => ({ ...window.leonConfigInfo }))
   const [statusMap, setStatusMap] = useState({
     clientCoreServerHandshake: 'loading',
-    tcpServerBoot: 'loading',
+    tcpServerBoot:
+      window.leonConfigInfo?.tcpServer?.enabled === false ? 'success' : 'loading',
     llm: 'loading',
     llmDutiesWarmUp: 'loading'
   })
@@ -129,8 +130,11 @@ function Init() {
 
   const statuses = []
   for (let key of Object.keys(statusMap)) {
+    if (key === 'tcpServerBoot' && config.tcpServer?.enabled === false) {
+      statuses.push('success')
+    }
     // If LLM is not enabled, we don't need to check for LLM duties warm up
-    if (
+    else if (
       key === 'llmDutiesWarmUp' &&
       (!config.llm?.enabled || !config.shouldWarmUpLLMDuties)
     ) {
@@ -174,7 +178,9 @@ function Init() {
             <Item status={statusMap.clientCoreServerHandshake}>
               Client and core server handshaked
             </Item>
-            <Item status={statusMap.tcpServerBoot}>TCP server booted</Item>
+            {config.tcpServer?.enabled !== false && (
+              <Item status={statusMap.tcpServerBoot}>TCP server booted</Item>
+            )}
             {config.llm && config.llm.enabled && (
               <Item status={statusMap.llm}>LLM loaded</Item>
             )}

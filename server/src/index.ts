@@ -18,7 +18,8 @@ import {
   NVIDIA_NVSHMEM_PATH,
   NVIDIA_LIBS_PATH,
   PYTORCH_TORCH_PATH,
-  PYTHON_TCP_SERVER_BIN_PATH
+  PYTHON_TCP_SERVER_BIN_PATH,
+  SHOULD_START_PYTHON_TCP_SERVER
 } from '@/constants'
 import {
   PYTHON_TCP_CLIENT,
@@ -42,15 +43,17 @@ import { LogHelper } from '@/helpers/log-helper'
 import { SystemHelper } from '@/helpers/system-helper'
 ;(async (): Promise<void> => {
   process.title = 'leon'
+  const shouldStartPythonTCPServer = SHOULD_START_PYTHON_TCP_SERVER
 
   // Kill any existing Leon process before starting a new one
   const processList = await psList()
   processList
     .filter(
       (p) =>
-        p.cmd?.includes(PYTHON_TCP_SERVER_BIN_PATH) ||
-        // PyTorch thread from the TCP server (from binary, not from npm start:tcp-server command)
-        (p.name?.includes('pt_main_thread') && !p.cmd?.includes('main.py')) ||
+        (shouldStartPythonTCPServer &&
+          (p.cmd?.includes(PYTHON_TCP_SERVER_BIN_PATH) ||
+            // PyTorch thread from the TCP server (from binary, not from npm start:tcp-server command)
+            (p.name?.includes('pt_main_thread') && !p.cmd?.includes('main.py')))) ||
         (p.cmd === process.title && p.pid !== process.pid)
     )
     .forEach((p) => {
@@ -65,65 +68,72 @@ import { SystemHelper } from '@/helpers/system-helper'
    * then can manually delete process from task manager to avoid
    * to have 2 TCP servers running at the same time
    */
-  LogHelper.time('TCP Server ready')
-  const tcpServerArgs = [
-    LangHelper.getShortCode(LEON_LANG),
-    '--pytorch-path',
-    PYTORCH_TORCH_PATH,
-    '--nvidia-path',
-    NVIDIA_LIBS_PATH
-  ]
-  const tcpServerCmd = [PYTHON_TCP_SERVER_BIN_PATH, ...tcpServerArgs]
-    .map((arg) => `"${arg}"`)
-    .join(' ')
-
-  const tcpServerEnv = { ...process.env }
-
-  if (SystemHelper.isLinux()) {
-    const torchLibPath = `${PYTORCH_TORCH_PATH}/lib`
-    const nvidiaLibPaths = [
-      `${NVIDIA_CUBLAS_PATH}/lib`,
-      `${NVIDIA_CUDNN_PATH}/lib`,
-      `${NVIDIA_CUSPARSE_PATH}/lib`,
-      `${NVIDIA_CUSPARSE_FULL_PATH}/lib`,
-      `${NVIDIA_NCCL_PATH}/lib`,
-      `${NVIDIA_NVSHMEM_PATH}/lib`,
-      `${NVIDIA_NVJITLINK_PATH}/lib`
+  if (shouldStartPythonTCPServer) {
+    LogHelper.time('TCP Server ready')
+    const tcpServerArgs = [
+      LangHelper.getShortCode(LEON_LANG),
+      '--pytorch-path',
+      PYTORCH_TORCH_PATH,
+      '--nvidia-path',
+      NVIDIA_LIBS_PATH
     ]
-    const existingLdPath = tcpServerEnv['LD_LIBRARY_PATH']
-    const combinedLdPath = [torchLibPath, ...nvidiaLibPaths, existingLdPath]
-      .filter(Boolean)
-      .join(':')
-    tcpServerEnv['LD_LIBRARY_PATH'] = combinedLdPath
+    const tcpServerCmd = [PYTHON_TCP_SERVER_BIN_PATH, ...tcpServerArgs]
+      .map((arg) => `"${arg}"`)
+      .join(' ')
+
+    const tcpServerEnv = { ...process.env }
+
+    if (SystemHelper.isLinux()) {
+      const torchLibPath = `${PYTORCH_TORCH_PATH}/lib`
+      const nvidiaLibPaths = [
+        `${NVIDIA_CUBLAS_PATH}/lib`,
+        `${NVIDIA_CUDNN_PATH}/lib`,
+        `${NVIDIA_CUSPARSE_PATH}/lib`,
+        `${NVIDIA_CUSPARSE_FULL_PATH}/lib`,
+        `${NVIDIA_NCCL_PATH}/lib`,
+        `${NVIDIA_NVSHMEM_PATH}/lib`,
+        `${NVIDIA_NVJITLINK_PATH}/lib`
+      ]
+      const existingLdPath = tcpServerEnv['LD_LIBRARY_PATH']
+      const combinedLdPath = [torchLibPath, ...nvidiaLibPaths, existingLdPath]
+        .filter(Boolean)
+        .join(':')
+      tcpServerEnv['LD_LIBRARY_PATH'] = combinedLdPath
+    }
+
+    global.pythonTCPServerProcess = spawn(tcpServerCmd, {
+      shell: true,
+      detached: IS_DEVELOPMENT_ENV,
+      env: tcpServerEnv
+    })
+    global.pythonTCPServerProcess.stdout.on('data', (data: Buffer) => {
+      LogHelper.title('Python TCP Server')
+      LogHelper.info(data.toString())
+
+      if (data.toString().includes('connection...')) {
+        LogHelper.timeEnd('TCP Server ready')
+      }
+    })
+    global.pythonTCPServerProcess.stderr.on('data', (data: Buffer) => {
+      const formattedData = data.toString().trim()
+      const shouldIgnore = shouldIgnoreTCPServerError(formattedData)
+
+      if (shouldIgnore) {
+        return
+      }
+
+      LogHelper.title('Python TCP Server')
+      LogHelper.error(data.toString())
+    })
+
+    // Connect the Python TCP client to the Python TCP server
+    PYTHON_TCP_CLIENT.connect()
+  } else {
+    LogHelper.title('Python TCP Server')
+    LogHelper.info(
+      'Skipped startup because routing mode is "agent" and ASR/STT + TTS are disabled'
+    )
   }
-
-  global.pythonTCPServerProcess = spawn(tcpServerCmd, {
-    shell: true,
-    detached: IS_DEVELOPMENT_ENV,
-    env: tcpServerEnv
-  })
-  global.pythonTCPServerProcess.stdout.on('data', (data: Buffer) => {
-    LogHelper.title('Python TCP Server')
-    LogHelper.info(data.toString())
-
-    if (data.toString().includes('connection...')) {
-      LogHelper.timeEnd('TCP Server ready')
-    }
-  })
-  global.pythonTCPServerProcess.stderr.on('data', (data: Buffer) => {
-    const formattedData = data.toString().trim()
-    const shouldIgnore = shouldIgnoreTCPServerError(formattedData)
-
-    if (shouldIgnore) {
-      return
-    }
-
-    LogHelper.title('Python TCP Server')
-    LogHelper.error(data.toString())
-  })
-
-  // Connect the Python TCP client to the Python TCP server
-  PYTHON_TCP_CLIENT.connect()
 
   try {
     await LLM_PROVIDER.init()
@@ -256,7 +266,9 @@ import { SystemHelper } from '@/helpers/system-helper'
     'SIGHUP'
   ].forEach((eventType) => {
     process.on(eventType, () => {
-      kill(global.pythonTCPServerProcess.pid as number)
+      if (global.pythonTCPServerProcess?.pid) {
+        kill(global.pythonTCPServerProcess.pid as number)
+      }
 
       if (IS_TELEMETRY_ENABLED) {
         Telemetry.stop()

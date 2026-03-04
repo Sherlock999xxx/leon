@@ -6,6 +6,7 @@ import {
   LANG,
   HAS_STT,
   HAS_TTS,
+  SHOULD_START_PYTHON_TCP_SERVER,
   IS_DEVELOPMENT_ENV,
   API_VERSION
 } from '@/constants'
@@ -106,7 +107,10 @@ export default class SocketServer {
         // const provider = await addProvider(socket.id)
 
         // Check whether the Python TCP client is connected to the Python TCP server
-        if (PYTHON_TCP_CLIENT.isConnected) {
+        if (!SHOULD_START_PYTHON_TCP_SERVER) {
+          this.socket?.emit('ready')
+          this.socket?.emit('init-tcp-server-boot', 'success')
+        } else if (PYTHON_TCP_CLIENT.isConnected) {
           this.socket?.emit('ready')
           this.socket?.emit('init-tcp-server-boot', 'success')
         } else {

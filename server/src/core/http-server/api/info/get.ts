@@ -9,7 +9,9 @@ import {
   STT_PROVIDER,
   TTS_PROVIDER,
   IS_TELEMETRY_ENABLED,
-  LLM_PROVIDER
+  LLM_PROVIDER,
+  LEON_ROUTING_MODE,
+  SHOULD_START_PYTHON_TCP_SERVER
 } from '@/constants'
 import { LLM_MANAGER, PERSONA } from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
@@ -70,6 +72,10 @@ export const getInfo: FastifyPluginAsync<APIOptions> = async (
         tts: {
           enabled: HAS_TTS,
           provider: TTS_PROVIDER
+        },
+        routingMode: LEON_ROUTING_MODE,
+        tcpServer: {
+          enabled: SHOULD_START_PYTHON_TCP_SERVER
         },
         mood: {
           type: PERSONA.mood.type,
