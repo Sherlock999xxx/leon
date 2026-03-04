@@ -37,6 +37,7 @@ function buildPlanningPromptSections(params: {
   systemPrompt: string
   includeTools?: boolean
   includeSchema?: boolean
+  schemaOverride?: Record<string, unknown>
   tools?: OpenAITool[]
 }): PromptLogSection[] {
   const sections: PromptLogSection[] = [
@@ -71,7 +72,7 @@ function buildPlanningPromptSections(params: {
       name: 'PLAN_SCHEMA',
       source:
         'server/src/core/llm-manager/llm-duties/react-llm-duty/plan-contract.ts',
-      content: JSON.stringify(PLAN_RESPONSE_SCHEMA)
+      content: JSON.stringify(params.schemaOverride || PLAN_RESPONSE_SCHEMA)
     })
   }
 
@@ -202,6 +203,67 @@ export async function runPlanningPhase(
     }
 
     const textFallback = toolResult?.textContent?.trim() || ''
+    const missingCreatePlanToolCall =
+      !toolResult?.toolCall && !toolResult?.unexpectedToolCall
+
+    const attemptForcedPlanOnlyFallback = async (): Promise<PlanResult | null> => {
+      if (!missingCreatePlanToolCall) {
+        return null
+      }
+
+      onPlanningStage?.('thinking')
+      const forcedPlanPrompt = `${prompt}\n\nSafety fallback: return ONLY type="plan" with one or more concrete tool steps. Do not return type="final".`
+      const forcedPlanSchema = {
+        type: 'object',
+        properties: {
+          type: { type: 'string', enum: ['plan'] },
+          steps: {
+            type: 'array',
+            minItems: 1,
+            items: PLAN_STEP_SCHEMA
+          },
+          summary: { type: 'string' }
+        },
+        required: ['type', 'steps'],
+        additionalProperties: false
+      }
+
+      const forcedPlanResult = await caller.callLLM(
+        forcedPlanPrompt,
+        planSystemPrompt,
+        forcedPlanSchema,
+        history,
+        buildPlanningPromptSections({
+          prompt: forcedPlanPrompt,
+          systemPrompt: planSystemPrompt,
+          includeSchema: true,
+          schemaOverride: forcedPlanSchema
+        }),
+        {
+          phase: 'planning'
+        }
+      )
+
+      const forcedParsed = parseOutput(forcedPlanResult?.output)
+      const forcedInterpreted =
+        (forcedParsed
+          ? extractPlanResultFromCreatePlanArgs(forcedParsed, {
+              allowLegacySummaryAsFinal: false
+            })
+          : null) || extractPlanFromParsed(forcedParsed)
+
+      if (forcedInterpreted?.type === 'plan' && forcedInterpreted.steps.length > 0) {
+        LogHelper.debug(
+          'Planning: forced plan-only fallback produced executable steps'
+        )
+        return forcedInterpreted
+      }
+
+      LogHelper.debug(
+        'Planning: forced plan-only fallback did not produce a valid plan'
+      )
+      return null
+    }
 
     if (toolResult?.toolCall) {
       if (toolResult.toolCall.functionName === 'create_plan') {
@@ -273,6 +335,12 @@ export async function runPlanningPhase(
             })
           : null) || extractPlanFromParsed(textFallbackParsed)
       if (textFallbackPlan) {
+        if (textFallbackPlan.type === 'final') {
+          const forcedPlan = await attemptForcedPlanOnlyFallback()
+          if (forcedPlan) {
+            return forcedPlan
+          }
+        }
         LogHelper.debug(
           'Planning: recovered structured output from text fallback (no JSON fallback needed)'
         )
@@ -324,6 +392,12 @@ export async function runPlanningPhase(
           })
         : null) || extractPlanFromParsed(parsed)
     if (planResult) {
+      if (planResult.type === 'final') {
+        const forcedPlan = await attemptForcedPlanOnlyFallback()
+        if (forcedPlan) {
+          return forcedPlan
+        }
+      }
       return planResult
     }
 
@@ -335,6 +409,12 @@ export async function runPlanningPhase(
           })
         : null) || extractPlanFromParsed(textFallbackParsed)
     if (textFallbackPlan) {
+      if (textFallbackPlan.type === 'final') {
+        const forcedPlan = await attemptForcedPlanOnlyFallback()
+        if (forcedPlan) {
+          return forcedPlan
+        }
+      }
       LogHelper.debug('Planning: recovered structured output from text fallback')
       return textFallbackPlan
     }
@@ -346,6 +426,10 @@ export async function runPlanningPhase(
       LogHelper.debug(
         'Planning: treating plain text fallback as final conversational answer'
       )
+      const forcedPlan = await attemptForcedPlanOnlyFallback()
+      if (forcedPlan) {
+        return forcedPlan
+      }
       return {
         type: 'final',
         answer: stripInlineToolMarkup(textFallback) || textFallback
@@ -365,15 +449,29 @@ export async function runPlanningPhase(
             })
           : null) || extractPlanFromParsed(parsedRaw)
       if (parsedRawPlan) {
+        if (parsedRawPlan.type === 'final') {
+          const forcedPlan = await attemptForcedPlanOnlyFallback()
+          if (forcedPlan) {
+            return forcedPlan
+          }
+        }
         return parsedRawPlan
       }
 
       if (shouldTreatPlanningTextAsFinalAnswer(raw)) {
+        const forcedPlan = await attemptForcedPlanOnlyFallback()
+        if (forcedPlan) {
+          return forcedPlan
+        }
         return { type: 'final', answer: stripInlineToolMarkup(raw) || raw }
       }
     }
 
     if (textFallback) {
+      const forcedPlan = await attemptForcedPlanOnlyFallback()
+      if (forcedPlan) {
+        return forcedPlan
+      }
       const sanitizedTextFallback = stripInlineToolMarkup(textFallback)
       return {
         type: 'final',
