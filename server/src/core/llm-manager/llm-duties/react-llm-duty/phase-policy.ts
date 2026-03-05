@@ -27,8 +27,8 @@ export interface ReactPhasePolicy {
 
 const REACT_PHASE_POLICIES: Record<ReactPhase, ReactPhasePolicy> = {
   planning: {
-    includePersonality: true,
-    includeMood: true,
+    includePersonality: false,
+    includeMood: false,
     thinkingEnabled: true,
     streamToProvider: true,
     streamToUser: false,

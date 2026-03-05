@@ -3,7 +3,8 @@ import { LogHelper } from '@/helpers/log-helper'
 import type {
   PlanStep,
   ExecutionRecord,
-  PlanResult
+  PlanResult,
+  FinalPhaseIntent
 } from './types'
 
 export const formatFilePath = (filePath: string): string => {
@@ -16,6 +17,24 @@ export const formatFilePath = (filePath: string): string => {
  */
 export const isToolLevel = (qualifiedName: string): boolean => {
   return qualifiedName.split('.').length <= 2
+}
+
+function parseFinalIntent(
+  value: unknown,
+  fallback: FinalPhaseIntent = 'answer'
+): FinalPhaseIntent {
+  const normalized =
+    typeof value === 'string' ? value.trim().toLowerCase() : ''
+  switch (normalized) {
+    case 'answer':
+    case 'clarification':
+    case 'cancelled':
+    case 'blocked':
+    case 'error':
+      return normalized
+    default:
+      return fallback
+  }
 }
 
 export function formatExecutionHistory(history: ExecutionRecord[]): string {
@@ -62,14 +81,45 @@ export function parseStepsFromArgs(
  * and the fallback of extracting function references from the summary.
  */
 export function extractPlanFromParsed(
-  parsed: Record<string, unknown> | null
-): { type: 'plan', steps: PlanStep[], summary: string } | { type: 'final', answer: string } | null {
+  parsed: Record<string, unknown> | null,
+  source: 'planning' | 'recovery' = 'planning'
+): PlanResult | null {
   if (!parsed) {
     return null
   }
 
   if (parsed['type'] === 'final' && parsed['answer']) {
-    return { type: 'final', answer: parsed['answer'] as string }
+    const answer = String(parsed['answer']).trim()
+    if (!answer) {
+      return null
+    }
+    return {
+      type: 'handoff',
+      signal: {
+        intent: parseFinalIntent(parsed['intent']),
+        draft: answer,
+        source
+      }
+    }
+  }
+
+  if (
+    parsed['type'] === 'handoff' &&
+    typeof parsed['intent'] === 'string' &&
+    parsed['draft']
+  ) {
+    const draft = String(parsed['draft']).trim()
+    if (!draft) {
+      return null
+    }
+    return {
+      type: 'handoff',
+      signal: {
+        intent: parseFinalIntent(parsed['intent']),
+        draft,
+        source
+      }
+    }
   }
 
   if (parsed['type'] === 'plan') {
@@ -235,9 +285,13 @@ export function extractPlanResultFromCreatePlanArgs(
   parsedArgs: Record<string, unknown>,
   options: {
     allowLegacySummaryAsFinal?: boolean
+    source?: 'planning' | 'recovery'
   } = {}
 ): PlanResult | null {
-  const { allowLegacySummaryAsFinal = true } = options
+  const {
+    allowLegacySummaryAsFinal = true,
+    source = 'planning'
+  } = options
 
   const parsedType =
     typeof parsedArgs['type'] === 'string'
@@ -253,7 +307,33 @@ export function extractPlanResultFromCreatePlanArgs(
       return null
     }
 
-    return { type: 'final', answer }
+    return {
+      type: 'handoff',
+      signal: {
+        intent: parseFinalIntent(parsedArgs['intent']),
+        draft: answer,
+        source
+      }
+    }
+  }
+
+  if (parsedType === 'handoff') {
+    const draft =
+      typeof parsedArgs['draft'] === 'string'
+        ? parsedArgs['draft'].trim()
+        : ''
+    if (!draft) {
+      return null
+    }
+
+    return {
+      type: 'handoff',
+      signal: {
+        intent: parseFinalIntent(parsedArgs['intent']),
+        draft,
+        source
+      }
+    }
   }
 
   if (parsedType === 'plan') {
@@ -295,7 +375,14 @@ export function extractPlanResultFromCreatePlanArgs(
         ? parsedArgs['summary'].trim()
         : ''
     if (summary) {
-      return { type: 'final', answer: summary }
+      return {
+        type: 'handoff',
+        signal: {
+          intent: 'answer',
+          draft: summary,
+          source
+        }
+      }
     }
   }
 
@@ -304,7 +391,14 @@ export function extractPlanResultFromCreatePlanArgs(
       ? parsedArgs['answer'].trim()
       : ''
   if (answer) {
-    return { type: 'final', answer }
+    return {
+      type: 'handoff',
+      signal: {
+        intent: parseFinalIntent(parsedArgs['intent']),
+        draft: answer,
+        source
+      }
+    }
   }
 
   return null

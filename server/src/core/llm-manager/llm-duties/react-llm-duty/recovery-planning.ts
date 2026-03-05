@@ -12,7 +12,8 @@ import type {
   LLMCaller,
   PlanResult,
   PlanStep,
-  PromptLogSection
+  PromptLogSection,
+  FinalPhaseIntent
 } from './types'
 import {
   formatExecutionHistory,
@@ -78,6 +79,20 @@ function buildRecoveryPromptSections(params: {
   return sections
 }
 
+function createRecoveryHandoff(
+  draft: string,
+  intent: FinalPhaseIntent = 'answer'
+): PlanResult {
+  return {
+    type: 'handoff',
+    signal: {
+      intent,
+      draft,
+      source: 'recovery'
+    }
+  }
+}
+
 export async function runRecoveryPlanningPhase(
   caller: LLMCaller,
   catalog: Catalog,
@@ -139,7 +154,7 @@ Create a revised plan from this point to complete the user request.`
         function: {
           name: 'create_plan',
           description:
-            'Create a revised execution plan or direct clarification answer. Use type="plan" with steps+summary, or type="final" with answer when user clarification is needed.',
+            'Create a revised execution plan or direct conversational handoff. Use type="plan" with steps+summary, or type="final" with answer when user input is needed or execution must stop.',
           parameters: {
             type: 'object',
             properties: {
@@ -174,7 +189,13 @@ Create a revised plan from this point to complete the user request.`
               answer: {
                 type: 'string',
                 description:
-                  'Direct user-facing clarification message when type="final".'
+                  'Draft plain text for the final answer phase when type="final".'
+              },
+              intent: {
+                type: 'string',
+                enum: ['answer', 'clarification', 'cancelled', 'error'],
+                description:
+                  'Optional when type="final". Defaults to "answer".'
               }
             },
             required: ['type'],
@@ -204,7 +225,7 @@ Create a revised plan from this point to complete the user request.`
     if (!toolResult) {
       const providerError = caller.consumeProviderErrorMessage()
       if (providerError) {
-        return { type: 'final', answer: providerError }
+        return createRecoveryHandoff(providerError, 'error')
       }
     }
 
@@ -219,7 +240,8 @@ Create a revised plan from this point to complete the user request.`
       )
       if (parsedArgs) {
         const interpreted = extractPlanResultFromCreatePlanArgs(parsedArgs, {
-          allowLegacySummaryAsFinal: true
+          allowLegacySummaryAsFinal: true,
+          source: 'recovery'
         })
         if (interpreted) {
           return interpreted
@@ -263,18 +285,19 @@ Create a revised plan from this point to complete the user request.`
     const extractedPlan =
       (parsedTextFallback
         ? extractPlanResultFromCreatePlanArgs(parsedTextFallback, {
-            allowLegacySummaryAsFinal: true
+            allowLegacySummaryAsFinal: true,
+            source: 'recovery'
           })
-        : null) || extractPlanFromParsed(parsedTextFallback)
+        : null) || extractPlanFromParsed(parsedTextFallback, 'recovery')
     if (extractedPlan) {
       return extractedPlan
     }
 
     if (textFallback && shouldTreatPlanningTextAsFinalAnswer(textFallback)) {
-      return {
-        type: 'final',
-        answer: stripInlineToolMarkup(textFallback) || textFallback
-      }
+      return createRecoveryHandoff(
+        stripInlineToolMarkup(textFallback) || textFallback,
+        'answer'
+      )
     }
   }
 
@@ -295,16 +318,17 @@ Create a revised plan from this point to complete the user request.`
   if (!jsonModeResult) {
     const providerError = caller.consumeProviderErrorMessage()
     if (providerError) {
-      return { type: 'final', answer: providerError }
+      return createRecoveryHandoff(providerError, 'error')
     }
   }
   const parsed = parseOutput(jsonModeResult?.output)
   const planResult =
     (parsed
       ? extractPlanResultFromCreatePlanArgs(parsed, {
-          allowLegacySummaryAsFinal: true
+          allowLegacySummaryAsFinal: true,
+          source: 'recovery'
         })
-      : null) || extractPlanFromParsed(parsed)
+      : null) || extractPlanFromParsed(parsed, 'recovery')
   if (planResult) {
     return planResult
   }
@@ -315,7 +339,7 @@ Create a revised plan from this point to complete the user request.`
       : ''
 
   if (raw && shouldTreatPlanningTextAsFinalAnswer(raw)) {
-    return { type: 'final', answer: stripInlineToolMarkup(raw) || raw }
+    return createRecoveryHandoff(stripInlineToolMarkup(raw) || raw, 'answer')
   }
 
   return null

@@ -40,25 +40,42 @@ export interface Catalog {
   mode: 'function' | 'tool'
 }
 
+export type FinalPhaseIntent =
+  | 'answer'
+  | 'clarification'
+  | 'cancelled'
+  | 'blocked'
+  | 'error'
+
+export interface FinalResponseSignal {
+  intent: FinalPhaseIntent
+  draft: string
+  source:
+    | 'planning'
+    | 'execution'
+    | 'recovery'
+    | 'self_observation'
+    | 'tool'
+    | 'system'
+}
+
 export type PlanResult =
   | { type: 'plan', steps: PlanStep[], summary: string }
-  | { type: 'final', answer: string }
+  | { type: 'handoff', signal: FinalResponseSignal }
 
 export type ExecutionStepResult =
-  | { type: 'final', answer: string }
+  | { type: 'handoff', signal: FinalResponseSignal }
   | { type: 'replan', reason: string, functions: string[] }
   | {
       type: 'executed'
       execution: ExecutionRecord
-      finalAnswer?: string
-      missingSettingsMessage?: string
+      handoffSignal?: FinalResponseSignal
     }
 
 export interface ToolExecutionResult {
   type: 'executed'
   execution: ExecutionRecord
-  finalAnswer?: string
-  missingSettingsMessage?: string
+  handoffSignal?: FinalResponseSignal
 }
 
 export interface PromptLogSection {

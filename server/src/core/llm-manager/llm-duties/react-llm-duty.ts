@@ -52,7 +52,8 @@ import type {
   PlanStepStatus,
   LLMCaller,
   PromptLogSection,
-  LLMCallOptions
+  LLMCallOptions,
+  FinalResponseSignal
 } from './react-llm-duty/types'
 import { widgetId, emitPlanWidget } from './react-llm-duty/plan-widget'
 import {
@@ -104,6 +105,7 @@ export class ReActLLMDuty extends LLMDuty {
   private hasStreamedTokenEmission = false
   private hasExplicitMemoryWrite = false
   private reasoningGenerationId: string | null = null
+  private finalAnswerPhaseCompleted = false
 
   constructor(params: ReactLLMDutyParams) {
     super()
@@ -175,6 +177,7 @@ export class ReActLLMDuty extends LLMDuty {
     this.hasStreamedTokenEmission = false
     this.hasExplicitMemoryWrite = false
     this.reasoningGenerationId = StringHelper.random(6, { onlyLetters: true })
+    this.finalAnswerPhaseCompleted = false
 
     try {
       const history =
@@ -205,6 +208,17 @@ export class ReActLLMDuty extends LLMDuty {
       }
 
       const caller = this.createLLMCaller(history, effectiveInput)
+      const finalizeFromSignal = async (
+        signal: FinalResponseSignal
+      ): Promise<LLMDutyResult> => {
+        const finalAnswer = await runFinalAnswerPhase(
+          caller,
+          executionHistory,
+          signal
+        )
+        this.finalAnswerPhaseCompleted = true
+        return this.makeDutyResult(finalAnswer)
+      }
       const planWidgetIdValue = continuation?.state.planWidgetId || widgetId('plan')
       let hasPlanningWidget = false
       const executionHistory: ExecutionRecord[] = []
@@ -286,7 +300,7 @@ export class ReActLLMDuty extends LLMDuty {
           updatePlanningStage
         )
 
-        if (planResult.type === 'final') {
+        if (planResult.type === 'handoff') {
           if (hasPlanningWidget) {
             emitPlanWidget(
               planningUiSteps.map((step) => ({ ...step, status: 'completed' })),
@@ -296,8 +310,10 @@ export class ReActLLMDuty extends LLMDuty {
             )
           }
           LogHelper.title(this.name)
-          LogHelper.debug(`Planning returned final answer directly: "${planResult.answer}"`)
-          return this.makeDutyResult(planResult.answer)
+          LogHelper.debug(
+            `Planning returned handoff signal: intent="${planResult.signal.intent}"`
+          )
+          return await finalizeFromSignal(planResult.signal)
         }
 
         LogHelper.title(this.name)
@@ -363,11 +379,13 @@ export class ReActLLMDuty extends LLMDuty {
           catalog
         )
 
-        if (stepResult.type === 'final') {
+        if (stepResult.type === 'handoff') {
           LogHelper.title(this.name)
-          LogHelper.debug(`Execution returned final answer: "${(stepResult.answer)}"`)
+          LogHelper.debug(
+            `Execution returned handoff signal: intent="${stepResult.signal.intent}"`
+          )
 
-          if (this.isLikelyClarificationRequest(stepResult.answer)) {
+          if (stepResult.signal.intent === 'clarification') {
             const pausedTrackedSteps =
               trackedSteps.length > 0
                 ? this.buildPausedTrackedSteps(trackedSteps, currentStepIndex)
@@ -384,7 +402,7 @@ export class ReActLLMDuty extends LLMDuty {
               phase: 'execution',
               planWidgetId: planWidgetIdValue,
               originalInput: continuation?.state.originalInput || ownerInputText,
-              clarificationQuestion: stepResult.answer,
+              clarificationQuestion: stepResult.signal.draft,
               pendingSteps: pendingWithCurrent,
               executionHistory,
               trackedSteps: pausedTrackedSteps,
@@ -408,7 +426,7 @@ export class ReActLLMDuty extends LLMDuty {
             LogHelper.debug(
               `Execution paused for clarification at step "${currentStep.label}"`
             )
-            return this.makeDutyResult(stepResult.answer)
+            return await finalizeFromSignal(stepResult.signal)
           }
 
           // Mark all remaining steps as completed in the widget
@@ -424,7 +442,7 @@ export class ReActLLMDuty extends LLMDuty {
             currentExecutingFunction
           )
 
-          return this.makeDutyResult(stepResult.answer)
+          return await finalizeFromSignal(stepResult.signal)
         }
 
         if (stepResult.type === 'replan') {
@@ -502,10 +520,12 @@ export class ReActLLMDuty extends LLMDuty {
         )
         currentStepIndex = nextTrackedIndex
 
-        // Check for short-circuit final answer from tool result
-        if (stepResult.finalAnswer) {
+        // Check for short-circuit handoff from tool result
+        if (stepResult.handoffSignal) {
           LogHelper.title(this.name)
-          LogHelper.debug(`Tool returned final_answer, short-circuiting: "${stepResult.finalAnswer}"`)
+          LogHelper.debug(
+            `Tool returned handoff signal: intent="${stepResult.handoffSignal.intent}"`
+          )
 
           // Mark all remaining as completed
           for (const ts of trackedSteps) {
@@ -520,14 +540,7 @@ export class ReActLLMDuty extends LLMDuty {
             currentExecutingFunction
           )
 
-          return this.makeDutyResult(stepResult.finalAnswer)
-        }
-
-        // Check for missing settings error — return immediately
-        if (stepResult.missingSettingsMessage) {
-          LogHelper.title(this.name)
-          LogHelper.debug(`Missing settings detected: "${stepResult.missingSettingsMessage}"`)
-          return this.makeDutyResult(stepResult.missingSettingsMessage)
+          return await finalizeFromSignal(stepResult.handoffSignal)
         }
 
         if (stepResult.execution.status === 'error') {
@@ -548,13 +561,13 @@ export class ReActLLMDuty extends LLMDuty {
             pendingSteps
           )
 
-          if (recoveryPlanResult?.type === 'final') {
+          if (recoveryPlanResult?.type === 'handoff') {
             LogHelper.title(this.name)
             LogHelper.debug(
-              `Recovery planning returned final answer: "${recoveryPlanResult.answer}"`
+              `Recovery planning returned handoff signal: intent="${recoveryPlanResult.signal.intent}"`
             )
 
-            if (this.isLikelyClarificationRequest(recoveryPlanResult.answer)) {
+            if (recoveryPlanResult.signal.intent === 'clarification') {
               const retryStepIndex = Math.max(0, currentStepIndex - 1)
               const pausedTrackedSteps =
                 trackedSteps.length > 0
@@ -573,7 +586,7 @@ export class ReActLLMDuty extends LLMDuty {
                 planWidgetId: planWidgetIdValue,
                 originalInput:
                   continuation?.state.originalInput || ownerInputText,
-                clarificationQuestion: recoveryPlanResult.answer,
+                clarificationQuestion: recoveryPlanResult.signal.draft,
                 pendingSteps: pendingWithCurrent,
                 executionHistory,
                 trackedSteps: pausedTrackedSteps,
@@ -597,10 +610,10 @@ export class ReActLLMDuty extends LLMDuty {
               LogHelper.debug(
                 `Recovery execution paused for clarification at step "${currentStep.label}"`
               )
-              return this.makeDutyResult(recoveryPlanResult.answer)
+              return await finalizeFromSignal(recoveryPlanResult.signal)
             }
 
-            return this.makeDutyResult(recoveryPlanResult.answer)
+            return await finalizeFromSignal(recoveryPlanResult.signal)
           }
 
           if (
@@ -664,13 +677,13 @@ export class ReActLLMDuty extends LLMDuty {
             executionHistory
           )
 
-          if (selfObservationResult?.type === 'final') {
+          if (selfObservationResult?.type === 'handoff') {
             LogHelper.title(this.name)
             LogHelper.debug(
-              `Execution self-observation returned final answer: "${selfObservationResult.answer}"`
+              `Execution self-observation returned handoff signal: intent="${selfObservationResult.signal.intent}"`
             )
 
-            return this.makeDutyResult(selfObservationResult.answer)
+            return await finalizeFromSignal(selfObservationResult.signal)
           }
 
           if (
@@ -740,18 +753,24 @@ export class ReActLLMDuty extends LLMDuty {
       )
 
       if (executionHistory.length === 0) {
-        LogHelper.debug('No executions completed, returning fallback')
+        LogHelper.debug('No executions completed, handing off to final phase')
         const providerError = LLM_PROVIDER.consumeLastProviderErrorMessage()
-        if (providerError) {
-          return this.makeDutyResult(providerError)
-        }
-
-        return this.makeDutyResult(
-          'I was unable to find the right tools to help with your request.'
-        )
+        const noExecutionSignal: FinalResponseSignal = providerError
+          ? {
+              intent: 'error',
+              draft: providerError,
+              source: 'system'
+            }
+          : {
+              intent: 'error',
+              draft: 'I was unable to find the right tools to help with your request.',
+              source: 'system'
+            }
+        return await finalizeFromSignal(noExecutionSignal)
       }
 
       const finalAnswer = await runFinalAnswerPhase(caller, executionHistory)
+      this.finalAnswerPhaseCompleted = true
       return this.makeDutyResult(finalAnswer)
     } catch (e) {
       LogHelper.title(this.name)
@@ -840,15 +859,6 @@ export class ReActLLMDuty extends LLMDuty {
 
       return { ...step, status: 'pending' as PlanStepStatus }
     })
-  }
-
-  private isLikelyClarificationRequest(answer: string): boolean {
-    const normalized = String(answer || '').trim()
-    if (!normalized) {
-      return false
-    }
-
-    return normalized.includes('?')
   }
 
   // ---------------------------------------------------------------------------
@@ -1660,6 +1670,12 @@ export class ReActLLMDuty extends LLMDuty {
   }
 
   private makeDutyResult(output: string): LLMDutyResult {
+    if (!this.finalAnswerPhaseCompleted) {
+      throw new Error(
+        'ReAct invariant violation: user-facing output must be produced by final_answer phase.'
+      )
+    }
+
     if (!this.hasStreamedTokenEmission && output?.trim()) {
       this.emitSyntheticTokenStream(output)
     }

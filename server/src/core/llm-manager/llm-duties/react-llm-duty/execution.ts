@@ -24,7 +24,9 @@ import type {
   ToolExecutionResult,
   LLMCaller,
   FunctionConfig,
-  PromptLogSection
+  PromptLogSection,
+  FinalPhaseIntent,
+  FinalResponseSignal
 } from './types'
 import {
   isToolLevel,
@@ -104,11 +106,44 @@ function buildExecutionPromptSections(params: {
   return sections
 }
 
+function parseExecutionHandoffIntent(
+  value: unknown,
+  fallback: FinalPhaseIntent = 'answer'
+): FinalPhaseIntent {
+  const normalized =
+    typeof value === 'string' ? value.trim().toLowerCase() : ''
+  switch (normalized) {
+    case 'answer':
+    case 'clarification':
+    case 'cancelled':
+    case 'blocked':
+    case 'error':
+      return normalized
+    default:
+      return fallback
+  }
+}
+
+function createExecutionHandoff(
+  draft: string,
+  intent: FinalPhaseIntent = 'answer',
+  source: FinalResponseSignal['source'] = 'execution'
+): { type: 'handoff', signal: FinalResponseSignal } {
+  return {
+    type: 'handoff',
+    signal: {
+      intent,
+      draft,
+      source
+    }
+  }
+}
+
 export async function runExecutionSelfObservationPhase(
   caller: LLMCaller,
   executionHistory: ExecutionRecord[]
 ): Promise<
-  | { type: 'final', answer: string }
+  | { type: 'handoff', signal: FinalResponseSignal }
   | { type: 'replan', reason: string, functions: string[] }
   | null
 > {
@@ -116,16 +151,16 @@ export async function runExecutionSelfObservationPhase(
   const systemPrompt = buildPhaseSystemPrompt(
     `You are evaluating whether execution should continue after the current plan finished.
 
-Use only the user request and collected observations.
+	Use only the user request and collected observations.
 
-Return ONLY one of:
-- {"type":"final","answer":"..."} when the request is fully completed.
-- {"type":"replan","functions":["toolkit_id.tool_id.function_name",...],"reason":"..."} when more tool steps are still needed.
+	Return ONLY one of:
+	- {"type":"handoff","intent":"answer","draft":"..."} when the request is fully completed.
+	- {"type":"replan","functions":["toolkit_id.tool_id.function_name",...],"reason":"..."} when more tool steps are still needed.
 
 Rules:
 - Base your decision strictly on observations, not assumptions.
 - If unsure, choose "replan" and provide the minimum next functions needed.
-- "answer" must be directly user-facing, not process/meta narration.`,
+	- "draft" must be directly user-facing, not process/meta narration.`,
     'execution'
   )
   const prompt = `${historySection}\n\nUser Request: "${caller.input}"\n\nCurrent plan status: no pending steps remain.\nDecide whether to finish now or continue with additional steps.`
@@ -133,9 +168,18 @@ Rules:
   const schema = {
     type: 'object',
     properties: {
-      type: { type: 'string', enum: ['final', 'replan'] },
-      answer: {
+      type: { type: 'string', enum: ['handoff', 'replan'] },
+      draft: {
         anyOf: [{ type: 'string' }, { type: 'null' }]
+      },
+      intent: {
+        anyOf: [
+          {
+            type: 'string',
+            enum: ['answer', 'clarification', 'cancelled', 'blocked', 'error']
+          },
+          { type: 'null' }
+        ]
       },
       functions: {
         anyOf: [
@@ -150,7 +194,7 @@ Rules:
         anyOf: [{ type: 'string' }, { type: 'null' }]
       }
     },
-    required: ['type', 'answer', 'functions', 'reason'],
+    required: ['type', 'draft', 'intent', 'functions', 'reason'],
     additionalProperties: false
   }
 
@@ -177,7 +221,7 @@ Rules:
   if (!completion) {
     const providerError = caller.consumeProviderErrorMessage()
     if (providerError) {
-      return { type: 'final', answer: providerError }
+      return createExecutionHandoff(providerError, 'error', 'self_observation')
     }
     return null
   }
@@ -187,10 +231,14 @@ Rules:
     return null
   }
 
-  if (parsed['type'] === 'final' && typeof parsed['answer'] === 'string') {
-    const answer = parsed['answer'].trim()
-    if (answer) {
-      return { type: 'final', answer }
+  if (parsed['type'] === 'handoff' && typeof parsed['draft'] === 'string') {
+    const draft = parsed['draft'].trim()
+    if (draft) {
+      return createExecutionHandoff(
+        draft,
+        parseExecutionHandoffIntent(parsed['intent']),
+        'self_observation'
+      )
     }
   }
 
@@ -504,11 +552,30 @@ async function resolveToolFunctionWithNativeTools(
     )
   }
 
-  // Text content fallback — parse for replan/final
+  // Text content fallback — parse for replan/handoff
   if (result.textContent) {
     const parsed = parseOutput(result.textContent)
-    if (parsed?.['type'] === 'final' && parsed['answer']) {
-      return { type: 'final', answer: parsed['answer'] as string }
+    if (
+      parsed?.['type'] === 'handoff' &&
+      typeof parsed['draft'] === 'string' &&
+      parsed['draft'].trim()
+    ) {
+      return createExecutionHandoff(
+        parsed['draft'].trim(),
+        parseExecutionHandoffIntent(parsed['intent']),
+        'execution'
+      )
+    }
+    if (
+      parsed?.['type'] === 'final' &&
+      typeof parsed['answer'] === 'string' &&
+      parsed['answer'].trim()
+    ) {
+      return createExecutionHandoff(
+        parsed['answer'].trim(),
+        parseExecutionHandoffIntent(parsed['intent']),
+        'execution'
+      )
     }
     if (parsed?.['type'] === 'replan') {
       return {
@@ -601,7 +668,7 @@ async function resolveToolFunctionWithJSONMode(
   const resolveSchema = {
     type: 'object',
     properties: {
-      type: { type: 'string', enum: ['execute', 'replan', 'final'] },
+      type: { type: 'string', enum: ['execute', 'replan', 'handoff'] },
       function_name: {
         anyOf: [{ type: 'string' }, { type: 'null' }]
       },
@@ -620,8 +687,17 @@ async function resolveToolFunctionWithJSONMode(
       reason: {
         anyOf: [{ type: 'string' }, { type: 'null' }]
       },
-      answer: {
+      draft: {
         anyOf: [{ type: 'string' }, { type: 'null' }]
+      },
+      intent: {
+        anyOf: [
+          {
+            type: 'string',
+            enum: ['answer', 'clarification', 'cancelled', 'blocked', 'error']
+          },
+          { type: 'null' }
+        ]
       }
     },
     required: [
@@ -630,7 +706,8 @@ async function resolveToolFunctionWithJSONMode(
       'tool_input',
       'functions',
       'reason',
-      'answer'
+      'draft',
+      'intent'
     ],
     additionalProperties: false
   }
@@ -667,8 +744,28 @@ async function resolveToolFunctionWithJSONMode(
     }
   }
 
-  if (parsed['type'] === 'final' && parsed['answer']) {
-    return { type: 'final', answer: parsed['answer'] as string }
+  if (
+    parsed['type'] === 'handoff' &&
+    typeof parsed['draft'] === 'string' &&
+    parsed['draft'].trim()
+  ) {
+    return createExecutionHandoff(
+      parsed['draft'].trim(),
+      parseExecutionHandoffIntent(parsed['intent']),
+      'execution'
+    )
+  }
+
+  if (
+    parsed['type'] === 'final' &&
+    typeof parsed['answer'] === 'string' &&
+    parsed['answer'].trim()
+  ) {
+    return createExecutionHandoff(
+      parsed['answer'].trim(),
+      parseExecutionHandoffIntent(parsed['intent']),
+      'execution'
+    )
   }
 
   if (parsed['type'] === 'replan') {
@@ -870,7 +967,7 @@ async function executeFunctionWithNativeTools(
       currentStepLabel
     )
 
-    if (toolResult.missingSettingsMessage || toolResult.finalAnswer) {
+    if (toolResult.handoffSignal) {
       return toolResult
     }
 
@@ -969,11 +1066,30 @@ async function executeFunctionWithNativeTools(
       return toolResult
     }
 
-    // Model responded with text instead of a tool call — parse for replan/final
+    // Model responded with text instead of a tool call — parse for replan/handoff
     if (result.textContent) {
       const parsed = parseOutput(result.textContent)
-      if (parsed?.['type'] === 'final' && parsed['answer']) {
-        return { type: 'final', answer: parsed['answer'] as string }
+      if (
+        parsed?.['type'] === 'handoff' &&
+        typeof parsed['draft'] === 'string' &&
+        parsed['draft'].trim()
+      ) {
+        return createExecutionHandoff(
+          parsed['draft'].trim(),
+          parseExecutionHandoffIntent(parsed['intent']),
+          'execution'
+        )
+      }
+      if (
+        parsed?.['type'] === 'final' &&
+        typeof parsed['answer'] === 'string' &&
+        parsed['answer'].trim()
+      ) {
+        return createExecutionHandoff(
+          parsed['answer'].trim(),
+          parseExecutionHandoffIntent(parsed['intent']),
+          'execution'
+        )
       }
       if (parsed?.['type'] === 'replan') {
         return {
@@ -1064,7 +1180,7 @@ async function executeFunctionWithJSONMode(
   const executeSchema = {
     type: 'object',
     properties: {
-      type: { type: 'string', enum: ['execute', 'replan', 'final'] },
+      type: { type: 'string', enum: ['execute', 'replan', 'handoff'] },
       function_name: {
         anyOf: [{ type: 'string' }, { type: 'null' }]
       },
@@ -1083,8 +1199,17 @@ async function executeFunctionWithJSONMode(
       reason: {
         anyOf: [{ type: 'string' }, { type: 'null' }]
       },
-      answer: {
+      draft: {
         anyOf: [{ type: 'string' }, { type: 'null' }]
+      },
+      intent: {
+        anyOf: [
+          {
+            type: 'string',
+            enum: ['answer', 'clarification', 'cancelled', 'blocked', 'error']
+          },
+          { type: 'null' }
+        ]
       }
     },
     required: [
@@ -1093,7 +1218,8 @@ async function executeFunctionWithJSONMode(
       'tool_input',
       'functions',
       'reason',
-      'answer'
+      'draft',
+      'intent'
     ],
     additionalProperties: false
   }
@@ -1169,8 +1295,28 @@ async function executeFunctionWithJSONMode(
       continue
     }
 
-    if (parsed['type'] === 'final' && parsed['answer']) {
-      return { type: 'final', answer: parsed['answer'] as string }
+    if (
+      parsed['type'] === 'handoff' &&
+      typeof parsed['draft'] === 'string' &&
+      parsed['draft'].trim()
+    ) {
+      return createExecutionHandoff(
+        parsed['draft'].trim(),
+        parseExecutionHandoffIntent(parsed['intent']),
+        'execution'
+      )
+    }
+
+    if (
+      parsed['type'] === 'final' &&
+      typeof parsed['answer'] === 'string' &&
+      parsed['answer'].trim()
+    ) {
+      return createExecutionHandoff(
+        parsed['answer'].trim(),
+        parseExecutionHandoffIntent(parsed['intent']),
+        'execution'
+      )
     }
 
     if (parsed['type'] === 'replan') {
@@ -1248,11 +1394,7 @@ async function executeFunctionWithJSONMode(
         currentStepLabel
       )
 
-      if (toolResult.missingSettingsMessage) {
-        return toolResult
-      }
-
-      if (toolResult.finalAnswer) {
+      if (toolResult.handoffSignal) {
         return toolResult
       }
 
@@ -1406,7 +1548,11 @@ export async function runToolExecution(
         requestedToolInput,
         ...(stepLabel ? { stepLabel } : {})
       },
-      finalAnswer
+      handoffSignal: {
+        intent: 'answer',
+        draft: finalAnswer,
+        source: 'tool'
+      }
     }
   }
 
@@ -1440,9 +1586,13 @@ export async function runToolExecution(
         requestedToolInput,
         ...(stepLabel ? { stepLabel } : {})
       },
-      missingSettingsMessage: `Missing tool settings: ${missingSettings.join(
-        ', '
-      )}. Please set them in ${formattedPath}.`
+      handoffSignal: {
+        intent: 'blocked',
+        draft: `Missing tool settings: ${missingSettings.join(
+          ', '
+        )}. Please set them in ${formattedPath}.`,
+        source: 'tool'
+      }
     }
   }
 

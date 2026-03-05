@@ -13,7 +13,8 @@ import type {
   Catalog,
   LLMCaller,
   PlanResult,
-  PromptLogSection
+  PromptLogSection,
+  FinalPhaseIntent
 } from './types'
 import {
   extractPlanFromParsed,
@@ -89,6 +90,20 @@ function isOperatingSystemControlOnlyPlan(steps: { function: string }[]): boolea
   )
 }
 
+function createPlanningHandoff(
+  draft: string,
+  intent: FinalPhaseIntent = 'answer'
+): PlanResult {
+  return {
+    type: 'handoff',
+    signal: {
+      intent,
+      draft,
+      source: 'planning'
+    }
+  }
+}
+
 export async function runPlanningPhase(
   caller: LLMCaller,
   catalog: Catalog,
@@ -121,7 +136,7 @@ export async function runPlanningPhase(
         function: {
           name: 'create_plan',
           description:
-            'Create either an execution plan or a direct conversational answer. Use type="plan" when tools are needed, or type="final" for purely conversational messages. For type="final", answer must be directly user-facing (not meta reasoning about what you will do). If you do not call this tool, output plain text prefixed with "FINAL_ANSWER:".',
+            'Create either an execution plan or a direct conversational handoff. Use type="plan" when tools are needed, or type="final" for purely conversational messages. For type="final", answer must be directly user-facing (not meta reasoning about what you will do). If you do not call this tool, output plain text prefixed with "FINAL_ANSWER:".',
           parameters: {
             type: 'object',
             properties: {
@@ -129,7 +144,7 @@ export async function runPlanningPhase(
                 type: 'string',
                 enum: ['plan', 'final'],
                 description:
-                  'Use "plan" when tools are needed, "final" for direct conversational answer.'
+                  'Use "plan" when tools are needed, "final" for direct conversational handoff.'
               },
               steps: {
                 type: 'array',
@@ -159,7 +174,13 @@ export async function runPlanningPhase(
               answer: {
                 type: 'string',
                 description:
-                  'Required when type="final". Direct user-facing final answer.'
+                  'Required when type="final". Draft plain text for the final answer phase.'
+              },
+              intent: {
+                type: 'string',
+                enum: ['answer', 'clarification', 'cancelled', 'error'],
+                description:
+                  'Optional when type="final". Defaults to "answer".'
               }
             },
             required: ['type'],
@@ -198,7 +219,7 @@ export async function runPlanningPhase(
         LogHelper.debug(
           `Planning aborted due to provider error: "${providerError}"`
         )
-        return { type: 'final', answer: providerError }
+        return createPlanningHandoff(providerError, 'error')
       }
     }
 
@@ -250,9 +271,10 @@ export async function runPlanningPhase(
       const forcedInterpreted =
         (forcedParsed
           ? extractPlanResultFromCreatePlanArgs(forcedParsed, {
-              allowLegacySummaryAsFinal: false
+              allowLegacySummaryAsFinal: false,
+              source: 'planning'
             })
-          : null) || extractPlanFromParsed(forcedParsed)
+          : null) || extractPlanFromParsed(forcedParsed, 'planning')
 
       if (forcedInterpreted?.type === 'plan' && forcedInterpreted.steps.length > 0) {
         LogHelper.debug(
@@ -274,7 +296,8 @@ export async function runPlanningPhase(
         )
         if (parsedArgs) {
           const interpreted = extractPlanResultFromCreatePlanArgs(parsedArgs, {
-            allowLegacySummaryAsFinal: true
+            allowLegacySummaryAsFinal: true,
+            source: 'planning'
           })
           if (interpreted) {
             if (
@@ -333,11 +356,12 @@ export async function runPlanningPhase(
       const textFallbackPlan =
         (textFallbackParsed
           ? extractPlanResultFromCreatePlanArgs(textFallbackParsed, {
-              allowLegacySummaryAsFinal: true
+              allowLegacySummaryAsFinal: true,
+              source: 'planning'
             })
-          : null) || extractPlanFromParsed(textFallbackParsed)
+          : null) || extractPlanFromParsed(textFallbackParsed, 'planning')
       if (textFallbackPlan) {
-        if (textFallbackPlan.type === 'final') {
+        if (textFallbackPlan.type === 'handoff') {
           const forcedPlan = await attemptForcedPlanOnlyFallback()
           if (forcedPlan) {
             return forcedPlan
@@ -357,10 +381,7 @@ export async function runPlanningPhase(
           LogHelper.debug(
             'Planning: returning direct final answer from marked text fallback'
           )
-          return {
-            type: 'final',
-            answer: markedTextFallbackFinalAnswer
-          }
+          return createPlanningHandoff(markedTextFallbackFinalAnswer, 'answer')
         }
 
         LogHelper.debug(
@@ -393,18 +414,19 @@ export async function runPlanningPhase(
         LogHelper.debug(
           `Planning JSON fallback aborted due to provider error: "${providerError}"`
         )
-        return { type: 'final', answer: providerError }
+        return createPlanningHandoff(providerError, 'error')
       }
     }
     const parsed = parseOutput(jsonModeResult?.output)
     const planResult =
       (parsed
         ? extractPlanResultFromCreatePlanArgs(parsed, {
-            allowLegacySummaryAsFinal: true
+            allowLegacySummaryAsFinal: true,
+            source: 'planning'
           })
-        : null) || extractPlanFromParsed(parsed)
+        : null) || extractPlanFromParsed(parsed, 'planning')
     if (planResult) {
-      if (planResult.type === 'final') {
+      if (planResult.type === 'handoff') {
         const forcedPlan = await attemptForcedPlanOnlyFallback()
         if (forcedPlan) {
           return forcedPlan
@@ -417,11 +439,12 @@ export async function runPlanningPhase(
     const textFallbackPlan =
       (textFallbackParsed
         ? extractPlanResultFromCreatePlanArgs(textFallbackParsed, {
-            allowLegacySummaryAsFinal: true
+            allowLegacySummaryAsFinal: true,
+            source: 'planning'
           })
-        : null) || extractPlanFromParsed(textFallbackParsed)
+        : null) || extractPlanFromParsed(textFallbackParsed, 'planning')
     if (textFallbackPlan) {
-      if (textFallbackPlan.type === 'final') {
+      if (textFallbackPlan.type === 'handoff') {
         const forcedPlan = await attemptForcedPlanOnlyFallback()
         if (forcedPlan) {
           return forcedPlan
@@ -439,10 +462,7 @@ export async function runPlanningPhase(
         LogHelper.debug(
           'Planning: using marked text fallback as final conversational answer'
         )
-        return {
-          type: 'final',
-          answer: markedTextFallbackFinalAnswer
-        }
+        return createPlanningHandoff(markedTextFallbackFinalAnswer, 'answer')
       }
     }
 
@@ -455,11 +475,12 @@ export async function runPlanningPhase(
       const parsedRawPlan =
         (parsedRaw
           ? extractPlanResultFromCreatePlanArgs(parsedRaw, {
-              allowLegacySummaryAsFinal: true
+              allowLegacySummaryAsFinal: true,
+              source: 'planning'
             })
-          : null) || extractPlanFromParsed(parsedRaw)
+          : null) || extractPlanFromParsed(parsedRaw, 'planning')
       if (parsedRawPlan) {
-        if (parsedRawPlan.type === 'final') {
+        if (parsedRawPlan.type === 'handoff') {
           const forcedPlan = await attemptForcedPlanOnlyFallback()
           if (forcedPlan) {
             return forcedPlan
@@ -475,7 +496,7 @@ export async function runPlanningPhase(
         }
         const markedRawAnswer = extractPlanningMarkedFinalAnswer(raw)
         if (markedRawAnswer) {
-          return { type: 'final', answer: markedRawAnswer }
+          return createPlanningHandoff(markedRawAnswer, 'answer')
         }
       }
     }
@@ -486,12 +507,19 @@ export async function runPlanningPhase(
         return forcedPlan
       }
       return {
-        type: 'final',
-        answer: 'I could not produce a structured plan. Please rephrase your request.'
+        type: 'handoff',
+        signal: {
+          intent: 'error',
+          draft: 'I could not produce a structured plan. Please rephrase your request.',
+          source: 'planning'
+        }
       }
     }
 
-    return { type: 'final', answer: raw || 'I could not determine what to do.' }
+    return createPlanningHandoff(
+      raw || 'I could not determine what to do.',
+      raw ? 'answer' : 'error'
+    )
   }
 
   // --- Local provider: use grammar-constrained JSON mode ---
@@ -513,7 +541,7 @@ export async function runPlanningPhase(
   if (!completionResult) {
     const providerError = caller.consumeProviderErrorMessage()
     if (providerError) {
-      return { type: 'final', answer: providerError }
+      return createPlanningHandoff(providerError, 'error')
     }
   }
 
@@ -521,9 +549,10 @@ export async function runPlanningPhase(
   const planResult =
     (parsed
       ? extractPlanResultFromCreatePlanArgs(parsed, {
-          allowLegacySummaryAsFinal: true
+          allowLegacySummaryAsFinal: true,
+          source: 'planning'
         })
-      : null) || extractPlanFromParsed(parsed)
+      : null) || extractPlanFromParsed(parsed, 'planning')
   if (planResult) {
     return planResult
   }
@@ -538,20 +567,21 @@ export async function runPlanningPhase(
     const parsedRawPlan =
       (parsedRaw
         ? extractPlanResultFromCreatePlanArgs(parsedRaw, {
-            allowLegacySummaryAsFinal: true
+            allowLegacySummaryAsFinal: true,
+            source: 'planning'
           })
-        : null) || extractPlanFromParsed(parsedRaw)
+        : null) || extractPlanFromParsed(parsedRaw, 'planning')
     if (parsedRawPlan) {
       return parsedRawPlan
     }
 
     if (shouldTreatPlanningTextAsFinalAnswer(raw)) {
-      return { type: 'final', answer: raw }
+      return createPlanningHandoff(raw, 'answer')
     }
   }
 
-  return {
-    type: 'final',
-    answer: 'I could not produce a structured plan. Please rephrase your request.'
-  }
+  return createPlanningHandoff(
+    'I could not produce a structured plan. Please rephrase your request.',
+    'error'
+  )
 }

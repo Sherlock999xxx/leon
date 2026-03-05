@@ -10,20 +10,22 @@ import {
 import type {
   ExecutionRecord,
   LLMCaller,
-  PromptLogSection
+  PromptLogSection,
+  FinalResponseSignal
 } from './types'
 import { formatExecutionHistory, parseOutput, parseToolCallArguments } from './utils'
 import { buildPhaseSystemPrompt } from './phase-policy'
 
 export async function runFinalAnswerPhase(
   caller: LLMCaller,
-  executionHistory: ExecutionRecord[]
+  executionHistory: ExecutionRecord[],
+  handoffSignal?: FinalResponseSignal | null
 ): Promise<string> {
   LogHelper.title(DUTY_NAME)
   LogHelper.debug('Synthesizing final answer from execution history...')
 
   const historySection = formatExecutionHistory(executionHistory)
-  const systemPrompt = buildPhaseSystemPrompt(
+  const defaultSystemPrompt = buildPhaseSystemPrompt(
     `You are synthesizing a final answer from tool execution results. Provide a clear, helpful, and complete response to the user based on the observations collected. Always include relevant details from the tool results.
 
 Important:
@@ -35,7 +37,29 @@ Important:
 ${FORMATTING_RULES}`,
     'final_answer'
   )
-  const prompt = `${historySection}\n\nUser Request: "${caller.input}"\n\nBased on the execution results above, provide a final answer to the user.`
+  const handoffSystemPrompt = buildPhaseSystemPrompt(
+    `You are producing the final user response from a phase handoff.
+
+Use the handoff intent and draft as authoritative instructions from internal phases.
+
+Rules:
+- Keep the same user-facing intent:
+  - clarification: ask one concise clarification question.
+  - cancelled: confirm that execution is stopped.
+  - blocked: explain what blocks completion and what must be configured.
+  - error: explain the failure concisely and safely.
+  - answer: provide the completed answer.
+- Preserve factual content from the draft and execution history.
+- Do not invent unobserved facts.
+- Return plain text only.
+
+${FORMATTING_RULES}`,
+    'final_answer'
+  )
+  const prompt = handoffSignal
+    ? `${historySection}\n\nUser Request: "${caller.input}"\n\nHandoff intent: "${handoffSignal.intent}"\nHandoff draft: "${handoffSignal.draft}"\nHandoff source: "${handoffSignal.source}"\n\nProduce the final user-facing response.`
+    : `${historySection}\n\nUser Request: "${caller.input}"\n\nBased on the execution results above, provide a final answer to the user.`
+  const systemPrompt = handoffSignal ? handoffSystemPrompt : defaultSystemPrompt
 
   const buildFinalAnswerPromptSections = (
     currentPrompt: string,
@@ -213,6 +237,10 @@ ${FORMATTING_RULES}`,
   }
 
   // Last resort: summarize from execution history
+  if (handoffSignal?.draft?.trim()) {
+    return handoffSignal.draft.trim()
+  }
+
   const lastSuccess = executionHistory
     .filter((e) => e.status === 'success')
     .pop()

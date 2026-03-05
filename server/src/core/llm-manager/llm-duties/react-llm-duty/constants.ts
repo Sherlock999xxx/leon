@@ -72,9 +72,9 @@ IMPORTANT: Only provide required parameters. Do NOT fill in optional parameters 
 When the next action is based on uncertainty, assumptions, ambiguous selection, or could be irreversible, ask for confirmation before executing the tool.
 
 Human-in-the-loop continuation:
-- If required information is missing, return {"type":"final","answer":"..."} with one concise clarification question.
+- If required information is missing, return {"type":"handoff","intent":"clarification","draft":"..."} with one concise clarification question.
 - If the request context already includes a clarification reply, use it to continue THIS SAME step (do not restart the whole task, do not re-run already completed steps).
-- If the clarification reply means the user wants to stop/cancel, return {"type":"final","answer":"..."} confirming execution is stopped.
+- If the clarification reply means the user wants to stop/cancel, return {"type":"handoff","intent":"cancelled","draft":"..."} confirming execution is stopped.
 
 tool_input must be a JSON string.
 
@@ -83,7 +83,7 @@ ${FORMATTING_RULES}
 Return ONLY one of the following JSON shapes:
 - {"type":"execute","function_name":"...","tool_input":"{...}"}
 - {"type":"replan","functions":["toolkit_id.tool_id.function_name",...],"reason":"..."}
-- {"type":"final","answer":"..."}
+- {"type":"handoff","intent":"answer|clarification|cancelled|error","draft":"..."}
 
 No other keys, no null values.`
 
@@ -94,9 +94,9 @@ You are given the available functions for a specific tool. Choose the most appro
 IMPORTANT: Only provide required parameters. Do NOT fill in optional parameters unless the user explicitly provided values for them.
 
 Human-in-the-loop continuation:
-- If required information is missing, return {"type":"final","answer":"..."} with one concise clarification question.
+- If required information is missing, return {"type":"handoff","intent":"clarification","draft":"..."} with one concise clarification question.
 - If the request context already includes a clarification reply, use it to continue THIS SAME step (do not restart the whole task, do not re-run already completed steps).
-- If the clarification reply means the user wants to stop/cancel, return {"type":"final","answer":"..."} confirming execution is stopped.
+- If the clarification reply means the user wants to stop/cancel, return {"type":"handoff","intent":"cancelled","draft":"..."} confirming execution is stopped.
 
 tool_input must be a JSON string.
 
@@ -105,7 +105,7 @@ ${FORMATTING_RULES}
 Return ONLY one of the following JSON shapes:
 - {"type":"execute","function_name":"...","tool_input":"{...}"}
 - {"type":"replan","functions":["toolkit_id.tool_id.function_name",...],"reason":"..."}
-- {"type":"final","answer":"..."}
+- {"type":"handoff","intent":"answer|clarification|cancelled|error","draft":"..."}
 
 No other keys, no null values.`
 
