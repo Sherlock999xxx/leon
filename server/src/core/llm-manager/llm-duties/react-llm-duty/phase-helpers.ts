@@ -302,6 +302,20 @@ export function extractPlanningMarkedFinalAnswer(text: string): string | null {
   return answer || null
 }
 
+export function extractPlanningTextHandoffDraft(text: string): string | null {
+  const markedAnswer = extractPlanningMarkedFinalAnswer(text)
+  if (markedAnswer) {
+    return markedAnswer
+  }
+
+  if (!shouldTreatPlanningTextAsFinalAnswer(text)) {
+    return null
+  }
+
+  const sanitized = stripInlineToolMarkup(text)
+  return sanitized || text.trim() || null
+}
+
 function humanizeIdentifier(value: string): string {
   return value
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')

@@ -1038,7 +1038,7 @@ export class ReActLLMDuty extends LLMDuty {
       ...(shouldStreamToUser
         ? {
             onToken: (chunk: unknown): void => {
-              const token =
+              const token = StringHelper.normalizeUserFacingText(
                 typeof chunk === 'string'
                   ? chunk
                   : LLM_PROVIDER.cleanUpResult(
@@ -1048,6 +1048,7 @@ export class ReActLLMDuty extends LLMDuty {
                         >[0]
                       )
                     )
+              )
 
               if (!token || !generationId) {
                 return
@@ -1227,7 +1228,7 @@ export class ReActLLMDuty extends LLMDuty {
         ...(shouldStreamToUserEffective
           ? {
               onToken: (chunk: unknown): void => {
-                const token =
+                const token = StringHelper.normalizeUserFacingText(
                   typeof chunk === 'string'
                     ? chunk
                     : LLM_PROVIDER.cleanUpResult(
@@ -1237,6 +1238,7 @@ export class ReActLLMDuty extends LLMDuty {
                           >[0]
                         )
                       )
+                )
 
                 if (!token || !generationId) {
                   return
@@ -1676,13 +1678,15 @@ export class ReActLLMDuty extends LLMDuty {
       )
     }
 
-    if (!this.hasStreamedTokenEmission && output?.trim()) {
-      this.emitSyntheticTokenStream(output)
+    const normalizedOutput = StringHelper.normalizeUserFacingText(output)
+
+    if (!this.hasStreamedTokenEmission && normalizedOutput?.trim()) {
+      this.emitSyntheticTokenStream(normalizedOutput)
     }
 
     LogHelper.title(this.name)
     LogHelper.success('Duty executed')
-    LogHelper.success(`Output — ${output}`)
+    LogHelper.success(`Output — ${normalizedOutput}`)
     LogHelper.debug(
       `Total tokens — input: ${this.totalInputTokens} | output: ${this.totalOutputTokens} | combined: ${this.totalInputTokens + this.totalOutputTokens}`
     )
@@ -1691,7 +1695,7 @@ export class ReActLLMDuty extends LLMDuty {
       dutyType: LLMDuties.ReAct,
       systemPrompt: this.systemPrompt,
       input: this.input,
-      output,
+      output: normalizedOutput,
       data: {
         hasExplicitMemoryWrite: this.hasExplicitMemoryWrite
       }

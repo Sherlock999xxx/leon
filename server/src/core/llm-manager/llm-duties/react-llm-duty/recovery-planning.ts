@@ -23,8 +23,7 @@ import {
   extractPlanResultFromCreatePlanArgs
 } from './utils'
 import {
-  stripInlineToolMarkup,
-  shouldTreatPlanningTextAsFinalAnswer,
+  extractPlanningTextHandoffDraft,
   createPlanFromUnexpectedToolCall
 } from './phase-helpers'
 import {
@@ -147,6 +146,8 @@ Create a revised plan from this point to complete the user request.`
     `Recovery planning triggered after failed step "${failedStep.label}" (${failedStep.function})`
   )
 
+  let textFallbackHandoffDraft: string | null = null
+
   if (caller.supportsNativeTools) {
     const planTools: OpenAITool[] = [
       {
@@ -184,18 +185,18 @@ Create a revised plan from this point to complete the user request.`
               summary: {
                 type: 'string',
                 description:
-                  'Short summary of the revised plan.'
+                  'For type="plan", a short summary of the revised plan. For type="final", set to null or omit.'
               },
               answer: {
                 type: 'string',
                 description:
-                  'Draft plain text for the final answer phase when type="final".'
+                  'For type="final", draft plain text for the final answer phase. For type="plan", set to null or omit.'
               },
               intent: {
                 type: 'string',
                 enum: ['answer', 'clarification', 'cancelled', 'error'],
                 description:
-                  'Optional when type="final". Defaults to "answer".'
+                  'For type="final", set the handoff intent. Use "answer" unless clarification, cancelled, or error is required. For type="plan", set to null or omit.'
               }
             },
             required: ['type'],
@@ -281,6 +282,7 @@ Create a revised plan from this point to complete the user request.`
     }
 
     const textFallback = toolResult?.textContent?.trim() || ''
+    textFallbackHandoffDraft = extractPlanningTextHandoffDraft(textFallback)
     const parsedTextFallback = parseOutput(textFallback)
     const extractedPlan =
       (parsedTextFallback
@@ -293,11 +295,8 @@ Create a revised plan from this point to complete the user request.`
       return extractedPlan
     }
 
-    if (textFallback && shouldTreatPlanningTextAsFinalAnswer(textFallback)) {
-      return createRecoveryHandoff(
-        stripInlineToolMarkup(textFallback) || textFallback,
-        'answer'
-      )
+    if (textFallbackHandoffDraft) {
+      return createRecoveryHandoff(textFallbackHandoffDraft, 'answer')
     }
   }
 
@@ -318,6 +317,9 @@ Create a revised plan from this point to complete the user request.`
   if (!jsonModeResult) {
     const providerError = caller.consumeProviderErrorMessage()
     if (providerError) {
+      if (textFallbackHandoffDraft) {
+        return createRecoveryHandoff(textFallbackHandoffDraft, 'answer')
+      }
       return createRecoveryHandoff(providerError, 'error')
     }
   }
@@ -337,9 +339,10 @@ Create a revised plan from this point to complete the user request.`
     typeof jsonModeResult?.output === 'string'
       ? jsonModeResult.output.trim()
       : ''
+  const rawHandoffDraft = extractPlanningTextHandoffDraft(raw)
 
-  if (raw && shouldTreatPlanningTextAsFinalAnswer(raw)) {
-    return createRecoveryHandoff(stripInlineToolMarkup(raw) || raw, 'answer')
+  if (rawHandoffDraft) {
+    return createRecoveryHandoff(rawHandoffDraft, 'answer')
   }
 
   return null

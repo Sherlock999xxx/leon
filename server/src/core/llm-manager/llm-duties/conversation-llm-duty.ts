@@ -170,9 +170,11 @@ export class ConversationLLMDuty extends LLMDuty {
           maxTokens: ConversationLLMDuty.context.contextSize,
           onToken: (chunk) => {
             if (!params.isWarmingUp) {
-              const detokenizedChunk = LLM_PROVIDER.cleanUpResult(
-                LLM_MANAGER.model.detokenize(
-                  chunk as Parameters<typeof LLM_MANAGER.model.detokenize>[0]
+              const detokenizedChunk = StringHelper.normalizeUserFacingText(
+                LLM_PROVIDER.cleanUpResult(
+                  LLM_MANAGER.model.detokenize(
+                    chunk as Parameters<typeof LLM_MANAGER.model.detokenize>[0]
+                  )
                 )
               )
 
@@ -188,6 +190,12 @@ export class ConversationLLMDuty extends LLMDuty {
           ...completionParams,
           history: ConversationLLMDuty.messagesHistoryForNonLocalProvider
         })
+      }
+
+      if (typeof completionResult?.output === 'string') {
+        completionResult.output = StringHelper.normalizeUserFacingText(
+          completionResult.output
+        )
       }
 
       await LOOP_CONVERSATION_LOGGER.push({

@@ -13,6 +13,7 @@ export const DUTY_NAME = 'ReAct LLM Duty'
 export const FORMATTING_RULES = `FORMATTING RULES for all user-facing text:
 - Do NOT use markdown (no **, ##, \`\`\`, etc.).
 - Use plain text only: newlines for paragraphs, dashes for lists.
+- Do not use em dashes or en dashes. Prefer periods, commas, colons, parentheses, or a simple ASCII hyphen when needed.
 - Keep answers concise.
 - When referring to yourself (Leon), use first-person only (I, me, my); never refer to yourself by name in third person.
 - ALWAYS wrap file paths with [FILE_PATH]/path/here[/FILE_PATH]. Example: the file is at [FILE_PATH]/home/user/file.txt[/FILE_PATH].`
@@ -54,12 +55,17 @@ For straightforward operational tasks (file listing, command execution, media tr
 Always create a complete plan with ALL steps needed upfront. Do not return only the first step.
 For example, if the user asks to "find a file and process it", include ALL steps: find, probe, process.
 
+"type" must always be either "plan" or "final".
+"steps", "summary", "answer", and "intent" must always be present.
+- For type="plan": use "steps" + "summary", set "answer" and "intent" to null.
+- For type="final": use "answer" + "intent", set "steps" and "summary" to null.
+
 "steps" is an ordered array of functions to call. Each step has:
   - "function": the fully qualified name (toolkit_id.tool_id.function_name). If the catalog only lists tools, use toolkit_id.tool_id.
   - "label": a very short user-facing description of what this step does. Must start with a verb (e.g. "Search for video files", "Download the page", "List matching items"). Keep it under 8 words.
 "summary" is a short natural language description of the plan for the user.
 
-No other keys, no null values.`
+No other keys.`
 
 export const EXECUTE_SYSTEM_PROMPT = `You are an autonomous acting agent executing a plan step by step.
 
@@ -121,9 +127,14 @@ If recovery is not possible without user input:
 
 Use only functions/tools listed in the catalog.
 
-Return only:
-- steps: ordered step list (can be empty)
-- summary: short explanation of the revised plan or clarification request`
+Return one JSON object with these top-level keys:
+- "type": "plan" or "final"
+- "steps": array for type="plan", otherwise null
+- "summary": short revised-plan summary for type="plan", otherwise null
+- "answer": final-answer handoff draft for type="final", otherwise null
+- "intent": final handoff intent for type="final", otherwise null
+
+Return all top-level keys. No other keys.`
 
 export const MAX_EXECUTIONS = 20
 export const MAX_REPLANS = 3

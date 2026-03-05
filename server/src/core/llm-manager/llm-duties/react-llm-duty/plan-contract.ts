@@ -10,21 +10,39 @@ export const PLAN_STEP_SCHEMA = {
   additionalProperties: false
 }
 
+const NULLABLE_PLAN_STEPS_SCHEMA = {
+  anyOf: [
+    {
+      type: 'array',
+      items: PLAN_STEP_SCHEMA
+    },
+    { type: 'null' }
+  ]
+}
+
+const NULLABLE_STRING_SCHEMA = {
+  anyOf: [{ type: 'string' }, { type: 'null' }]
+}
+
+const NULLABLE_PLAN_INTENT_SCHEMA = {
+  anyOf: [
+    {
+      type: 'string',
+      enum: ['answer', 'clarification', 'cancelled', 'error']
+    },
+    { type: 'null' }
+  ]
+}
+
 export const PLAN_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
     type: { type: 'string', enum: ['plan', 'final'] },
-    steps: {
-      type: 'array',
-      items: PLAN_STEP_SCHEMA
-    },
-    summary: { type: 'string' },
-    answer: { type: 'string' },
-    intent: {
-      type: 'string',
-      enum: ['answer', 'clarification', 'cancelled', 'error']
-    }
+    steps: NULLABLE_PLAN_STEPS_SCHEMA,
+    summary: NULLABLE_STRING_SCHEMA,
+    answer: NULLABLE_STRING_SCHEMA,
+    intent: NULLABLE_PLAN_INTENT_SCHEMA
   },
-  required: ['type'],
+  required: ['type', 'steps', 'summary', 'answer', 'intent'],
   additionalProperties: false
 }

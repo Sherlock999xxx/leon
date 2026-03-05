@@ -95,4 +95,12 @@ export class StringHelper {
 
     return str
   }
+
+  /**
+   * Normalize punctuation in user-facing text to avoid typographic dash styles
+   * that make responses feel machine-generated.
+   */
+  public static normalizeUserFacingText(str: string): string {
+    return String(str || '').replace(/[\u2012-\u2015\u2e3a\u2e3b]/gu, '-')
+  }
 }

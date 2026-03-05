@@ -25,6 +25,7 @@ import {
 import {
   shouldTreatPlanningTextAsFinalAnswer,
   extractPlanningMarkedFinalAnswer,
+  extractPlanningTextHandoffDraft,
   createPlanFromUnexpectedToolCall
 } from './phase-helpers'
 import {
@@ -171,23 +172,23 @@ export async function runPlanningPhase(
                   }
                 },
                 description:
-                  'Required when type="plan". Keep empty or omit for type="final".'
+                  'For type="plan", the ordered execution steps. For type="final", set to null or omit.'
               },
               summary: {
                 type: 'string',
                 description:
-                  'Required when type="plan". Short plan summary.'
+                  'For type="plan", a short plan summary. For type="final", set to null or omit.'
               },
               answer: {
                 type: 'string',
                 description:
-                  'Required when type="final". Draft plain text for the final answer phase.'
+                  'For type="final", draft plain text for the final answer phase. For type="plan", set to null or omit.'
               },
               intent: {
                 type: 'string',
                 enum: ['answer', 'clarification', 'cancelled', 'error'],
                 description:
-                  'Optional when type="final". Use "clarification" if required info is still missing after planning checks.'
+                  'For type="final", set the handoff intent. Use "answer" unless clarification, cancelled, or error is required. For type="plan", set to null or omit.'
               }
             },
             required: ['type'],
@@ -233,6 +234,8 @@ export async function runPlanningPhase(
     const textFallback = toolResult?.textContent?.trim() || ''
     const markedTextFallbackFinalAnswer =
       extractPlanningMarkedFinalAnswer(textFallback)
+    const textFallbackHandoffDraft =
+      extractPlanningTextHandoffDraft(textFallback)
     const missingCreatePlanToolCall =
       !toolResult?.toolCall && !toolResult?.unexpectedToolCall
 
@@ -254,7 +257,7 @@ export async function runPlanningPhase(
           },
           summary: { type: 'string' }
         },
-        required: ['type', 'steps'],
+        required: ['type', 'steps', 'summary'],
         additionalProperties: false
       }
 
@@ -384,15 +387,14 @@ export async function runPlanningPhase(
         textFallback &&
         shouldTreatPlanningTextAsFinalAnswer(textFallback)
       ) {
-        if (markedTextFallbackFinalAnswer) {
-          LogHelper.debug(
-            'Planning: returning direct final answer from marked text fallback'
-          )
-          return createPlanningHandoff(markedTextFallbackFinalAnswer, 'answer')
-        }
-
         LogHelper.debug(
-          'Planning: plain text fallback received without tool call; skipping direct final answer and attempting JSON fallback first'
+          markedTextFallbackFinalAnswer
+            ? 'Planning: returning direct final answer from marked text fallback'
+            : 'Planning: plain text fallback received without tool call; routing to final answer handoff'
+        )
+        return createPlanningHandoff(
+          textFallbackHandoffDraft || markedTextFallbackFinalAnswer || textFallback,
+          'answer'
         )
       } else {
         LogHelper.debug('Planning: no tool call returned, falling back to JSON mode')
@@ -418,6 +420,12 @@ export async function runPlanningPhase(
     if (!jsonModeResult) {
       const providerError = caller.consumeProviderErrorMessage()
       if (providerError) {
+        if (textFallbackHandoffDraft) {
+          LogHelper.debug(
+            'Planning JSON fallback failed; reusing preserved plain text handoff'
+          )
+          return createPlanningHandoff(textFallbackHandoffDraft, 'answer')
+        }
         LogHelper.debug(
           `Planning JSON fallback aborted due to provider error: "${providerError}"`
         )
@@ -462,21 +470,19 @@ export async function runPlanningPhase(
     }
 
     if (
-      textFallback &&
-      shouldTreatPlanningTextAsFinalAnswer(textFallback)
+      textFallbackHandoffDraft
     ) {
-      if (markedTextFallbackFinalAnswer) {
-        LogHelper.debug(
-          'Planning: using marked text fallback as final conversational answer'
-        )
-        return createPlanningHandoff(markedTextFallbackFinalAnswer, 'answer')
-      }
+      LogHelper.debug(
+        'Planning: using preserved text fallback as final conversational answer'
+      )
+      return createPlanningHandoff(textFallbackHandoffDraft, 'answer')
     }
 
     const raw =
       typeof jsonModeResult?.output === 'string'
         ? jsonModeResult.output.trim()
         : ''
+    const rawHandoffDraft = extractPlanningTextHandoffDraft(raw)
     if (raw) {
       const parsedRaw = parseOutput(raw)
       const parsedRawPlan =
@@ -496,15 +502,8 @@ export async function runPlanningPhase(
         return parsedRawPlan
       }
 
-      if (shouldTreatPlanningTextAsFinalAnswer(raw)) {
-        const markedRawAnswer = extractPlanningMarkedFinalAnswer(raw)
-        if (markedRawAnswer) {
-          return createPlanningHandoff(markedRawAnswer, 'answer')
-        }
-        const forcedPlan = await attemptForcedPlanOnlyFallback()
-        if (forcedPlan) {
-          return forcedPlan
-        }
+      if (rawHandoffDraft) {
+        return createPlanningHandoff(rawHandoffDraft, 'answer')
       }
     }
 
@@ -512,6 +511,9 @@ export async function runPlanningPhase(
       const forcedPlan = await attemptForcedPlanOnlyFallback()
       if (forcedPlan) {
         return forcedPlan
+      }
+      if (textFallbackHandoffDraft) {
+        return createPlanningHandoff(textFallbackHandoffDraft, 'answer')
       }
       return {
         type: 'handoff',
@@ -525,7 +527,7 @@ export async function runPlanningPhase(
 
     return createPlanningHandoff(
       raw || 'I could not determine what to do.',
-      raw ? 'answer' : 'error'
+      'error'
     )
   }
 
@@ -582,8 +584,9 @@ export async function runPlanningPhase(
       return parsedRawPlan
     }
 
-    if (shouldTreatPlanningTextAsFinalAnswer(raw)) {
-      return createPlanningHandoff(raw, 'answer')
+    const rawHandoffDraft = extractPlanningTextHandoffDraft(raw)
+    if (rawHandoffDraft) {
+      return createPlanningHandoff(rawHandoffDraft, 'answer')
     }
   }
 
