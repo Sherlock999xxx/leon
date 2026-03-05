@@ -143,7 +143,7 @@ export async function runPlanningPhase(
         function: {
           name: 'create_plan',
           description:
-            'Create either an execution plan or a direct conversational handoff. Use type="plan" when tools are needed, or type="final" when asking clarification or returning a direct answer. For type="final", answer must be directly user-facing. If you do not call this tool, output plain text prefixed with "FINAL_ANSWER:".',
+            'Create either an execution plan or a handoff signal. Use type="plan" when tools are needed, or type="final" for answer/clarification/cancel/error handoff. If you do not call this tool, output plain text prefixed with "FINAL_ANSWER:".',
           parameters: {
             type: 'object',
             properties: {
@@ -176,7 +176,7 @@ export async function runPlanningPhase(
               summary: {
                 type: 'string',
                 description:
-                  'Required when type="plan". Short user-facing plan summary.'
+                  'Required when type="plan". Short plan summary.'
               },
               answer: {
                 type: 'string',

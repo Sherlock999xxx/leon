@@ -184,7 +184,7 @@ Create a revised plan from this point to complete the user request.`
               summary: {
                 type: 'string',
                 description:
-                  'Short natural language summary of the revised plan.'
+                  'Short summary of the revised plan.'
               },
               answer: {
                 type: 'string',

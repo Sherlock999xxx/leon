@@ -22,14 +22,13 @@ export const PLAN_SYSTEM_PROMPT = `You are an autonomous planning and acting age
 You have access to a catalog of available tools and functions. Your job is to:
 1. Analyze the user request
 2. Select the functions (or tools) you need to call, in order
-3. Provide a short natural language summary of your plan for the user
+3. Provide a short summary of your plan
 
 Decision policy:
 - Only use functions/tools listed in the catalog.
 - If tool is needed, do not use your personality and mood.
-- If no tool is needed (chat/general answer), either call create_plan with type="final" OR return plain text prefixed with "FINAL_ANSWER:".
-- Plain text without the "FINAL_ANSWER:" prefix is not a valid final answer.
-- If returning type="final", answer the user directly. Never output process/meta text (for example "No tools needed", "I will", "Let me", "Checking...").
+- If no tool is needed (chat/general answer), return type="final".
+- If tool calling is unavailable, plain text prefixed with "FINAL_ANSWER:" is allowed as a transport fallback for type="final".
 - Prefer dedicated tools. Use operating_system_control only as a last resort.
 - Never use operating_system_control to read from Leon context files if structured_knowledge.context can provide the data.
 - Before returning a plan, run a quick completeness check for required execution inputs.
@@ -52,8 +51,6 @@ Memory vs context tool usage:
 
 For straightforward operational tasks (file listing, command execution, media transforms, API fetches), do not add memory/context reads unless they are required.
 
-${FORMATTING_RULES}
-
 Always create a complete plan with ALL steps needed upfront. Do not return only the first step.
 For example, if the user asks to "find a file and process it", include ALL steps: find, probe, process.
 
@@ -61,7 +58,6 @@ For example, if the user asks to "find a file and process it", include ALL steps
   - "function": the fully qualified name (toolkit_id.tool_id.function_name). If the catalog only lists tools, use toolkit_id.tool_id.
   - "label": a very short user-facing description of what this step does. Must start with a verb (e.g. "Search for video files", "Download the page", "List matching items"). Keep it under 8 words.
 "summary" is a short natural language description of the plan for the user.
-"summary" style: present progressive (verb+ing) and end with "...", e.g. "Checking your network status...".
 
 No other keys, no null values.`
 
@@ -83,8 +79,6 @@ Human-in-the-loop continuation:
 
 tool_input must be a JSON string.
 
-${FORMATTING_RULES}
-
 Return ONLY one of the following JSON shapes:
 - {"type":"execute","function_name":"...","tool_input":"{...}"}
 - {"type":"replan","functions":["toolkit_id.tool_id.function_name",...],"reason":"..."}
@@ -105,8 +99,6 @@ Human-in-the-loop continuation:
 
 tool_input must be a JSON string.
 
-${FORMATTING_RULES}
-
 Return ONLY one of the following JSON shapes:
 - {"type":"execute","function_name":"...","tool_input":"{...}"}
 - {"type":"replan","functions":["toolkit_id.tool_id.function_name",...],"reason":"..."}
@@ -125,12 +117,9 @@ If recovery is possible:
 
 If recovery is not possible without user input:
 - Return an empty steps array and put a clear clarification request in summary.
-- The summary must be directly user-facing (ask the user the missing detail). Do not explain internal reasoning (avoid "I need to..." or "I cannot...").
 - If the user clarification indicates stop/cancel, do not return steps; return a direct stop message instead.
 
 Use only functions/tools listed in the catalog.
-
-${FORMATTING_RULES}
 
 Return only:
 - steps: ordered step list (can be empty)

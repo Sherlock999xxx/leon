@@ -160,7 +160,7 @@ export async function runExecutionSelfObservationPhase(
 Rules:
 - Base your decision strictly on observations, not assumptions.
 - If unsure, choose "replan" and provide the minimum next functions needed.
-	- "draft" must be directly user-facing, not process/meta narration.`,
+	- "draft" should be a concise handoff payload for the final answer phase.`,
     'execution'
   )
   const prompt = `${historySection}\n\nUser Request: "${caller.input}"\n\nCurrent plan status: no pending steps remain.\nDecide whether to finish now or continue with additional steps.`
