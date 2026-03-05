@@ -19,7 +19,11 @@ export const PLAN_RESPONSE_SCHEMA = {
       items: PLAN_STEP_SCHEMA
     },
     summary: { type: 'string' },
-    answer: { type: 'string' }
+    answer: { type: 'string' },
+    intent: {
+      type: 'string',
+      enum: ['answer', 'clarification', 'cancelled', 'error']
+    }
   },
   required: ['type'],
   additionalProperties: false

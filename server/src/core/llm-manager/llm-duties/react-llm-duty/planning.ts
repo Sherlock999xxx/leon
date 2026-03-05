@@ -104,6 +104,13 @@ function createPlanningHandoff(
   }
 }
 
+function shouldAttemptForcedPlanFallback(planResult: PlanResult): boolean {
+  return (
+    planResult.type === 'handoff' &&
+    planResult.signal.intent === 'answer'
+  )
+}
+
 export async function runPlanningPhase(
   caller: LLMCaller,
   catalog: Catalog,
@@ -136,7 +143,7 @@ export async function runPlanningPhase(
         function: {
           name: 'create_plan',
           description:
-            'Create either an execution plan or a direct conversational handoff. Use type="plan" when tools are needed, or type="final" for purely conversational messages. For type="final", answer must be directly user-facing (not meta reasoning about what you will do). If you do not call this tool, output plain text prefixed with "FINAL_ANSWER:".',
+            'Create either an execution plan or a direct conversational handoff. Use type="plan" when tools are needed, or type="final" when asking clarification or returning a direct answer. For type="final", answer must be directly user-facing. If you do not call this tool, output plain text prefixed with "FINAL_ANSWER:".',
           parameters: {
             type: 'object',
             properties: {
@@ -180,7 +187,7 @@ export async function runPlanningPhase(
                 type: 'string',
                 enum: ['answer', 'clarification', 'cancelled', 'error'],
                 description:
-                  'Optional when type="final". Defaults to "answer".'
+                  'Optional when type="final". Use "clarification" if required info is still missing after planning checks.'
               }
             },
             required: ['type'],
@@ -361,7 +368,7 @@ export async function runPlanningPhase(
             })
           : null) || extractPlanFromParsed(textFallbackParsed, 'planning')
       if (textFallbackPlan) {
-        if (textFallbackPlan.type === 'handoff') {
+        if (shouldAttemptForcedPlanFallback(textFallbackPlan)) {
           const forcedPlan = await attemptForcedPlanOnlyFallback()
           if (forcedPlan) {
             return forcedPlan
@@ -426,7 +433,7 @@ export async function runPlanningPhase(
           })
         : null) || extractPlanFromParsed(parsed, 'planning')
     if (planResult) {
-      if (planResult.type === 'handoff') {
+      if (shouldAttemptForcedPlanFallback(planResult)) {
         const forcedPlan = await attemptForcedPlanOnlyFallback()
         if (forcedPlan) {
           return forcedPlan
@@ -444,7 +451,7 @@ export async function runPlanningPhase(
           })
         : null) || extractPlanFromParsed(textFallbackParsed, 'planning')
     if (textFallbackPlan) {
-      if (textFallbackPlan.type === 'handoff') {
+      if (shouldAttemptForcedPlanFallback(textFallbackPlan)) {
         const forcedPlan = await attemptForcedPlanOnlyFallback()
         if (forcedPlan) {
           return forcedPlan
@@ -480,7 +487,7 @@ export async function runPlanningPhase(
             })
           : null) || extractPlanFromParsed(parsedRaw, 'planning')
       if (parsedRawPlan) {
-        if (parsedRawPlan.type === 'handoff') {
+        if (shouldAttemptForcedPlanFallback(parsedRawPlan)) {
           const forcedPlan = await attemptForcedPlanOnlyFallback()
           if (forcedPlan) {
             return forcedPlan
@@ -490,13 +497,13 @@ export async function runPlanningPhase(
       }
 
       if (shouldTreatPlanningTextAsFinalAnswer(raw)) {
-        const forcedPlan = await attemptForcedPlanOnlyFallback()
-        if (forcedPlan) {
-          return forcedPlan
-        }
         const markedRawAnswer = extractPlanningMarkedFinalAnswer(raw)
         if (markedRawAnswer) {
           return createPlanningHandoff(markedRawAnswer, 'answer')
+        }
+        const forcedPlan = await attemptForcedPlanOnlyFallback()
+        if (forcedPlan) {
+          return forcedPlan
         }
       }
     }
