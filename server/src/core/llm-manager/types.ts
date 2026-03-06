@@ -86,6 +86,8 @@ export interface OpenAIToolCall {
   }
 }
 
+export type LLMReasoningMode = 'off' | 'guarded' | 'on'
+
 export interface CompletionParams {
   dutyType: LLMDuties
   systemPrompt: string
@@ -109,6 +111,11 @@ export interface CompletionParams {
    * tool_choice is forced.
    */
   disableThinking?: boolean
+  /**
+   * Optional provider-agnostic reasoning mode for remote providers.
+   * This is more expressive than the legacy disableThinking boolean.
+   */
+  reasoningMode?: LLMReasoningMode
   /**
    * Optional compatibility flag to relax a forced tool_choice into `auto`
    * for providers that reject specified tool_choice values.

@@ -10,6 +10,7 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 
 import type {
   CompletionParams,
+  LLMReasoningMode,
   OpenAITool,
   OpenAIToolCall,
   OpenAIToolChoice,
@@ -322,6 +323,174 @@ export default class AISDKRemoteLLMProvider {
     }
   }
 
+  private resolveManagedReasoningMode(
+    completionParams: CompletionParams
+  ): LLMReasoningMode | null {
+    if (!completionParams.reasoningMode) {
+      return null
+    }
+
+    return completionParams.disableThinking === true
+      ? 'off'
+      : completionParams.reasoningMode
+  }
+
+  private getReasoningBudget(
+    completionParams: CompletionParams,
+    minimum = 0
+  ): number | null {
+    const budget = completionParams.thoughtTokensBudget
+    if (typeof budget !== 'number' || !Number.isFinite(budget)) {
+      return minimum > 0 ? minimum : null
+    }
+
+    return Math.max(minimum, Math.floor(budget))
+  }
+
+  private buildManagedProviderOptions(
+    reasoningMode: LLMReasoningMode,
+    completionParams: CompletionParams
+  ): Record<string, unknown> {
+    if (this.config.flavor === 'openai-responses') {
+      if (reasoningMode === 'off') {
+        return {
+          openai: {
+            reasoningEffort: 'low'
+          }
+        }
+      }
+
+      return {
+        openai: {
+          reasoningEffort: reasoningMode === 'guarded' ? 'low' : 'medium',
+          reasoningSummary: 'detailed'
+        }
+      }
+    }
+
+    if (this.config.flavor === 'openrouter') {
+      if (reasoningMode === 'off') {
+        return {
+          openrouter: {
+            reasoning: {
+              enabled: false,
+              effort: 'none',
+              exclude: true
+            }
+          }
+        }
+      }
+
+      if (reasoningMode === 'guarded') {
+        return {
+          openrouter: {
+            reasoning: {
+              effort: 'low'
+            }
+          }
+        }
+      }
+
+      return {
+        openrouter: {
+          reasoning: {
+            max_tokens: this.getReasoningBudget(completionParams, 1024) || 1024
+          }
+        }
+      }
+    }
+
+    if (this.config.flavor === 'openai-compatible') {
+      return {}
+    }
+
+    if (this.config.flavor === 'anthropic') {
+      if (reasoningMode === 'on') {
+        return {
+          anthropic: {
+            thinking: {
+              type: 'enabled',
+              budgetTokens: this.getReasoningBudget(completionParams, 1024) || 1024
+            },
+            sendReasoning: true
+          }
+        }
+      }
+
+      return {
+        anthropic: {
+          thinking: { type: 'disabled' },
+          sendReasoning: true
+        }
+      }
+    }
+
+    if (this.config.flavor === 'moonshotai') {
+      if (reasoningMode === 'on') {
+        return {
+          moonshotai: {
+            thinking: {
+              type: 'enabled',
+              budgetTokens: this.getReasoningBudget(completionParams, 1024) || 1024
+            },
+            reasoningHistory: 'interleaved'
+          }
+        }
+      }
+
+      // Moonshot's explicit thinking budget starts at 1024 tokens, so guarded
+      // mode falls back to disabled instead of forcing a large reasoning block.
+      return {
+        moonshotai: {
+          thinking: { type: 'disabled' },
+          reasoningHistory: 'disabled'
+        }
+      }
+    }
+
+    if (this.config.flavor === 'huggingface') {
+      return {
+        huggingface: {
+          reasoningEffort:
+            reasoningMode === 'on'
+              ? 'medium'
+              : 'low'
+        }
+      }
+    }
+
+    if (this.config.flavor === 'cerebras') {
+      return {
+        cerebras: {
+          reasoningEffort:
+            reasoningMode === 'on'
+              ? 'medium'
+              : 'low'
+        }
+      }
+    }
+
+    if (this.config.flavor === 'groq') {
+      if (reasoningMode === 'off') {
+        return {
+          groq: {
+            reasoningEffort: 'none',
+            reasoningFormat: 'hidden'
+          }
+        }
+      }
+
+      return {
+        groq: {
+          reasoningEffort: reasoningMode === 'guarded' ? 'low' : 'medium',
+          reasoningFormat: 'parsed'
+        }
+      }
+    }
+
+    return {}
+  }
+
   private buildCallOptions(
     prompt: PromptOrChatHistory,
     completionParams: CompletionParams
@@ -358,8 +527,16 @@ export default class AISDKRemoteLLMProvider {
     }
 
     const providerOptions: Record<string, unknown> = {}
+    const managedReasoningMode = this.resolveManagedReasoningMode(
+      completionParams
+    )
 
-    if (this.config.flavor === 'openai-responses') {
+    if (managedReasoningMode) {
+      Object.assign(
+        providerOptions,
+        this.buildManagedProviderOptions(managedReasoningMode, completionParams)
+      )
+    } else if (this.config.flavor === 'openai-responses') {
       if (completionParams.disableThinking === true) {
         providerOptions['openai'] = {
           reasoningEffort: 'low'

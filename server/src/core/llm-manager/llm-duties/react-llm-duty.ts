@@ -918,8 +918,13 @@ export class ReActLLMDuty extends LLMDuty {
   } | null> {
     const phase = options?.phase ?? 'execution'
     const phasePolicy = getPhasePolicy(phase)
-    const disableThinking =
-      options?.disableThinking ?? !phasePolicy.thinkingEnabled
+    const reasoningMode =
+      options?.disableThinking === true
+        ? 'off'
+        : (options?.reasoningMode ?? phasePolicy.reasoningMode)
+    const thoughtTokensBudget =
+      options?.thoughtTokensBudget ?? phasePolicy.thoughtTokensBudget
+    const disableThinking = reasoningMode === 'off'
     const shouldEmitReasoning =
       options?.emitReasoning ?? phasePolicy.emitReasoning
     const shouldStream =
@@ -954,6 +959,10 @@ export class ReActLLMDuty extends LLMDuty {
               this.emitReasoningToken(reasoningChunk, reasoningGenerationId)
             }
           }
+        : {}),
+      reasoningMode,
+      ...(typeof thoughtTokensBudget === 'number'
+        ? { thoughtTokensBudget }
         : {}),
       ...(disableThinking ? { disableThinking: true } : {}),
       ...(history ? { history } : {})
@@ -998,8 +1007,13 @@ export class ReActLLMDuty extends LLMDuty {
   } | null> {
     const phase = options?.phase ?? 'execution'
     const phasePolicy = getPhasePolicy(phase)
-    const disableThinking =
-      options?.disableThinking ?? !phasePolicy.thinkingEnabled
+    const reasoningMode =
+      options?.disableThinking === true
+        ? 'off'
+        : (options?.reasoningMode ?? phasePolicy.reasoningMode)
+    const thoughtTokensBudget =
+      options?.thoughtTokensBudget ?? phasePolicy.thoughtTokensBudget
+    const disableThinking = reasoningMode === 'off'
     const shouldEmitReasoning =
       options?.emitReasoning ?? phasePolicy.emitReasoning
     const shouldStreamToUser =
@@ -1038,6 +1052,10 @@ export class ReActLLMDuty extends LLMDuty {
               this.emitReasoningToken(reasoningChunk, reasoningGenerationId)
             }
           }
+        : {}),
+      reasoningMode,
+      ...(typeof thoughtTokensBudget === 'number'
+        ? { thoughtTokensBudget }
         : {}),
       ...(disableThinking ? { disableThinking: true } : {}),
       ...(shouldStreamToUser
@@ -1132,8 +1150,13 @@ export class ReActLLMDuty extends LLMDuty {
     // lets phases decide when forcing a tool is worth disabling thinking.
     const effectiveToolChoice: OpenAIToolChoice | undefined =
       tools.length === 0 ? undefined : toolChoice
-    const disableThinking =
-      options?.disableThinking ?? !phasePolicy.thinkingEnabled
+    const reasoningMode =
+      options?.disableThinking === true
+        ? 'off'
+        : (options?.reasoningMode ?? phasePolicy.reasoningMode)
+    const thoughtTokensBudget =
+      options?.thoughtTokensBudget ?? phasePolicy.thoughtTokensBudget
+    const disableThinking = reasoningMode === 'off'
     const shouldEmitReasoning =
       options?.emitReasoning ?? phasePolicy.emitReasoning
     const shouldStreamToUserEffective =
@@ -1228,6 +1251,10 @@ export class ReActLLMDuty extends LLMDuty {
                 this.emitReasoningToken(reasoningChunk, reasoningGenerationId)
               }
             }
+          : {}),
+        reasoningMode,
+        ...(typeof thoughtTokensBudget === 'number'
+          ? { thoughtTokensBudget }
           : {}),
         ...(disableThinking ? { disableThinking: true } : {}),
         ...(shouldStreamToUserEffective

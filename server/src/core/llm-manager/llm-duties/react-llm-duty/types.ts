@@ -1,6 +1,7 @@
 import type { LLMDutyParams } from '@/core/llm-manager/llm-duty'
 import type { MessageLog } from '@/types'
 import type {
+  LLMReasoningMode,
   OpenAITool,
   OpenAIToolChoice
 } from '@/core/llm-manager/types'
@@ -89,9 +90,11 @@ export type ReactPhase = 'planning' | 'execution' | 'recovery' | 'final_answer'
 export interface LLMCallOptions {
   phase?: ReactPhase
   disableThinking?: boolean
+  reasoningMode?: LLMReasoningMode
   emitReasoning?: boolean
   streamToProvider?: boolean
   streamToUser?: boolean
+  thoughtTokensBudget?: number
 }
 
 /**
