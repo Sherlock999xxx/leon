@@ -68,6 +68,7 @@ import {
   runExecutionStep,
   runFinalAnswerPhase
 } from './react-llm-duty/phases'
+import { buildStepLabelFromFunction } from './react-llm-duty/phase-helpers'
 
 const REACT_CONTINUATION_STATE_FILENAME = '.react-execution-continuation-state.json'
 const REACT_CONTINUATION_MAX_AGE_MS = 30 * 60 * 1_000
@@ -458,7 +459,10 @@ export class ReActLLMDuty extends LLMDuty {
             break
           }
 
-          pendingSteps = stepResult.functions.map((f) => ({ function: f, label: f }))
+          pendingSteps = stepResult.functions.map((f) => ({
+            function: f,
+            label: buildStepLabelFromFunction(f)
+          }))
 
           // Rebuild tracked steps: keep completed ones, replace remaining
           const completedSteps = trackedSteps.filter(
@@ -693,7 +697,7 @@ export class ReActLLMDuty extends LLMDuty {
             replanCount += 1
             pendingSteps = selfObservationResult.functions.map((f) => ({
               function: f,
-              label: f
+              label: buildStepLabelFromFunction(f)
             }))
 
             LogHelper.title(this.name)
@@ -704,10 +708,11 @@ export class ReActLLMDuty extends LLMDuty {
               LogHelper.debug(
                 `Execution self-observation reason: "${selfObservationResult.reason}"`
               )
+              const normalizedReason = selfObservationResult.reason
+                .trim()
+                .replace(/[.?!]+$/g, '')
               await this.emitProgress(
-                this.toProgressiveMessage(
-                  `${selfObservationResult.reason.trim().replace(/[.]+$/, '')}...`
-                )
+                normalizedReason ? `${normalizedReason}...` : 'Working...'
               )
             }
 
@@ -1664,11 +1669,7 @@ export class ReActLLMDuty extends LLMDuty {
       ? normalized
       : `${normalized.replace(/[.?!]+$/g, '')}...`
 
-    if (/^([A-Za-z]+ing)\b/.test(withEllipsis)) {
-      return withEllipsis
-    }
-
-    return `Working on: ${withEllipsis}`
+    return withEllipsis
   }
 
   private makeDutyResult(output: string): LLMDutyResult {

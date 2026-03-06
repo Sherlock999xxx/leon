@@ -332,7 +332,7 @@ function normalizeStepLabelFromFunction(functionName: string): string {
     return 'Run tool step'
   }
 
-  return `Run ${readable}`
+  return readable.charAt(0).toUpperCase() + readable.slice(1)
 }
 
 function getFunctionDescription(functionName: string): string {
@@ -364,6 +364,18 @@ function descriptionToStepLabel(description: string): string {
   const words = cleaned.split(' ')
   const limited = words.slice(0, 8).join(' ')
   return limited.charAt(0).toUpperCase() + limited.slice(1)
+}
+
+export function buildStepLabelFromFunction(functionName: string): string {
+  const functionDescription = getFunctionDescription(functionName)
+  if (functionDescription) {
+    const descriptionLabel = descriptionToStepLabel(functionDescription)
+    if (descriptionLabel) {
+      return descriptionLabel
+    }
+  }
+
+  return normalizeStepLabelFromFunction(functionName)
 }
 
 function commandTokenFromArgs(rawArguments: string): string {
@@ -400,15 +412,7 @@ function buildRecoveredStepLabel(
     return `Run ${commandToken} command`
   }
 
-  const functionDescription = getFunctionDescription(functionName)
-  if (functionDescription) {
-    const descriptionLabel = descriptionToStepLabel(functionDescription)
-    if (descriptionLabel) {
-      return descriptionLabel
-    }
-  }
-
-  return normalizeStepLabelFromFunction(functionName)
+  return buildStepLabelFromFunction(functionName)
 }
 
 function resolveFunctionNameForPlan(functionName: string): string | null {

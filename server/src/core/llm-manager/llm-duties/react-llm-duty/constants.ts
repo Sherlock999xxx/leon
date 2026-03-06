@@ -64,6 +64,7 @@ For example, if the user asks to "find a file and process it", include ALL steps
   - "function": the fully qualified name (toolkit_id.tool_id.function_name). If the catalog only lists tools, use toolkit_id.tool_id.
   - "label": a very short user-facing description of what this step does. Must start with a verb (e.g. "Search for video files", "Download the page", "List matching items"). Keep it under 8 words.
 "summary" is a short natural language description of the plan for the user.
+"summary" must be a progress update in present progressive form and end with "...". Example: "Checking your network status...".
 
 No other keys.`
 
@@ -130,9 +131,11 @@ Use only functions/tools listed in the catalog.
 Return one JSON object with these top-level keys:
 - "type": "plan" or "final"
 - "steps": array for type="plan", otherwise null
-- "summary": short revised-plan summary for type="plan", otherwise null
+- "summary": short revised-plan progress update for type="plan", otherwise null
 - "answer": final-answer handoff draft for type="final", otherwise null
 - "intent": final handoff intent for type="final", otherwise null
+
+If "summary" is used, it must be a progress update in present progressive form and end with "...". Example: "Checking the previous failure and updating the plan...".
 
 Return all top-level keys. No other keys.`
 

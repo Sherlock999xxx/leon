@@ -151,16 +151,17 @@ export async function runExecutionSelfObservationPhase(
   const systemPrompt = buildPhaseSystemPrompt(
     `You are evaluating whether execution should continue after the current plan finished.
 
-	Use only the user request and collected observations.
+Use only the user request and collected observations.
 
-	Return ONLY one of:
-	- {"type":"handoff","intent":"answer","draft":"..."} when the request is fully completed.
-	- {"type":"replan","functions":["toolkit_id.tool_id.function_name",...],"reason":"..."} when more tool steps are still needed.
+Return ONLY one of:
+- {"type":"handoff","intent":"answer","draft":"..."} when the request is fully completed.
+- {"type":"replan","functions":["toolkit_id.tool_id.function_name",...],"reason":"..."} when more tool steps are still needed.
 
 Rules:
 - Base your decision strictly on observations, not assumptions.
 - If unsure, choose "replan" and provide the minimum next functions needed.
-	- "draft" should be a concise handoff payload for the final answer phase.`,
+- For "replan", "reason" must be a short progress update in present progressive form and end with "...". Example: "Checking additional context files...".
+- "draft" should be a concise handoff payload for the final answer phase.`,
     'execution'
   )
   const prompt = `${historySection}\n\nUser Request: "${caller.input}"\n\nCurrent plan status: no pending steps remain.\nDecide whether to finish now or continue with additional steps.`
