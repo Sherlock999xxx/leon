@@ -110,6 +110,17 @@ export class ConversationLogger {
     return []
   }
 
+  public async loadAll(): Promise<MessageLog[]> {
+    try {
+      return await this.getAllLogs()
+    } catch (e) {
+      LogHelper.title(this.settings.loggerName)
+      LogHelper.error(`Failed to load all conversation logs: ${e})`)
+    }
+
+    return []
+  }
+
   public async clear(): Promise<void> {
     try {
       await fs.promises.writeFile(this.conversationLogPath, '[]', 'utf-8')

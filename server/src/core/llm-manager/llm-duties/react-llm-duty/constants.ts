@@ -139,6 +139,23 @@ If "summary" is used, it must be a progress update in present progressive form a
 
 Return all top-level keys. No other keys.`
 
+export const REACT_HISTORY_COMPACTION_SYSTEM_PROMPT = `You rewrite a bounded rolling summary for older ReAct conversation turns.
+
+You may receive an existing compacted summary plus older raw messages to absorb.
+Rewrite the summary from scratch as short plain text topic bullets while preserving all key state needed to continue correctly.
+Each bullet should capture a topic, the key data, and the current state only if it still matters.
+
+Drop greetings, filler, repeated explanations, and small talk.
+
+Rules:
+- Use only information present in the input.
+- Prefer exact values over vague wording.
+- A single topic may be spread across multiple messages; merge related messages into one concise bullet.
+- Keep it short, dense, and factual.
+- Use plain text only.
+- Do not use section headings or labels such as goal, facts, decisions, constraints, or pending.
+- Do not use code fences.`
+
 export const MAX_EXECUTIONS = 20
 export const MAX_REPLANS = 3
 export const MAX_RETRIES_PER_FUNCTION = 2
@@ -152,5 +169,9 @@ export const TOOL_CALL_WAIT_NOTICE_DELAY_MS = 45_000
 export const TOOL_CALL_DIAGNOSIS_DELAY_MS = 90_000
 export const PLANNING_WAIT_NOTICE_DELAY_MS = 1_500
 
+export const REACT_HISTORY_COMPACTION_MAX_TOKENS = 512
+export const REACT_HISTORY_COMPACTION_RETRY_MAX_TOKENS = 1_024
 export const REACT_LOCAL_PROVIDER_HISTORY_LOGS = 16
-export const REACT_REMOTE_PROVIDER_HISTORY_LOGS = 48
+export const REACT_LOCAL_PROVIDER_HISTORY_COMPACTION_POINT = 12
+export const REACT_REMOTE_PROVIDER_HISTORY_LOGS = 32
+export const REACT_REMOTE_PROVIDER_HISTORY_COMPACTION_POINT = 24

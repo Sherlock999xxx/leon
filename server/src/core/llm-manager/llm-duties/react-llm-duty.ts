@@ -1,4 +1,4 @@
-import type { LlamaContext } from 'node-llama-cpp'
+import type { ChatHistoryItem, LlamaContext } from 'node-llama-cpp'
 import { LlamaChatSession } from 'node-llama-cpp'
 
 import {
@@ -39,8 +39,13 @@ import {
   CHARS_PER_TOKEN,
   TOOL_CALL_WAIT_NOTICE_DELAY_MS,
   TOOL_CALL_DIAGNOSIS_DELAY_MS,
+  REACT_HISTORY_COMPACTION_MAX_TOKENS,
+  REACT_HISTORY_COMPACTION_RETRY_MAX_TOKENS,
+  REACT_HISTORY_COMPACTION_SYSTEM_PROMPT,
   REACT_LOCAL_PROVIDER_HISTORY_LOGS,
+  REACT_LOCAL_PROVIDER_HISTORY_COMPACTION_POINT,
   REACT_REMOTE_PROVIDER_HISTORY_LOGS,
+  REACT_REMOTE_PROVIDER_HISTORY_COMPACTION_POINT,
   MAX_EXECUTIONS,
   MAX_REPLANS
 } from './react-llm-duty/constants'
@@ -69,9 +74,21 @@ import {
   runFinalAnswerPhase
 } from './react-llm-duty/phases'
 import { buildStepLabelFromFunction } from './react-llm-duty/phase-helpers'
+import {
+  buildCompactedHistoryMessage,
+  findMessageSequenceStart,
+  formatHistoryForCompaction,
+  hasHistoryCompactionContent,
+  normalizeHistoryCompactionSummary,
+  toChatHistoryItems
+} from './react-llm-duty/history-compaction'
 
 const REACT_CONTINUATION_STATE_FILENAME = '.react-execution-continuation-state.json'
+const REACT_HISTORY_COMPACTION_STATE_FILENAME =
+  '.react-history-compaction-state.json'
 const REACT_CONTINUATION_MAX_AGE_MS = 30 * 60 * 1_000
+
+type ReactHistoryCompactionScope = 'local' | 'remote'
 
 interface ReactExecutionContinuationState {
   version: 1
@@ -88,6 +105,42 @@ interface ReactExecutionContinuationState {
   createdAt: number
 }
 
+interface PreparedReactHistory {
+  messageLogs: MessageLog[]
+  localChatHistory?: ChatHistoryItem[]
+}
+
+interface ReactHistoryCompactionProviderState {
+  summary: string | null
+  summarySentAt: number | null
+  tail: MessageLog[]
+}
+
+interface ReactHistoryCompactionState {
+  version: 1
+  local: ReactHistoryCompactionProviderState
+  remote: ReactHistoryCompactionProviderState
+}
+
+interface ReactHistoryCompactionConfig {
+  historyLimit: number
+  compactionBatchSize: number
+}
+
+function createEmptyHistoryCompactionProviderState(): ReactHistoryCompactionProviderState {
+  return {
+    summary: null,
+    summarySentAt: null,
+    tail: []
+  }
+}
+
+const REACT_HISTORY_COMPACTION_STATE_FALLBACK: ReactHistoryCompactionState = {
+  version: 1,
+  local: createEmptyHistoryCompactionProviderState(),
+  remote: createEmptyHistoryCompactionProviderState()
+}
+
 export class ReActLLMDuty extends LLMDuty {
   private static instance: ReActLLMDuty
   private static context: LlamaContext = null as unknown as LlamaContext
@@ -97,6 +150,11 @@ export class ReActLLMDuty extends LLMDuty {
     new ContextStateStore<ReactExecutionContinuationState | null>(
       REACT_CONTINUATION_STATE_FILENAME,
       null
+    )
+  private static readonly historyCompactionStateStore =
+    new ContextStateStore<ReactHistoryCompactionState>(
+      REACT_HISTORY_COMPACTION_STATE_FILENAME,
+      REACT_HISTORY_COMPACTION_STATE_FALLBACK
     )
   protected systemPrompt: LLMDutyParams['systemPrompt'] = null
   protected readonly name = 'ReAct LLM Duty'
@@ -181,14 +239,12 @@ export class ReActLLMDuty extends LLMDuty {
     this.finalAnswerPhaseCompleted = false
 
     try {
-      const history =
-        LLM_PROVIDER_NAME !== LLMProviders.Local
-          ? await CONVERSATION_LOGGER.load({
-              nbOfLogsToLoad: REACT_REMOTE_PROVIDER_HISTORY_LOGS
-            })
-          : await CONVERSATION_LOGGER.load({
-              nbOfLogsToLoad: REACT_LOCAL_PROVIDER_HISTORY_LOGS
-            })
+      const { messageLogs: history, localChatHistory } =
+        await this.loadPreparedHistory()
+
+      if (LLM_PROVIDER_NAME === LLMProviders.Local && localChatHistory) {
+        ReActLLMDuty.session.setChatHistory(localChatHistory)
+      }
 
       const ownerInputText = this.getInputAsText(this.input)
       const continuation = this.consumeExecutionContinuation(ownerInputText)
@@ -208,18 +264,6 @@ export class ReActLLMDuty extends LLMDuty {
         )
       }
 
-      const caller = this.createLLMCaller(history, effectiveInput)
-      const finalizeFromSignal = async (
-        signal: FinalResponseSignal
-      ): Promise<LLMDutyResult> => {
-        const finalAnswer = await runFinalAnswerPhase(
-          caller,
-          executionHistory,
-          signal
-        )
-        this.finalAnswerPhaseCompleted = true
-        return this.makeDutyResult(finalAnswer)
-      }
       const planWidgetIdValue = continuation?.state.planWidgetId || widgetId('plan')
       let hasPlanningWidget = false
       const executionHistory: ExecutionRecord[] = []
@@ -229,6 +273,35 @@ export class ReActLLMDuty extends LLMDuty {
       let trackedSteps: TrackedPlanStep[] = []
       let currentStepIndex = 0
       let currentExecutingFunction: string | null = null
+      const caller = this.createLLMCaller(history, effectiveInput)
+      const finalizeWithPostAnswerMaintenance = async (
+        finalAnswer: string
+      ): Promise<LLMDutyResult> => {
+        this.finalAnswerPhaseCompleted = true
+        const dutyResult = this.makeDutyResult(finalAnswer)
+        try {
+          await this.maybeCompactHistoryAfterAnswer(
+            planWidgetIdValue,
+            trackedSteps
+          )
+        } catch (error) {
+          LogHelper.title(this.name)
+          LogHelper.warning(
+            `Post-answer history compaction failed: ${String(error)}`
+          )
+        }
+        return dutyResult
+      }
+      const finalizeFromSignal = async (
+        signal: FinalResponseSignal
+      ): Promise<LLMDutyResult> => {
+        const finalAnswer = await runFinalAnswerPhase(
+          caller,
+          executionHistory,
+          signal
+        )
+        return finalizeWithPostAnswerMaintenance(finalAnswer)
+      }
 
       if (continuation) {
         pendingSteps = continuation.state.pendingSteps.map((step) => ({
@@ -775,11 +848,460 @@ export class ReActLLMDuty extends LLMDuty {
       }
 
       const finalAnswer = await runFinalAnswerPhase(caller, executionHistory)
-      this.finalAnswerPhaseCompleted = true
-      return this.makeDutyResult(finalAnswer)
+      return await finalizeWithPostAnswerMaintenance(finalAnswer)
     } catch (e) {
       LogHelper.title(this.name)
       LogHelper.error(`Failed to execute: ${e}`)
+    }
+
+    return null
+  }
+
+  private async loadPreparedHistory(): Promise<PreparedReactHistory> {
+    const historyConfig = this.getHistoryCompactionConfig()
+    const historyScope = this.getHistoryCompactionScope()
+    const conversationLogs = await CONVERSATION_LOGGER.loadAll()
+    const currentState = this.loadHistoryCompactionProviderState(historyScope)
+    const synchronizedState = this.synchronizeHistoryCompactionState(
+      conversationLogs,
+      currentState
+    )
+
+    if (synchronizedState.shouldPersist) {
+      this.saveHistoryCompactionProviderState(historyScope, synchronizedState.state)
+    }
+
+    return this.buildPreparedHistory(
+      this.buildHistoryForCurrentTurn(
+        conversationLogs,
+        synchronizedState.state,
+        historyConfig
+      )
+    )
+  }
+
+  private getHistoryCompactionScope(): ReactHistoryCompactionScope {
+    return LLM_PROVIDER_NAME === LLMProviders.Local ? 'local' : 'remote'
+  }
+
+  private getHistoryCompactionConfig(): ReactHistoryCompactionConfig {
+    if (LLM_PROVIDER_NAME === LLMProviders.Local) {
+      return {
+        historyLimit: REACT_LOCAL_PROVIDER_HISTORY_LOGS,
+        compactionBatchSize: REACT_LOCAL_PROVIDER_HISTORY_COMPACTION_POINT
+      }
+    }
+
+    return {
+      historyLimit: REACT_REMOTE_PROVIDER_HISTORY_LOGS,
+      compactionBatchSize: REACT_REMOTE_PROVIDER_HISTORY_COMPACTION_POINT
+    }
+  }
+
+  private loadHistoryCompactionProviderState(
+    scope: ReactHistoryCompactionScope
+  ): ReactHistoryCompactionProviderState {
+    const persistedState = ReActLLMDuty.historyCompactionStateStore.load()
+    return this.normalizeHistoryCompactionProviderState(persistedState?.[scope])
+  }
+
+  private normalizeHistoryCompactionProviderState(
+    value: unknown
+  ): ReactHistoryCompactionProviderState {
+    const record =
+      value && typeof value === 'object'
+        ? (value as Record<string, unknown>)
+        : null
+
+    return {
+      summary: normalizeHistoryCompactionSummary(record?.['summary']),
+      summarySentAt:
+        typeof record?.['summarySentAt'] === 'number'
+          ? record['summarySentAt']
+          : null,
+      tail: this.normalizeMessageLogs(record?.['tail'])
+    }
+  }
+
+  private saveHistoryCompactionProviderState(
+    scope: ReactHistoryCompactionScope,
+    providerState: ReactHistoryCompactionProviderState
+  ): void {
+    const persistedState = ReActLLMDuty.historyCompactionStateStore.load()
+    const nextState: ReactHistoryCompactionState = {
+      version: 1,
+      local:
+        scope === 'local'
+          ? providerState
+          : this.normalizeHistoryCompactionProviderState(persistedState?.local),
+      remote:
+        scope === 'remote'
+          ? providerState
+          : this.normalizeHistoryCompactionProviderState(persistedState?.remote)
+    }
+
+    ReActLLMDuty.historyCompactionStateStore.save(nextState)
+  }
+
+  private normalizeMessageLogs(value: unknown): MessageLog[] {
+    if (!Array.isArray(value)) {
+      return []
+    }
+
+    return value.flatMap((item) => {
+      const record =
+        item && typeof item === 'object'
+          ? (item as Record<string, unknown>)
+          : null
+
+      if (
+        !record ||
+        (record['who'] !== 'owner' && record['who'] !== 'leon') ||
+        typeof record['sentAt'] !== 'number' ||
+        typeof record['message'] !== 'string'
+      ) {
+        return []
+      }
+
+      return [
+        {
+          who: record['who'],
+          sentAt: record['sentAt'],
+          message: record['message']
+        }
+      ]
+    })
+  }
+
+  private hasStoredHistoryCompactionState(
+    state: ReactHistoryCompactionProviderState
+  ): boolean {
+    return Boolean(
+      hasHistoryCompactionContent(state.summary) ||
+        state.summarySentAt !== null ||
+        state.tail.length > 0
+    )
+  }
+
+  private areMessageLogsEqual(left: MessageLog[], right: MessageLog[]): boolean {
+    if (left.length !== right.length) {
+      return false
+    }
+
+    return left.every((message, index) => {
+      const otherMessage = right[index]
+
+      return (
+        otherMessage &&
+        message.who === otherMessage.who &&
+        message.sentAt === otherMessage.sentAt &&
+        message.message === otherMessage.message
+      )
+    })
+  }
+
+  private areHistoryCompactionStatesEqual(
+    left: ReactHistoryCompactionProviderState,
+    right: ReactHistoryCompactionProviderState
+  ): boolean {
+    return (
+      left.summary === right.summary &&
+      left.summarySentAt === right.summarySentAt &&
+      this.areMessageLogsEqual(left.tail, right.tail)
+    )
+  }
+
+  private synchronizeHistoryCompactionState(
+    conversationLogs: MessageLog[],
+    currentState: ReactHistoryCompactionProviderState
+  ): {
+    state: ReactHistoryCompactionProviderState
+    shouldPersist: boolean
+  } {
+    const emptyState = createEmptyHistoryCompactionProviderState()
+
+    if (!hasHistoryCompactionContent(currentState.summary)) {
+      return {
+        state: emptyState,
+        shouldPersist:
+          this.hasStoredHistoryCompactionState(currentState) &&
+          !this.areHistoryCompactionStatesEqual(currentState, emptyState)
+      }
+    }
+
+    if (currentState.tail.length === 0) {
+      return {
+        state: emptyState,
+        shouldPersist: true
+      }
+    }
+
+    const tailStartIndex = findMessageSequenceStart(conversationLogs, currentState.tail)
+    if (tailStartIndex === -1) {
+      LogHelper.title(this.name)
+      LogHelper.debug('History compaction state reset; rebuilding from raw logs')
+
+      return {
+        state: emptyState,
+        shouldPersist: true
+      }
+    }
+
+    const synchronizedState: ReactHistoryCompactionProviderState = {
+      summary: currentState.summary,
+      summarySentAt: currentState.summarySentAt,
+      tail: conversationLogs.slice(tailStartIndex)
+    }
+
+    return {
+      state: synchronizedState,
+      shouldPersist: !this.areHistoryCompactionStatesEqual(
+        currentState,
+        synchronizedState
+      )
+    }
+  }
+
+  private buildHistoryForCurrentTurn(
+    conversationLogs: MessageLog[],
+    state: ReactHistoryCompactionProviderState,
+    config: ReactHistoryCompactionConfig
+  ): MessageLog[] {
+    if (
+      hasHistoryCompactionContent(state.summary) &&
+      state.tail.length > 0 &&
+      state.tail.length < config.historyLimit
+    ) {
+      return this.buildHistoryFromCompactionState(state)
+    }
+
+    return conversationLogs.slice(-config.historyLimit)
+  }
+
+  private getStateForPostAnswerCompaction(
+    conversationLogs: MessageLog[],
+    synchronizedState: ReactHistoryCompactionProviderState
+  ): ReactHistoryCompactionProviderState {
+    if (hasHistoryCompactionContent(synchronizedState.summary)) {
+      return synchronizedState
+    }
+
+    return {
+      summary: null,
+      summarySentAt: null,
+      tail: [...conversationLogs]
+    }
+  }
+
+  private async rollHistoryCompactionState(
+    state: ReactHistoryCompactionProviderState,
+    config: ReactHistoryCompactionConfig
+  ): Promise<ReactHistoryCompactionProviderState | null> {
+    let nextSummary = state.summary
+    let nextSummarySentAt = state.summarySentAt
+    let nextTail = [...state.tail]
+    let compactedBatches = 0
+    let compactedMessages = 0
+
+    while (nextTail.length >= config.historyLimit) {
+      const batch = nextTail.slice(0, config.compactionBatchSize)
+
+      LogHelper.title(this.name)
+      LogHelper.debug(
+        `History compaction triggering: batch=${batch.length} tail=${nextTail.length} threshold=${config.historyLimit}`
+      )
+
+      const compactedSummary = await this.compactHistoryLogs(batch, nextSummary)
+
+      if (!compactedSummary || !hasHistoryCompactionContent(compactedSummary)) {
+        return null
+      }
+
+      nextSummary = compactedSummary
+      nextSummarySentAt =
+        batch[batch.length - 1]?.sentAt ?? nextSummarySentAt ?? Date.now()
+      nextTail = nextTail.slice(config.compactionBatchSize)
+      compactedBatches += 1
+      compactedMessages += batch.length
+    }
+
+    if (compactedBatches > 0) {
+      LogHelper.title(this.name)
+      LogHelper.debug(
+        `History compaction advanced: batches=${compactedBatches} absorbed=${compactedMessages} remaining=${nextTail.length}`
+      )
+    }
+
+    return {
+      summary: nextSummary,
+      summarySentAt: nextSummarySentAt,
+      tail: nextTail
+    }
+  }
+
+  private async maybeCompactHistoryAfterAnswer(
+    planWidgetId: string,
+    trackedSteps: TrackedPlanStep[]
+  ): Promise<void> {
+    const historyConfig = this.getHistoryCompactionConfig()
+    const historyScope = this.getHistoryCompactionScope()
+    const conversationLogs = await CONVERSATION_LOGGER.loadAll()
+    const currentState = this.loadHistoryCompactionProviderState(historyScope)
+    const synchronizedState = this.synchronizeHistoryCompactionState(
+      conversationLogs,
+      currentState
+    )
+
+    if (synchronizedState.shouldPersist) {
+      this.saveHistoryCompactionProviderState(historyScope, synchronizedState.state)
+    }
+
+    const stateToCompact = this.getStateForPostAnswerCompaction(
+      conversationLogs,
+      synchronizedState.state
+    )
+
+    if (stateToCompact.tail.length < historyConfig.historyLimit) {
+      return
+    }
+
+    const compactionWidgetSteps = [
+      ...trackedSteps.map((step) => ({ ...step })),
+      {
+        label: 'Compacting history...',
+        status: 'in_progress' as PlanStepStatus
+      }
+    ]
+
+    emitPlanWidget(compactionWidgetSteps, null, planWidgetId, true, null)
+
+    const compactedState = await this.rollHistoryCompactionState(
+      stateToCompact,
+      historyConfig
+    )
+
+    if (!compactedState) {
+      emitPlanWidget(trackedSteps, null, planWidgetId, true, null)
+      return
+    }
+
+    this.saveHistoryCompactionProviderState(historyScope, compactedState)
+    compactionWidgetSteps[compactionWidgetSteps.length - 1]!.status = 'completed'
+    emitPlanWidget(compactionWidgetSteps, null, planWidgetId, true, null)
+  }
+
+  private buildHistoryFromCompactionState(
+    state: ReactHistoryCompactionProviderState
+  ): MessageLog[] {
+    if (!state.summary || !hasHistoryCompactionContent(state.summary)) {
+      return [...state.tail]
+    }
+
+    const summaryMessage: MessageLog = {
+      who: 'leon',
+      sentAt: state.summarySentAt ?? state.tail[0]?.sentAt ?? Date.now(),
+      message: buildCompactedHistoryMessage(state.summary)
+    }
+
+    return [summaryMessage, ...state.tail]
+  }
+
+  private buildPreparedHistory(history: MessageLog[]): PreparedReactHistory {
+    if (LLM_PROVIDER_NAME !== LLMProviders.Local) {
+      return {
+        messageLogs: history
+      }
+    }
+
+    const [existingSystemMessage] = ReActLLMDuty.session.getChatHistory()
+    const systemMessage: ChatHistoryItem = existingSystemMessage || {
+      type: 'system',
+      text: this.systemPrompt as string
+    }
+
+    return {
+      messageLogs: history,
+      localChatHistory: [systemMessage, ...toChatHistoryItems(history)]
+    }
+  }
+
+  private async compactHistoryLogs(
+    logsToCompact: MessageLog[],
+    previousSummary: string | null
+  ): Promise<string | null> {
+    if (logsToCompact.length === 0) {
+      return null
+    }
+
+    const prompt = formatHistoryForCompaction(previousSummary, logsToCompact)
+    const baseCompletionParams = {
+      dutyType: LLMDuties.ReAct,
+      systemPrompt: REACT_HISTORY_COMPACTION_SYSTEM_PROMPT,
+      temperature: 0,
+      thoughtTokensBudget: 0,
+      disableThinking: true,
+      trackProviderErrors: false
+    }
+
+    const maxTokenBudgets = [
+      REACT_HISTORY_COMPACTION_MAX_TOKENS,
+      REACT_HISTORY_COMPACTION_RETRY_MAX_TOKENS
+    ]
+
+    for (const maxTokens of maxTokenBudgets) {
+      try {
+        let result = null
+
+        if (LLM_PROVIDER_NAME === LLMProviders.Local) {
+          const tempContext = await LLM_MANAGER.model.createContext()
+          const tempSession = new LlamaChatSession({
+            contextSequence: tempContext.getSequence(),
+            autoDisposeSequence: true,
+            systemPrompt: REACT_HISTORY_COMPACTION_SYSTEM_PROMPT
+          })
+
+          try {
+            result = await LLM_PROVIDER.prompt(prompt, {
+              ...baseCompletionParams,
+              session: tempSession,
+              maxTokens: Math.min(maxTokens, tempContext.contextSize)
+            })
+          } finally {
+            tempSession.dispose({ disposeSequence: true })
+            await tempContext.dispose()
+          }
+        } else {
+          result = await LLM_PROVIDER.prompt(prompt, {
+            ...baseCompletionParams,
+            maxTokens
+          })
+        }
+
+        const normalized = normalizeHistoryCompactionSummary(result?.output)
+        if (normalized && hasHistoryCompactionContent(normalized)) {
+          return normalized
+        }
+
+        if (maxTokens !== maxTokenBudgets[maxTokenBudgets.length - 1]) {
+          LogHelper.title(this.name)
+          LogHelper.warning(
+            `History compaction returned invalid structured output; retrying with maxTokens=${REACT_HISTORY_COMPACTION_RETRY_MAX_TOKENS}`
+          )
+        }
+      } catch (error) {
+        if (maxTokens === maxTokenBudgets[maxTokenBudgets.length - 1]) {
+          LogHelper.title(this.name)
+          LogHelper.warning(
+            `History compaction failed; using raw history instead: ${String(error)}`
+          )
+          return null
+        }
+
+        LogHelper.title(this.name)
+        LogHelper.warning(
+          `History compaction attempt failed; retrying with maxTokens=${REACT_HISTORY_COMPACTION_RETRY_MAX_TOKENS}: ${String(error)}`
+        )
+      }
     }
 
     return null
