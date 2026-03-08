@@ -146,12 +146,20 @@ export default class LLMProvider {
         `${LLM_PROVIDERS_MAP[LLM_PROVIDER as LLMProviders]}.js`
       )
     )
+
+    this.disposeCurrentProvider()
     this.llmProvider = new provider()
 
     LogHelper.title('LLM Provider')
     LogHelper.success(`Initialized with "${LLM_PROVIDER}" provider`)
 
     return true
+  }
+
+  private disposeCurrentProvider(): void {
+    const provider = this.llmProvider as { dispose?: () => void } | undefined
+
+    provider?.dispose?.()
   }
 
   private normalizeCompletionResultForLocalProvider(

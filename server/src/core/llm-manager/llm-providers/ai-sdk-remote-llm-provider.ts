@@ -6,6 +6,7 @@ import { createMoonshotAI } from '@ai-sdk/moonshotai'
 import { createHuggingFace } from '@ai-sdk/huggingface'
 import { createCerebras } from '@ai-sdk/cerebras'
 import { createGroq } from '@ai-sdk/groq'
+import { createWebSocketFetch } from 'ai-sdk-openai-websocket-fetch'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 
 import type {
@@ -64,6 +65,9 @@ export default class AISDKRemoteLLMProvider {
 
   private readonly config: AISDKRemoteProviderConfig
   private readonly languageModel: unknown
+  private openAIWebSocketFetch:
+    | ReturnType<typeof createWebSocketFetch>
+    | undefined
 
   constructor(config: AISDKRemoteProviderConfig) {
     this.config = config
@@ -85,6 +89,10 @@ export default class AISDKRemoteLLMProvider {
     return this.model
   }
 
+  public dispose(): void {
+    this.openAIWebSocketFetch?.close()
+  }
+
   private checkAPIKey(): void {
     if (!this.apiKey || this.apiKey === '') {
       LogHelper.title(this.name)
@@ -100,9 +108,11 @@ export default class AISDKRemoteLLMProvider {
     const headers = this.config.headers?.(apiKey)
 
     if (this.config.flavor === 'openai-responses') {
+      const fetch = this.getOpenAIWebSocketFetch()
       const provider = createOpenAI({
         apiKey,
         baseURL: this.config.baseURL,
+        fetch,
         ...(headers && Object.keys(headers).length > 0 ? { headers } : {})
       })
 
@@ -183,6 +193,31 @@ export default class AISDKRemoteLLMProvider {
     }
 
     throw new Error(`Unsupported AI SDK flavor: ${this.config.flavor}`)
+  }
+
+  private getOpenAIWebSocketFetch(): ReturnType<typeof createWebSocketFetch> {
+    if (!this.openAIWebSocketFetch) {
+      this.openAIWebSocketFetch = createWebSocketFetch({
+        url: this.toOpenAIResponsesWebSocketURL(this.config.baseURL)
+      })
+    }
+
+    return this.openAIWebSocketFetch
+  }
+
+  private toOpenAIResponsesWebSocketURL(baseURL: string): string {
+    const url = new URL(baseURL)
+    const normalizedBasePath = url.pathname.endsWith('/')
+      ? url.pathname
+      : `${url.pathname}/`
+
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    url.pathname = new URL('responses', `http://localhost${normalizedBasePath}`)
+      .pathname
+    url.search = ''
+    url.hash = ''
+
+    return url.toString()
   }
 
   private toTextPrompt(
