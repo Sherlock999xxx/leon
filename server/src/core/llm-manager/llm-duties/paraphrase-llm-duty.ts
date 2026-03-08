@@ -157,6 +157,26 @@ The sun is a star, it is the closest star to Earth.`
         completionResult = await LLM_PROVIDER.prompt(prompt, completionParams)
       }
 
+      if (!completionResult) {
+        const providerError = LLM_PROVIDER.consumeLastProviderErrorMessage()
+        if (!providerError) {
+          return null
+        }
+
+        completionResult = {
+          dutyType: completionParams.dutyType,
+          systemPrompt: completionParams.systemPrompt,
+          input: prompt,
+          output: providerError,
+          data: null,
+          maxTokens: 0,
+          thoughtTokensBudget: 0,
+          usedInputTokens: 0,
+          usedOutputTokens: 0,
+          temperature: completionParams.temperature
+        }
+      }
+
       LogHelper.title(this.name)
       LogHelper.success('Duty executed')
       LogHelper.success(`Prompt — ${prompt}`)

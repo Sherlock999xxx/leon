@@ -70,6 +70,9 @@
     "llm_provider_http_error": [
       "{{ provider }} provider: error to complete prompt: {{ error }}{{ api_error }}"
     ],
+    "llm_remote_provider_error": [
+      "I hit an error with the remote {{ provider }} provider while completing the inference: {{ error }}{{ api_error }}"
+    ],
     "action_loop_stopped": [
       "Sure, let me know if you need anything else",
       "Alright, let me know what you need next",

@@ -192,6 +192,26 @@ export class ConversationLLMDuty extends LLMDuty {
         })
       }
 
+      if (!completionResult) {
+        const providerError = LLM_PROVIDER.consumeLastProviderErrorMessage()
+        if (!providerError) {
+          return null
+        }
+
+        completionResult = {
+          dutyType: completionParams.dutyType,
+          systemPrompt: completionParams.systemPrompt,
+          input: prompt,
+          output: providerError,
+          data: null,
+          maxTokens: 0,
+          thoughtTokensBudget: 0,
+          usedInputTokens: 0,
+          usedOutputTokens: 0,
+          temperature: completionParams.temperature
+        }
+      }
+
       if (typeof completionResult?.output === 'string') {
         completionResult.output = StringHelper.normalizeUserFacingText(
           completionResult.output

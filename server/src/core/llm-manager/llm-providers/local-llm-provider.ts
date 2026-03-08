@@ -96,18 +96,12 @@ export default class LocalLLMProvider {
             promptParams
           )
         } else {
-          LogHelper.title(this.name)
-          const errorMessage = 'Invalid session or prompt type'
-          LogHelper.error(errorMessage)
-          return reject(new Error(errorMessage))
+          return reject(new Error('Invalid session or prompt type'))
         }
 
         return resolve(promise)
       } catch (e) {
-        LogHelper.title(this.name)
-        const errorMessage = `Failed to run completion: ${e}`
-        LogHelper.error(errorMessage)
-        return reject(new Error(errorMessage))
+        return reject(e instanceof Error ? e : new Error(String(e)))
       }
     })
   }

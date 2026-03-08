@@ -128,6 +128,11 @@ export interface CompletionParams {
    */
   trackProviderErrors?: boolean
   /**
+   * Internal retry budget for remote provider failures handled by the central
+   * LLM provider wrapper.
+   */
+  remoteProviderErrorRetries?: number
+  /**
    * OpenAI-compatible tools for remote providers that support native
    * tool/function calling. When set, the provider sends these as `tools`
    * in the API request instead of (or in addition to) JSON mode.

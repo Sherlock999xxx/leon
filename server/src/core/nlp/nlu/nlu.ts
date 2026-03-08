@@ -20,7 +20,8 @@ import {
   CONVERSATION_LOGGER,
   SOCKET_SERVER,
   MEMORY_MANAGER,
-  PERSONA
+  PERSONA,
+  LLM_PROVIDER
 } from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
 import Conversation from '@/core/nlp/conversation'
@@ -72,6 +73,7 @@ export default class NLU {
   private _nluResult: NLUResult = DEFAULT_NLU_RESULT
   // Used to store the conversation state (across multiple turns)
   public conversation = new Conversation('conv0')
+  private hasHandledProviderFailure = false
 
   private readonly routingRoutes: Record<RoutingRoute, RoutingRoute> = {
     workflow: 'workflow',
@@ -128,6 +130,30 @@ export default class NLU {
 
       NLU.instance = this
     }
+  }
+
+  private async handleProviderFailure(): Promise<boolean> {
+    const providerError = LLM_PROVIDER.consumeLastProviderErrorMessage()
+
+    if (!providerError) {
+      return false
+    }
+
+    this.hasHandledProviderFailure = true
+
+    LogHelper.title('NLU')
+    LogHelper.warning(
+      `Handled LLM provider failure locally: ${providerError}`
+    )
+
+    this.conversation.cleanActiveState()
+    await NLUProcessResultUpdater.update(DEFAULT_NLU_PROCESS_RESULT)
+
+    if (!BRAIN.isMuted) {
+      await BRAIN.talk(providerError, true)
+    }
+
+    return true
   }
 
   // TODO: core rewrite delete?
@@ -344,6 +370,11 @@ export default class NLU {
       await skillRouterDuty.init()
 
       const skillRouterResult = await skillRouterDuty.execute()
+      if (!skillRouterResult) {
+        await this.handleProviderFailure()
+        return null
+      }
+
       const skillResult = skillRouterResult?.output as unknown as string
 
       if (skillResult && skillResult !== 'None') {
@@ -374,6 +405,11 @@ export default class NLU {
       await actionCallingDuty.init()
 
       const actionCallingResult = await actionCallingDuty.execute()
+      if (!actionCallingResult) {
+        await this.handleProviderFailure()
+        return null
+      }
+
       const actionCallingOutput =
         actionCallingResult?.output as unknown as string
       const parsedActionCallingOutputs: ActionCallingOutput[] =
@@ -908,6 +944,11 @@ export default class NLU {
       await slotFillingDuty.init()
 
       const slotFillingResult = await slotFillingDuty.execute()
+      if (!slotFillingResult) {
+        await this.handleProviderFailure()
+        return false
+      }
+
       const slotFillingOutput =
         slotFillingResult?.output as unknown as SlotFillingOutput
 
@@ -1040,6 +1081,7 @@ export default class NLU {
       try {
         LogHelper.title('NLU')
         LogHelper.info('Processing...')
+        this.hasHandledProviderFailure = false
 
         await CONVERSATION_LOGGER.push({
           who: 'owner',
@@ -1067,9 +1109,16 @@ export default class NLU {
         }
 
         const shouldPickSkillAction = await this.preProcessRoute()
+        if (this.hasHandledProviderFailure) {
+          return resolve(null)
+        }
 
         if (shouldPickSkillAction) {
           const chosenSkill = await this.chooseSkill(utterance)
+          if (this.hasHandledProviderFailure) {
+            return resolve(null)
+          }
+
           const isSkillFound = !!chosenSkill
 
           if (!isSkillFound) {
@@ -1090,6 +1139,9 @@ export default class NLU {
             utterance,
             chosenSkill
           )
+          if (this.hasHandledProviderFailure) {
+            return resolve(null)
+          }
 
           if (
             parsedActionCallingOutputs &&

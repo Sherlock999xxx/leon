@@ -985,11 +985,7 @@ export default class AISDKRemoteLLMProvider {
           data: responseData
         } as AxiosResponse)
       } catch (e) {
-        const errorMessage = `Failed to run completion: ${String(e)}`
-
-        LogHelper.title(this.name)
-        LogHelper.error(errorMessage)
-        return reject(e instanceof Error ? e : new Error(errorMessage))
+        return reject(e instanceof Error ? e : new Error(String(e)))
       }
     })
   }

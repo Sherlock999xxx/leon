@@ -15,7 +15,13 @@ import type {
   SkillCustomTrimEntityTypeSchema,
   SkillCustomLLMEntityTypeSchema
 } from '@/schemas/skill-schemas'
-import { BRAIN, MODEL_LOADER, PYTHON_TCP_CLIENT, LLM_MANAGER } from '@/core'
+import {
+  BRAIN,
+  MODEL_LOADER,
+  PYTHON_TCP_CLIENT,
+  LLM_MANAGER,
+  LLM_PROVIDER
+} from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
 import { StringHelper } from '@/helpers/string-helper'
 import { SkillDomainHelper } from '@/helpers/skill-domain-helper'
@@ -463,6 +469,15 @@ export default class NER {
     })
     await customNERDuty.init()
     const result = await customNERDuty.execute()
+    if (!result) {
+      const providerError = LLM_PROVIDER.consumeLastProviderErrorMessage()
+
+      if (providerError && !BRAIN.isMuted) {
+        await BRAIN.talk(providerError, true)
+      }
+
+      return []
+    }
 
     const schemaKeys = Object.keys(schema)
     return schemaKeys.map((key) => {

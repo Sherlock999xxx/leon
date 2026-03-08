@@ -77,7 +77,9 @@ const LLM_PROVIDERS_MAP = {
 const DEFAULT_MAX_EXECUTION_TIMOUT =
   LLM_PROVIDER === LLMProviders.Local ? 32_000 : 120_000
 const DEFAULT_MAX_EXECUTION_RETRIES = 2
+const DEFAULT_REMOTE_PROVIDER_ERROR_RETRIES = 1
 const TIMEOUT_RETRY_INCREMENT_MS = 30_000
+const REMOTE_PROVIDER_ERROR_RETRY_DELAY_MS = 5_000
 const RETRYABLE_ERROR_RETRY_DELAY_MS = 1_250
 const EMPTY_COMPLETION_RETRY_DELAY_MS = 750
 const MAX_LOG_SERIALIZED_LENGTH = 4_000
@@ -515,21 +517,6 @@ export default class LLMProvider {
     })
   }
 
-  private async safeTalk(message: string): Promise<void> {
-    if (!message) {
-      return
-    }
-
-    try {
-      await BRAIN.talk(message, true)
-    } catch (error) {
-      LogHelper.title('LLM Provider')
-      LogHelper.warning(
-        `Failed to emit provider error message to user: ${String(error)}`
-      )
-    }
-  }
-
   private isThinkingToolChoiceConflictError(error: unknown): boolean {
     const message = String(error ?? '').toLowerCase()
     return (
@@ -606,6 +593,24 @@ export default class LLMProvider {
     }
 
     return this.truncateForLog(this.safeSerialize(details))
+  }
+
+  private buildProviderErrorMessage(
+    error: string,
+    details = '',
+    isRemoteProvider = false
+  ): string {
+    return BRAIN.wernicke(
+      isRemoteProvider
+        ? 'llm_remote_provider_error'
+        : 'llm_provider_http_error',
+      '',
+      {
+        '{{ provider }}': LLM_PROVIDER,
+        '{{ error }}': error,
+        '{{ api_error }}': details ? `\n${details}` : ''
+      }
+    )
   }
 
   private extractOpenAICompatibleReasoningFragments(
@@ -1658,6 +1663,9 @@ export default class LLMProvider {
       completionParams.maxTokens ?? DEFAULT_MAX_TOKENS
     completionParams.thoughtTokensBudget =
       completionParams.thoughtTokensBudget ?? DEFAULT_THOUGHT_TOKENS_BUDGET
+    completionParams.remoteProviderErrorRetries =
+      completionParams.remoteProviderErrorRetries ??
+      DEFAULT_REMOTE_PROVIDER_ERROR_RETRIES
 
     /**
      * TODO: support onToken (stream) for Groq provider too
@@ -1699,6 +1707,7 @@ export default class LLMProvider {
 
     const isJSONMode = completionParams.data !== null
     const shouldStreamOutput = completionParams.shouldStream === true
+    const isRemoteProvider = LLM_PROVIDER !== LLMProviders.Local
 
     const abortController = new AbortController()
     let timeoutHandle: NodeJS.Timeout | null = null
@@ -1754,6 +1763,15 @@ export default class LLMProvider {
       LogHelper.title('LLM Provider')
       LogHelper.error(`Error to complete prompt: ${String(e)}`)
       LogHelper.timeEnd(measureExecutionTimeLabel)
+
+      if (trackProviderErrors) {
+        this.lastProviderErrorMessage = this.buildProviderErrorMessage(
+          String(e),
+          this.buildProviderErrorDetails(e),
+          isRemoteProvider
+        )
+      }
+
       return null
     }
     // Ensure late rejections after timeout/abort are consumed to avoid
@@ -1798,6 +1816,8 @@ export default class LLMProvider {
         this.isThinkingToolChoiceConflictError(e)
       const isUnsupportedToolChoice = this.isUnsupportedToolChoiceError(e)
       const remainingRetries = completionParams.maxRetries ?? 0
+      const remainingRemoteProviderErrorRetries =
+        completionParams.remoteProviderErrorRetries ?? 0
 
       const hasForcedToolChoice =
         Array.isArray(completionParams.tools) &&
@@ -1857,7 +1877,29 @@ export default class LLMProvider {
       }
 
       if (
-        (isTimeoutError || isRetryableNonTimeoutError) &&
+        !isTimeoutError &&
+        isRemoteProvider &&
+        remainingRemoteProviderErrorRetries > 0
+      ) {
+        if (!abortController.signal.aborted) {
+          abortController.abort()
+        }
+
+        await this.waitForRetry(REMOTE_PROVIDER_ERROR_RETRY_DELAY_MS)
+
+        LogHelper.title('LLM Provider')
+        LogHelper.warning(
+          `Remote provider failed; retrying after ${REMOTE_PROVIDER_ERROR_RETRY_DELAY_MS}ms (${remainingRemoteProviderErrorRetries} retry left)`
+        )
+
+        return this.prompt(promptOrChatHistory, {
+          ...completionParams,
+          remoteProviderErrorRetries: remainingRemoteProviderErrorRetries - 1
+        })
+      }
+
+      if (
+        (isTimeoutError || (!isRemoteProvider && isRetryableNonTimeoutError)) &&
         remainingRetries > 0
       ) {
         if (!abortController.signal.aborted) {
@@ -1886,49 +1928,22 @@ export default class LLMProvider {
         })
       }
 
-      if (
-        trackProviderErrors &&
-        (axios.isAxiosError(e) ||
-          (e && typeof e === 'object' && ('status' in e || 'statusCode' in e)))
-      ) {
+      if (trackProviderErrors && !this.lastProviderErrorMessage) {
         const apiErrorDetails = this.buildProviderErrorDetails(e)
         const statusLike =
           e && typeof e === 'object' && 'statusCode' in e
             ? (e as { statusCode?: unknown }).statusCode
             : undefined
-        const brainMessage = BRAIN.wernicke('llm_provider_http_error', '', {
-          '{{ provider }}': LLM_PROVIDER,
-          '{{ error }}':
-            statusLike !== undefined
-              ? `${String(e)} (statusCode=${String(statusLike)})`
-              : String(e),
-          '{{ api_error }}': apiErrorDetails ? `\n${apiErrorDetails}` : ''
-        })
 
-        await this.safeTalk(brainMessage)
-        this.lastProviderErrorMessage = brainMessage
-      } else if (trackProviderErrors && isRetryableNonTimeoutError) {
-        const apiErrorDetails = this.buildProviderErrorDetails(e)
-        const brainMessage = BRAIN.wernicke('llm_provider_http_error', '', {
-          '{{ provider }}': LLM_PROVIDER,
-          '{{ error }}': String(e),
-          '{{ api_error }}': apiErrorDetails ? `\n${apiErrorDetails}` : ''
-        })
-
-        await this.safeTalk(brainMessage)
-        this.lastProviderErrorMessage = brainMessage
+        this.lastProviderErrorMessage = this.buildProviderErrorMessage(
+          statusLike !== undefined
+            ? `${String(e)} (statusCode=${String(statusLike)})`
+            : String(e),
+          apiErrorDetails,
+          isRemoteProvider
+        )
       }
 
-      if (trackProviderErrors && !this.lastProviderErrorMessage) {
-        const apiErrorDetails = this.buildProviderErrorDetails(e)
-        this.lastProviderErrorMessage = BRAIN.wernicke('llm_provider_http_error', '', {
-          '{{ provider }}': LLM_PROVIDER,
-          '{{ error }}': String(e),
-          '{{ api_error }}': apiErrorDetails ? `\n${apiErrorDetails}` : ''
-        })
-      }
-
-      // throw new Error('Prompt failed after all retries')
       return null
 
       /*// Avoid infinite loop
@@ -1960,7 +1975,6 @@ export default class LLMProvider {
     /**
      * Normalize the completion result according to the provider
      */
-    const isRemoteProvider = LLM_PROVIDER !== LLMProviders.Local
     let remoteRawData: unknown = null
     let shouldUseRemoteStreaming = false
 
@@ -2121,17 +2135,11 @@ export default class LLMProvider {
       }
 
       if (trackProviderErrors) {
-        const brainMessage = BRAIN.wernicke('llm_provider_http_error', '', {
-          '{{ provider }}': LLM_PROVIDER,
-          '{{ error }}':
-            'Provider returned an empty completion payload (no text, no tool call, no token usage)',
-          '{{ api_error }}': providerPayloadSnippet
-            ? `\n${providerPayloadSnippet}`
-            : ''
-        })
-
-        await this.safeTalk(brainMessage)
-        this.lastProviderErrorMessage = brainMessage
+        this.lastProviderErrorMessage = this.buildProviderErrorMessage(
+          'Provider returned an empty completion payload (no text, no tool call, no token usage)',
+          providerPayloadSnippet,
+          isRemoteProvider
+        )
       }
       return null
     }
