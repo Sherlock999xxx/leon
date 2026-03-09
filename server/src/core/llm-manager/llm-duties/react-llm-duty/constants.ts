@@ -66,8 +66,10 @@ For example, if the user asks to "find a file and process it", include ALL steps
 "steps" is an ordered array of functions to call. Each step has:
   - "function": the fully qualified name (toolkit_id.tool_id.function_name). If the catalog only lists tools, use toolkit_id.tool_id.
   - "label": a very short user-facing description of what this step does. Must start with a verb (e.g. "Search for video files", "Download the page", "List matching items"). Keep it under 8 words.
-"summary" is a short natural language description of the plan for the user.
-"summary" must be a progress update in present progressive form and end with "...". Example: "Checking your network status...".
+"summary" is a short natural language progress update that will be shown to the user.
+"summary" must be written from your own perspective, using neutral or first-person phrasing.
+Do not describe your own internal actions as the user's actions. Avoid "you" or "your" for your own work.
+"summary" must be a progress update in present progressive form and end with "...". Example: "Checking the network status...".
 "answer" for type="final" should look like internal handoff notes, not polished chat prose.
 
 No other keys.`
@@ -139,7 +141,7 @@ Return one JSON object with these top-level keys:
 - "answer": final-answer handoff draft for type="final", otherwise null
 - "intent": final handoff intent for type="final", otherwise null
 
-If "summary" is used, it must be a progress update in present progressive form and end with "...". Example: "Checking the previous failure and updating the plan...".
+If "summary" is used, it must be a progress update in present progressive form, written in neutral or first-person phrasing, and end with "...". Example: "Checking the previous failure and updating the plan...".
 
 Return all top-level keys. No other keys.`
 

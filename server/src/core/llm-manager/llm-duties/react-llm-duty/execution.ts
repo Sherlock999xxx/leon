@@ -159,7 +159,7 @@ Return ONLY one of:
 Rules:
 - Base your decision strictly on observations, not assumptions.
 - If unsure, choose "replan" and provide the minimum next functions needed.
-- For "replan", "reason" must be a short progress update in present progressive form and end with "...". Example: "Checking additional context files...".
+- For "replan", "reason" must be a short progress update in present progressive form, written in neutral or first-person phrasing, and end with "...". Example: "Checking additional context files...".
 - "draft" should be a concise handoff payload for the final answer phase.`,
     'execution'
   )

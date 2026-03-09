@@ -483,7 +483,9 @@ export function createPlanFromUnexpectedToolCall(
     resolvedFunction,
     unexpectedToolCall.arguments
   )
-  const summary = sanitizedSummary || `I will ${label.charAt(0).toLowerCase()}${label.slice(1)}.`
+  const summary =
+    sanitizedSummary ||
+    `Working on ${label.charAt(0).toLowerCase()}${label.slice(1)}...`
 
   return {
     type: 'plan',
