@@ -28,7 +28,8 @@ import {
   LLM_PROVIDER,
   LLM_MANAGER,
   TOOLKIT_REGISTRY,
-  CONTEXT_MANAGER
+  CONTEXT_MANAGER,
+  PULSE_MANAGER
 } from '@/core'
 import { shouldIgnoreTCPServerError } from '@/utilities'
 import { Updater } from '@/updater'
@@ -225,6 +226,7 @@ import { SystemHelper } from '@/helpers/system-helper'
 
   // Start the socket server
   SOCKET_SERVER.init()
+  PULSE_MANAGER.start()
 
   // Check for updates on startup and every 24 hours
   if (IS_PRODUCTION_ENV) {

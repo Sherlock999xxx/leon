@@ -110,7 +110,7 @@ export class NetworkEcosystemContextFile extends ContextFile {
     const neighborLines =
       rankedDevices.length > 0
         ? rankedDevices.slice(0, MAX_NEIGHBORS).map((device, index) => {
-            return `- ${index + 1}. ${device.ip} | identifier ${device.identifier} | names ${device.resolvedNames.join(', ') || 'none'} | MAC ${device.mac} | interface ${device.networkInterface} | hint ${device.hint} | first seen ${device.firstSeenAt} | last seen ${device.lastSeenAt} | seen ${device.seenCount} time(s)`
+            return `- ${index + 1}. ${device.ip} | identifier ${device.identifier} | names ${device.resolvedNames.join(', ') || 'none'} | MAC ${device.mac} | interface ${device.networkInterface} | hint ${device.hint} | first seen ${DateHelper.getDateTime(device.firstSeenAt) || device.firstSeenAt} | last seen ${DateHelper.getDateTime(device.lastSeenAt) || device.lastSeenAt} | seen ${device.seenCount} time(s)`
           })
         : ['- No local neighbors detected']
 
@@ -125,7 +125,7 @@ export class NetworkEcosystemContextFile extends ContextFile {
       `> Environment, interfaces, discovered devices, inferred services. ${summary}`,
       '# NETWORK_ECOSYSTEM',
       `- Generated at: ${DateHelper.getDateTime()}`,
-      `- Tracking started at: ${updatedState.trackingStartedAt}`,
+      `- Tracking started at: ${DateHelper.getDateTime(updatedState.trackingStartedAt)}`,
       `- Local neighbors: ${neighbors.length}`,
       `- Inferred service signals: ${inferredServices.length}`,
       '## Network Environment',

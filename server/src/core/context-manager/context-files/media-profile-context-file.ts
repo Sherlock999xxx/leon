@@ -83,7 +83,7 @@ export class MediaProfileContextFile extends ContextFile {
       `> Top media domains and app/platform signals. ${summary}`,
       '# MEDIA_PROFILE',
       `- Generated at: ${DateHelper.getDateTime()}`,
-      `- Tracking started at: ${updatedState.trackingStartedAt}`,
+      `- Tracking started at: ${DateHelper.getDateTime(updatedState.trackingStartedAt)}`,
       `- Browser records parsed this run: ${browserRecords.length}`,
       `- Domain signals stored: ${Object.keys(updatedState.domains).length}`,
       '## Top Media Domains',

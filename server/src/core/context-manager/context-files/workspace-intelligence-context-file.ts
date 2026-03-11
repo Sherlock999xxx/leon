@@ -85,7 +85,7 @@ export class WorkspaceIntelligenceContextFile extends ContextFile {
       repositorySnapshots.length > 0
         ? repositorySnapshots.slice(0, MAX_REPOS).map((repo, index) => {
             const state = updatedState.repositories[repo.repoPath]
-            return `- ${index + 1}. ${repo.repoName} | ${repo.repoPath} | branch ${repo.branch} | language ${repo.primaryLanguage} | files ${repo.fileCount} | last modified ${repo.lastModifiedAt} | seen ${state?.seenCount || 1} time(s)`
+            return `- ${index + 1}. ${repo.repoName} | ${repo.repoPath} | branch ${repo.branch} | language ${repo.primaryLanguage} | files ${repo.fileCount} | last modified ${DateHelper.getDateTime(repo.lastModifiedAt) || repo.lastModifiedAt} | seen ${state?.seenCount || 1} time(s)`
           })
         : ['- No repositories discovered in configured roots']
 
@@ -104,7 +104,7 @@ export class WorkspaceIntelligenceContextFile extends ContextFile {
       `> Repositories, language distribution, toolchain availability. ${summary}`,
       '# WORKSPACE_INTELLIGENCE',
       `- Generated at: ${DateHelper.getDateTime()}`,
-      `- Tracking started at: ${updatedState.trackingStartedAt}`,
+      `- Tracking started at: ${DateHelper.getDateTime(updatedState.trackingStartedAt)}`,
       `- Workspace roots scanned: ${workspaceRoots.join(', ') || 'none'}`,
       `- Repository count: ${repositorySnapshots.length}`,
       '## Repositories',

@@ -35,7 +35,7 @@ export class HostSystemContextFile extends ContextFile {
     const cpuModel = os.cpus()[0]?.model || 'unknown'
     const cpuCores = os.cpus().length
     const totalMemory = this.probeHelper.formatGiB(os.totalmem())
-    const bootTimeIso = new Date(Date.now() - os.uptime() * 1_000).toISOString()
+    const bootTime = DateHelper.getDateTime(Date.now() - os.uptime() * 1_000)
 
     return [
       `> OS/runtime identity, locale/timezone, VPN/proxy and hardware basics. Host system is ${operatingSystemNameVersion} (${os.platform()} ${os.release()}, ${os.arch()}), user ${username}, shell ${shell}, owner location ${ownerLocation.value}${vpnProxyStatus.behindVpnOrProxy ? ' (VPN/proxy detected).' : '.'}`,
@@ -62,7 +62,7 @@ export class HostSystemContextFile extends ContextFile {
       `- Username: ${username}`,
       `- Home directory: ${os.homedir()}`,
       `- Shell: ${shell}`,
-      `- Boot time (UTC): ${bootTimeIso}`,
+      `- Boot time: ${bootTime}`,
       `- Uptime: ${this.probeHelper.formatUptime(os.uptime())}`,
       `- Temporary directory: ${os.tmpdir()}`
     ].join('\n')

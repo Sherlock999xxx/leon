@@ -329,6 +329,8 @@ export const HAS_LLM_NLG = process.env['LEON_LLM_NLG'] === 'true' && HAS_LLM
 export const HAS_LLM_ACTION_RECOGNITION =
   process.env['LEON_LLM_ACTION_RECOGNITION'] === 'true' && HAS_LLM
 export const LEON_ROUTING_MODE = process.env['LEON_ROUTING_MODE'] || 'smart'
+export const LEON_PULSE_ENABLED = true
+export const LEON_PULSE_INTERVAL_MS = 30 * 60 * 1_000
 export const SHOULD_START_PYTHON_TCP_SERVER = !(
   LEON_ROUTING_MODE.toLowerCase() === 'agent' &&
   !HAS_STT &&

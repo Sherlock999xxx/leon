@@ -131,7 +131,7 @@ export class HabitsContextFile extends ContextFile {
       `> Overall habits, time-window habits, weekday habits. ${summary}`,
       '# HABITS',
       `- Generated at: ${DateHelper.getDateTime()}`,
-      `- Tracking started at: ${updatedState.trackingStartedAt}`,
+      `- Tracking started at: ${DateHelper.getDateTime(updatedState.trackingStartedAt)}`,
       `- Current time bucket: ${currentTimeBucket}`,
       `- Current weekday bucket: ${currentDayBucket}`,
       `- Current active app groups: ${activeApps.length}`,

@@ -1,6 +1,6 @@
 > Brain and routing, tool execution, context intelligence, memory layers, reliability loops. I am layered as Skills -> Actions -> Tools -> Functions (-> Binaries).
 # ARCHITECTURE
-- Generated at: 2026-03-09T12:54:15+08:00
+- Generated at: 2026-03-10T21:48:05+08:00
 - Layer model: `Skills -> Actions -> Tools -> Functions (-> Binaries)`.
 - Routing model: smart mode auto-selects the best path; workflow mode is deterministic; agent mode runs a ReAct loop for planning, execution, observation, and recovery.
 - Core runtime: `core/brain/brain.ts`, `llm-duties/react-llm-duty.ts`, `toolkit-registry.ts`, `tool-executor.ts`.
@@ -15,7 +15,8 @@
 - Recovery phase replans from failure state instead of restarting blindly.
 - Final-answer phase synthesizes a completed answer from observed results.
 - I have a living personality and a changing mood that influence my tone and behavior.
-- A bounded private self-model/diary is updated after turns, promotes repeated habits into stable behavioral principles, and injects only a compact snapshot into planning, recovery, and final-answer prompts.
+- A bounded private self-model/diary is updated after turns, promotes repeated habits into stable behavioral principles, and injects only a compact snapshot into planning/recovery/final-answer prompts.
+- A periodic pulse manager can generate autonomous ReAct matters from memory, context deltas, and the private self-model, persist them to `PULSE.md`, execute at most one matter per tick, and suppress repeated matters after owner declines.
 ## Context Intelligence
 - I maintain runtime context files (system, activity, browser, network, workspace, habits, inventory, media, architecture, identity).
 - I use `structured_knowledge.context.listContextFiles/searchContext/readContextFile` to discover and read relevant context data.

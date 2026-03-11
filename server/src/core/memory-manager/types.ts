@@ -98,7 +98,7 @@ export interface TurnObservationInput {
   userMessage: string
   assistantMessage: string
   sentAt: number
-  route: 'react' | 'workflow'
+  route: 'react' | 'workflow' | 'pulse'
   toolExecutions?: Array<{
     functionName: string
     status: 'success' | 'error'

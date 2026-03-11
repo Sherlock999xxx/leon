@@ -23,7 +23,8 @@ import {
   PERSONA,
   LLM_PROVIDER,
   TOOL_CALL_LOGGER,
-  SELF_MODEL_MANAGER
+  SELF_MODEL_MANAGER,
+  PULSE_MANAGER
 } from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
 import Conversation from '@/core/nlp/conversation'
@@ -1150,6 +1151,14 @@ export default class NLU {
               who: 'owner',
               message: utterance
             })
+            void PULSE_MANAGER.observeOwnerUtterance(utterance).catch(
+              (error: unknown) => {
+                LogHelper.title('NLU')
+                LogHelper.warning(
+                  `Failed to observe pulse owner feedback: ${error}`
+                )
+              }
+            )
 
             await NLUProcessResultUpdater.update({
               new: {

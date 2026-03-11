@@ -100,7 +100,7 @@ export class LocalInventoryContextFile extends ContextFile {
     const topUsageLines =
       rankedByUsage.length > 0
         ? rankedByUsage.slice(0, MAX_RUNNING_APPS).map((entry, index) => {
-            return `- ${index + 1}. ${entry.appName} | observed ${this.probeHelper.formatUptime(entry.observedSeconds)} | last seen ${entry.lastSeenAt} | seen ${entry.seenCount} sample(s)`
+            return `- ${index + 1}. ${entry.appName} | observed ${this.probeHelper.formatUptime(entry.observedSeconds)} | last seen ${DateHelper.getDateTime(entry.lastSeenAt) || entry.lastSeenAt} | seen ${entry.seenCount} sample(s)`
           })
         : ['- No usage history collected yet']
 
@@ -119,7 +119,7 @@ export class LocalInventoryContextFile extends ContextFile {
       `- Generated at: ${DateHelper.getDateTime()}`,
       `- Usage sample source: ${runningSnapshot.source}`,
       `- Peripherals probe source: ${peripherals.source}`,
-      `- Tracking started at: ${updatedState.trackingStartedAt}`,
+      `- Tracking started at: ${DateHelper.getDateTime(updatedState.trackingStartedAt)}`,
       `- Running processes sampled for usage estimation: ${runningSnapshot.entries.length}`,
       `- Installed app entries: ${installedApps.length}`,
       '## Most Used / Recently Seen Apps',

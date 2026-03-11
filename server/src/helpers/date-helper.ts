@@ -13,8 +13,17 @@ export class DateHelper {
    * Get date time
    * @example getDateTime() // 2022-09-12T12:42:57+08:00
    */
-  public static getDateTime(): string {
-    return dayjs().tz(this.getTimeZone()).format()
+  public static getDateTime(date?: string | number | Date | null): string {
+    const dateTime =
+      typeof date === 'undefined' || date === null || date === ''
+        ? dayjs()
+        : dayjs(date)
+
+    if (!dateTime.isValid()) {
+      return ''
+    }
+
+    return dateTime.tz(this.getTimeZone()).format()
   }
 
   /**

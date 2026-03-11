@@ -89,7 +89,7 @@ export class ActivityContextFile extends ContextFile {
     const logLines =
       recentLogFiles.length > 0
         ? recentLogFiles.slice(0, MAX_LOG_LINES).map((entry, index) => {
-            return `- ${index + 1}. ${entry.modifiedAt} | ${entry.appHint} | ${entry.filePath} | ${entry.sizeBytes} B`
+            return `- ${index + 1}. ${this.formatDateTime(entry.modifiedAt)} | ${entry.appHint} | ${entry.filePath} | ${entry.sizeBytes} B`
           })
         : ['- No recent app log files detected in common user log locations']
 
@@ -98,21 +98,25 @@ export class ActivityContextFile extends ContextFile {
       '# ACTIVITY',
       `- Generated at: ${DateHelper.getDateTime()}`,
       `- Process probe source: ${processSnapshot.source}`,
-      `- Process sample time: ${processSnapshot.sampledAt}`,
+      `- Process sample time: ${this.formatDateTime(processSnapshot.sampledAt)}`,
       `- Running processes sampled: ${processSnapshot.entries.length}`,
       `- Active app groups: ${appActivity.length}`,
-      `- Boot time (UTC): ${new Date(Date.now() - os.uptime() * 1_000).toISOString()}`,
+      `- Boot time: ${DateHelper.getDateTime(Date.now() - os.uptime() * 1_000)}`,
       `- Uptime: ${this.probeHelper.formatUptime(os.uptime())}`,
       '- Note: this is a running-process snapshot, not a foreground-window tracker.',
       '- Note: observed app time below is cumulative from periodic snapshots.',
       '## Active Apps',
       ...appLines,
       '## Observed App Time',
-      `- Tracking started at: ${updatedTrackingState.trackingStartedAt}`,
+      `- Tracking started at: ${this.formatDateTime(updatedTrackingState.trackingStartedAt)}`,
       ...observedAppLines,
       '## Recent App Logs',
       ...logLines
     ].join('\n')
+  }
+
+  private formatDateTime(value: string | number | Date): string {
+    return DateHelper.getDateTime(value) || String(value || 'unknown')
   }
 
   private aggregateAppActivity(

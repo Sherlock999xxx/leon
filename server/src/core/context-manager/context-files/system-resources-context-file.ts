@@ -36,7 +36,7 @@ export class SystemResourcesContextFile extends ContextFile {
       '# SYSTEM_RESOURCES',
       `- Generated at: ${generatedAt}`,
       `- Uptime: ${this.probeHelper.formatUptime(os.uptime())}`,
-      `- Boot time (UTC): ${new Date(Date.now() - os.uptime() * 1_000).toISOString()}`,
+      `- Boot time: ${DateHelper.getDateTime(Date.now() - os.uptime() * 1_000)}`,
       `- RAM total: ${this.probeHelper.formatGiB(totalMemoryBytes)}`,
       `- RAM used: ${this.probeHelper.formatGiB(usedMemoryBytes)} (${usedMemoryPct}%)`,
       `- RAM free: ${this.probeHelper.formatGiB(freeMemoryBytes)}`,

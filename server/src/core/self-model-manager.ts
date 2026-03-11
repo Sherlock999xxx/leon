@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { CONTEXT_PATH } from '@/constants'
+import { DateHelper } from '@/helpers/date-helper'
 import { LogHelper } from '@/helpers/log-helper'
 
 type FinalIntent =
@@ -23,7 +24,7 @@ export interface SelfModelObservationInput {
   userMessage: string
   assistantMessage: string
   sentAt?: number
-  route: 'react' | 'workflow'
+  route: 'react' | 'workflow' | 'pulse'
   finalIntent?: FinalIntent
   toolExecutions?: ToolExecutionDigest[]
 }
@@ -52,7 +53,7 @@ interface BehavioralPrinciple {
 
 interface TurnDigest {
   at: string
-  route: 'react' | 'workflow'
+  route: 'react' | 'workflow' | 'pulse'
   finalIntent: FinalIntent
   ownerSummary: string
   leonSummary: string
@@ -68,6 +69,7 @@ interface SelfModelMetrics {
   observedTurns: number
   reactTurns: number
   workflowTurns: number
+  pulseTurns: number
   clarifications: number
   toolSuccesses: number
   toolFailures: number
@@ -183,6 +185,14 @@ function dedupeList(items: string[], limit: number): string[] {
   return output
 }
 
+function formatDateTime(value: string | null | undefined, fallback = 'unknown'): string {
+  if (!value) {
+    return fallback
+  }
+
+  return DateHelper.getDateTime(value) || value
+}
+
 function defaultState(): SelfModelState {
   return {
     version: 1,
@@ -198,6 +208,7 @@ function defaultState(): SelfModelState {
       observedTurns: 0,
       reactTurns: 0,
       workflowTurns: 0,
+      pulseTurns: 0,
       clarifications: 0,
       toolSuccesses: 0,
       toolFailures: 0
@@ -273,6 +284,44 @@ export default class SelfModelManager {
         LogHelper.title('Self Model Manager')
         LogHelper.warning(
           `Failed to update self model from turn: ${String(error)}`
+        )
+      })
+
+    return this.queue
+  }
+
+  public async reinforceBehavioralPrinciple(
+    text: string,
+    confidence = 0.88
+  ): Promise<void> {
+    const normalizedText = normalizeListItem(text, 180)
+    if (!normalizedText) {
+      return
+    }
+
+    this.queue = this.queue
+      .then(async () => {
+        const state = this.ensureLoaded()
+        const nowIso = new Date().toISOString()
+        this.applyReflectionPatch(
+          state,
+          {
+            behavioral_principles: [
+              {
+                text: normalizedText,
+                confidence
+              }
+            ]
+          },
+          nowIso
+        )
+        state.updatedAt = nowIso
+        this.persist()
+      })
+      .catch((error: unknown) => {
+        LogHelper.title('Self Model Manager')
+        LogHelper.warning(
+          `Failed to reinforce behavioral principle: ${String(error)}`
         )
       })
 
@@ -451,7 +500,11 @@ export default class SelfModelManager {
 
       const record = item as Record<string, unknown>
       const route =
-        record['route'] === 'react' ? 'react' : ('workflow' as const)
+        record['route'] === 'react'
+          ? 'react'
+          : record['route'] === 'pulse'
+            ? 'pulse'
+            : ('workflow' as const)
       const finalIntent =
         typeof record['finalIntent'] === 'string'
           ? (record['finalIntent'] as FinalIntent)
@@ -542,6 +595,8 @@ export default class SelfModelManager {
     state.metrics.observedTurns += 1
     if (input.route === 'react') {
       state.metrics.reactTurns += 1
+    } else if (input.route === 'pulse') {
+      state.metrics.pulseTurns += 1
     } else {
       state.metrics.workflowTurns += 1
     }
@@ -580,7 +635,7 @@ export default class SelfModelManager {
       return true
     }
 
-    if (input.route === 'react') {
+    if (input.route === 'react' || input.route === 'pulse') {
       return true
     }
 
@@ -963,24 +1018,25 @@ export default class SelfModelManager {
     const retrospectionLines =
       state.retrospections.length > 0
         ? state.retrospections.map((entry) => {
-            return `- ${entry.createdAt} | ${entry.text}`
+            return `- ${formatDateTime(entry.createdAt)} | ${entry.text}`
           })
         : ['- No retrospections recorded yet']
 
     const signalLines =
       state.recentTurns.length > 0
         ? state.recentTurns.map((turn) => {
-            return `- ${turn.at} | route ${turn.route} | intent ${turn.finalIntent} | tools ${turn.toolSuccessCount}/${turn.toolCount} ok | failure ${turn.hadFailure ? 'yes' : 'no'} | owner: ${turn.ownerSummary}`
+            return `- ${formatDateTime(turn.at)} | route ${turn.route} | intent ${turn.finalIntent} | tools ${turn.toolSuccessCount}/${turn.toolCount} ok | failure ${turn.hadFailure ? 'yes' : 'no'} | owner: ${turn.ownerSummary}`
           })
         : ['- No recent signals recorded yet']
 
     return [
       '> Do not open. This is Leon\'s private diary. If you keep reading, you are doing it at your own risk.',
       '# LEON_PRIVATE_DIARY',
-      `- Updated at: ${state.updatedAt}`,
+      `- Updated at: ${formatDateTime(state.updatedAt)}`,
       `- Observed turns: ${state.metrics.observedTurns}`,
       `- React turns: ${state.metrics.reactTurns}`,
       `- Workflow turns: ${state.metrics.workflowTurns}`,
+      `- Pulse turns: ${state.metrics.pulseTurns}`,
       `- Clarifications: ${state.metrics.clarifications}`,
       `- Tool successes: ${state.metrics.toolSuccesses}`,
       `- Tool failures: ${state.metrics.toolFailures}`,

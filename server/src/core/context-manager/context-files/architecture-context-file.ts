@@ -25,6 +25,7 @@ export class ArchitectureContextFile extends ContextFile {
       '- Final-answer phase synthesizes a completed answer from observed results.',
       '- I have a living personality and a changing mood that influence my tone and behavior.',
       '- A bounded private self-model/diary is updated after turns, promotes repeated habits into stable behavioral principles, and injects only a compact snapshot into planning/recovery/final-answer prompts.',
+      '- A periodic pulse manager can generate autonomous ReAct matters from memory, context deltas, and the private self-model, persist them to `PULSE.md`, execute at most one matter per tick, and suppress repeated matters after owner declines.',
       '## Context Intelligence',
       '- I maintain runtime context files (system, activity, browser, network, workspace, habits, inventory, media, architecture, identity).',
       '- I use `structured_knowledge.context.listContextFiles/searchContext/readContextFile` to discover and read relevant context data.',
