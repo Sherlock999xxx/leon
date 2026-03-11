@@ -232,7 +232,7 @@ Rules:
     prompt,
     systemPrompt,
     schema,
-    caller.history,
+    undefined,
     buildExecutionPromptSections({
       prompt,
       systemPrompt,
@@ -523,7 +523,7 @@ async function resolveToolFunctionWithNativeTools(
     resolveSystemPrompt,
     tools,
     'auto',
-    caller.history,
+    undefined,
     false,
     buildExecutionPromptSections({
       prompt,
@@ -758,7 +758,7 @@ async function resolveToolFunctionWithJSONMode(
     prompt,
     resolveSystemPrompt,
     resolveSchema,
-    caller.history,
+    undefined,
     buildExecutionPromptSections({
       prompt,
       systemPrompt: resolveSystemPrompt,
@@ -1038,7 +1038,7 @@ async function executeFunctionWithNativeTools(
       executeSystemPrompt,
       [tool],
       { type: 'function', function: { name: functionName } },
-      caller.history,
+      undefined,
       false,
       buildExecutionPromptSections({
         prompt,
@@ -1277,7 +1277,7 @@ async function executeFunctionWithJSONMode(
       prompt,
       executeSystemPrompt,
       executeSchema,
-      caller.history,
+      undefined,
       buildExecutionPromptSections({
         prompt,
         systemPrompt: executeSystemPrompt,

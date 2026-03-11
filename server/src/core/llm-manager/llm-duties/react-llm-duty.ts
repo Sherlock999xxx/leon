@@ -1445,6 +1445,29 @@ export class ReActLLMDuty extends LLMDuty {
     }
   }
 
+  private async withLocalPromptSession<T>(
+    history: MessageLog[] | undefined,
+    runner: (session: LlamaChatSession) => Promise<T>
+  ): Promise<T> {
+    if (Array.isArray(history) && history.length > 0) {
+      return runner(ReActLLMDuty.session)
+    }
+
+    const tempContext = await LLM_MANAGER.model.createContext()
+    const tempSession = new LlamaChatSession({
+      contextSequence: tempContext.getSequence(),
+      autoDisposeSequence: true,
+      systemPrompt: this.systemPrompt as string
+    })
+
+    try {
+      return await runner(tempSession)
+    } finally {
+      tempSession.dispose({ disposeSequence: true })
+      await tempContext.dispose()
+    }
+  }
+
   private async callLLM(
     prompt: string,
     systemPrompt: string,
@@ -1513,10 +1536,12 @@ export class ReActLLMDuty extends LLMDuty {
 
     let result
     if (LLM_PROVIDER_NAME === LLMProviders.Local) {
-      result = await LLM_PROVIDER.prompt(prompt, {
-        ...completionParams,
-        session: ReActLLMDuty.session
-      })
+      result = await this.withLocalPromptSession(history, (session) =>
+        LLM_PROVIDER.prompt(prompt, {
+          ...completionParams,
+          session
+        })
+      )
     } else {
       result = await LLM_PROVIDER.prompt(prompt, completionParams)
     }
@@ -1635,10 +1660,12 @@ export class ReActLLMDuty extends LLMDuty {
 
     let result
     if (LLM_PROVIDER_NAME === LLMProviders.Local) {
-      result = await LLM_PROVIDER.prompt(prompt, {
-        ...completionParams,
-        session: ReActLLMDuty.session
-      })
+      result = await this.withLocalPromptSession(history, (session) =>
+        LLM_PROVIDER.prompt(prompt, {
+          ...completionParams,
+          session
+        })
+      )
     } else {
       result = await LLM_PROVIDER.prompt(prompt, completionParams)
     }
