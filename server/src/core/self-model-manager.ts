@@ -701,6 +701,7 @@ export default class SelfModelManager {
             '- "story_update" should be one short first-person sentence when Leon\'s trajectory meaningfully shifts.',
             '- "behavioral_principles" should contain at most 2 durable first-person service habits that are likely to remain useful across future turns for this owner.',
             '- Only propose a behavioral principle when it reflects a repeated or clearly durable adaptation, not a one-off tactic.',
+            '- Keep the self-model about durable behavior and decisions only; do not preserve reusable wording from outputs.',
             '- "current_focus" should contain up to 3 short items.',
             '- "working_theories" should contain up to 3 short items.',
             '- "retrospection" should be one short first-person sentence about what Leon learned or should do differently.',

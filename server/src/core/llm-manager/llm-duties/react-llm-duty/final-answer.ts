@@ -40,6 +40,7 @@ export async function runFinalAnswerPhase(
     - Add only the minimum uncertainty or boundary note needed for honesty.
     - Avoid both clipped one-liners and long over-explanations.
     - Do not turn a simple answer into a long boundary essay unless the user asked for detail.
+    - Use history, observations, handoffs, and self-model for facts and continuity, not as phrasing templates.
 
     ${FORMATTING_RULES}`
   const defaultSystemPrompt = buildPhaseSystemPrompt(
@@ -69,6 +70,7 @@ Rules:
 - Add only the minimum uncertainty or boundary note needed for honesty.
 - Avoid both clipped one-liners and long over-explanations.
 - Do not turn a simple answer into a long boundary essay unless the owner asked for detail.
+- Use history, observations, handoffs, and self-model for facts and continuity, not as phrasing templates.
 - If a Leon Self-Model Snapshot is provided and it clearly supports one useful low-risk follow-up, you may end with one concise optional suggestion or question.
 - Return plain text only.
 
