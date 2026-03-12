@@ -130,6 +130,22 @@ interface ReactHistoryCompactionState {
   remote: ReactHistoryCompactionProviderState
 }
 
+function buildProgressMessageFromSteps(steps: PlanStep[]): string | null {
+  const normalizedLabels = steps
+    .map((step) => step.label.trim())
+    .filter((label) => label.length > 0)
+
+  if (normalizedLabels.length === 0) {
+    return null
+  }
+
+  if (normalizedLabels.length === 1) {
+    return `${normalizedLabels[0]}...`
+  }
+
+  return `${normalizedLabels[0]} and ${normalizedLabels[1]}...`
+}
+
 interface ReactHistoryCompactionConfig {
   historyLimit: number
   compactionBatchSize: number
@@ -429,7 +445,14 @@ export class ReActLLMDuty extends LLMDuty {
         }
 
         // Emit plan summary as text, then show the widget
-        if (planResult.summary) {
+        const planningProgressMessage = buildProgressMessageFromSteps(
+          planResult.steps
+        )
+        if (planningProgressMessage) {
+          await this.emitProgress(
+            this.toProgressiveMessage(planningProgressMessage)
+          )
+        } else if (planResult.summary) {
           await this.emitProgress(this.toProgressiveMessage(planResult.summary))
         }
         emitPlanWidget(
@@ -721,7 +744,14 @@ export class ReActLLMDuty extends LLMDuty {
             LogHelper.debug(
               `Recovery re-plan ${replanCount}/${MAX_REPLANS}: ${pendingSteps.map((s) => s.function).join(' -> ')}`
             )
-            if (recoveryPlanResult.summary) {
+            const recoveryProgressMessage = buildProgressMessageFromSteps(
+              recoveryPlanResult.steps
+            )
+            if (recoveryProgressMessage) {
+              await this.emitProgress(
+                this.toProgressiveMessage(recoveryProgressMessage)
+              )
+            } else if (recoveryPlanResult.summary) {
               LogHelper.debug(
                 `Recovery plan summary: "${recoveryPlanResult.summary}"`
               )
@@ -1255,7 +1285,6 @@ export class ReActLLMDuty extends LLMDuty {
       dutyType: LLMDuties.ReAct,
       systemPrompt: REACT_HISTORY_COMPACTION_SYSTEM_PROMPT,
       temperature: 0,
-      thoughtTokensBudget: 0,
       disableThinking: true,
       trackProviderErrors: false
     }
@@ -1487,8 +1516,6 @@ export class ReActLLMDuty extends LLMDuty {
       options?.disableThinking === true
         ? 'off'
         : (options?.reasoningMode ?? phasePolicy.reasoningMode)
-    const thoughtTokensBudget =
-      options?.thoughtTokensBudget ?? phasePolicy.thoughtTokensBudget
     const disableThinking = reasoningMode === 'off'
     const shouldEmitReasoning =
       options?.emitReasoning ?? phasePolicy.emitReasoning
@@ -1527,9 +1554,6 @@ export class ReActLLMDuty extends LLMDuty {
           }
         : {}),
       reasoningMode,
-      ...(typeof thoughtTokensBudget === 'number'
-        ? { thoughtTokensBudget }
-        : {}),
       ...(disableThinking ? { disableThinking: true } : {}),
       ...(history ? { history } : {})
     }
@@ -1580,8 +1604,6 @@ export class ReActLLMDuty extends LLMDuty {
       options?.disableThinking === true
         ? 'off'
         : (options?.reasoningMode ?? phasePolicy.reasoningMode)
-    const thoughtTokensBudget =
-      options?.thoughtTokensBudget ?? phasePolicy.thoughtTokensBudget
     const disableThinking = reasoningMode === 'off'
     const shouldEmitReasoning =
       options?.emitReasoning ?? phasePolicy.emitReasoning
@@ -1624,9 +1646,6 @@ export class ReActLLMDuty extends LLMDuty {
           }
         : {}),
       reasoningMode,
-      ...(typeof thoughtTokensBudget === 'number'
-        ? { thoughtTokensBudget }
-        : {}),
       ...(disableThinking ? { disableThinking: true } : {}),
       ...(shouldStreamToUser
         ? {
@@ -1727,8 +1746,6 @@ export class ReActLLMDuty extends LLMDuty {
       options?.disableThinking === true
         ? 'off'
         : (options?.reasoningMode ?? phasePolicy.reasoningMode)
-    const thoughtTokensBudget =
-      options?.thoughtTokensBudget ?? phasePolicy.thoughtTokensBudget
     const disableThinking = reasoningMode === 'off'
     const shouldEmitReasoning =
       options?.emitReasoning ?? phasePolicy.emitReasoning
@@ -1850,9 +1867,6 @@ export class ReActLLMDuty extends LLMDuty {
             }
           : {}),
         reasoningMode,
-        ...(typeof thoughtTokensBudget === 'number'
-          ? { thoughtTokensBudget }
-          : {}),
         ...(disableThinking ? { disableThinking: true } : {}),
         ...(shouldStreamToUserEffective
           ? {

@@ -1,10 +1,35 @@
 import os
+from pathlib import Path
 from typing import Dict, Any, Optional
 from ...base_tool import BaseTool, ExecuteCommandOptions
 from ...toolkit_config import ToolkitConfig
 
 DEFAULT_SETTINGS = {}
 REQUIRED_SETTINGS = []
+
+CRITICAL_COMMAND_PATTERNS = [
+    "rm -rf /",
+    "rm -rf /*",
+    "mkfs",
+    "format",
+    "fdisk",
+    "kill -9 -1",
+]
+
+HIGH_RISK_COMMAND_PATTERNS = [
+    "dd if=",
+    "eval $(curl",
+    "eval $(wget",
+]
+
+MEDIUM_RISK_COMMAND_PATTERNS = []
+
+UNSAFE_COMMAND_PATTERNS = [
+    *CRITICAL_COMMAND_PATTERNS,
+    *HIGH_RISK_COMMAND_PATTERNS,
+    "fork()",
+    "while true; do",
+]
 
 
 class BashTool(BaseTool):
@@ -50,6 +75,17 @@ class BashTool(BaseTool):
         Returns:
             Dict with keys: success, stdout, stderr, returncode, command
         """
+        analyzed_command = self._resolve_command_for_safety_analysis(command)
+        if not self.is_safe_command(analyzed_command):
+            risk_level = self.get_command_risk_level(analyzed_command)
+            risk_description = self.get_risk_description(analyzed_command)
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Blocked unsafe bash command ({risk_level} risk): This command may {risk_description}.",
+                "returncode": -1,
+                "command": command,
+            }
 
         try:
             # Use shell execution via the base tool's command execution method
@@ -120,36 +156,14 @@ class BashTool(BaseTool):
         Basic safety check for bash commands.
         Returns True if command appears safe to execute.
         """
-
-        # List of dangerous command patterns
-        dangerous_patterns = [
-            "rm -rf /",
-            "rm -rf /*",
-            "mkfs",
-            "dd if=",
-            "format",
-            "fdisk",
-            "> /dev/",
-            "chmod 777 /",
-            "chown -R",
-            "kill -9 -1",
-            "killall -9",
-            "fork()",
-            "while true; do",
-            "curl | sh",
-            "wget | sh",
-            "| bash",
-            "| sh",
-            "eval $(curl",
-            "eval $(wget",
-        ]
-
         command_lower = command.lower()
 
-        # Check for dangerous patterns
-        for pattern in dangerous_patterns:
+        for pattern in UNSAFE_COMMAND_PATTERNS:
             if pattern in command_lower:
                 return False
+
+        if self._is_download_piped_to_shell(command_lower):
+            return False
 
         return True
 
@@ -161,59 +175,23 @@ class BashTool(BaseTool):
 
         command_lower = command.lower()
 
-        # Critical risk commands
-        critical_patterns = [
-            "rm -rf /",
-            "rm -rf /*",
-            "mkfs",
-            "format",
-            "fdisk",
-            "kill -9 -1",
-        ]
-
-        # High risk commands
-        high_risk_patterns = [
-            "rm -rf",
-            "rm -f",
-            "chmod 777",
-            "chown -R",
-            "dd if=",
-            "killall",
-            "pkill",
-            "sudo su",
-            "curl | sh",
-            "wget | sh",
-        ]
-
-        # Medium risk commands
-        medium_risk_patterns = [
-            "sudo",
-            "rm ",
-            "mv ",
-            "cp ",
-            "chmod",
-            "chown",
-            "install",
-            "apt ",
-            "yum ",
-            "brew ",
-            "pip install",
-        ]
-
         risk_level = "low"
-        for pattern in critical_patterns:
+        for pattern in CRITICAL_COMMAND_PATTERNS:
             if pattern in command_lower:
                 risk_level = "critical"
                 break
 
         if risk_level == "low":
-            for pattern in high_risk_patterns:
+            for pattern in HIGH_RISK_COMMAND_PATTERNS:
                 if pattern in command_lower:
                     risk_level = "high"
                     break
 
+        if risk_level == "low" and self._is_download_piped_to_shell(command_lower):
+            risk_level = "high"
+
         if risk_level == "low":
-            for pattern in medium_risk_patterns:
+            for pattern in MEDIUM_RISK_COMMAND_PATTERNS:
                 if pattern in command_lower:
                     risk_level = "medium"
                     break
@@ -237,6 +215,8 @@ class BashTool(BaseTool):
             return "change file permissions or ownership"
         elif any(pkg in command_lower for pkg in ["apt", "yum", "brew", "pip"]):
             return "install or modify system packages"
+        elif self._is_download_piped_to_shell(command_lower):
+            return "download remote content and execute it as a shell script"
         elif "curl" in command_lower or "wget" in command_lower:
             return "download content from the internet"
         else:
@@ -246,3 +226,24 @@ class BashTool(BaseTool):
                 "medium": "modify your system",
                 "low": "perform system operations",
             }.get(risk_level, "affect your system")
+
+    def _resolve_command_for_safety_analysis(self, command: str) -> str:
+        trimmed_command = command.strip()
+        if not trimmed_command or any(char.isspace() for char in trimmed_command):
+            return command
+
+        candidate_path = Path(trimmed_command).expanduser().resolve()
+
+        try:
+            if not candidate_path.is_file():
+                return command
+
+            file_content = candidate_path.read_text(encoding="utf-8")
+            return file_content if file_content.strip() else command
+        except Exception:
+            return command
+
+    def _is_download_piped_to_shell(self, command_lower: str) -> bool:
+        downloads_remote_content = "curl" in command_lower or "wget" in command_lower
+        pipes_to_shell = "| bash" in command_lower or "| sh" in command_lower
+        return downloads_remote_content and pipes_to_shell

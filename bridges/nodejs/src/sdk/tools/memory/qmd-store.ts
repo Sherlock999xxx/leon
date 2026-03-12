@@ -1,6 +1,9 @@
+import { execFile } from 'node:child_process'
 import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import os from 'node:os'
 import path from 'node:path'
+import { promisify } from 'node:util'
 
 import {
   createStore,
@@ -35,6 +38,32 @@ const writeChains = new Map<string, Promise<void>>()
 const QMD_WRITE_LOCK_RETRY_MS = 250
 const QMD_WRITE_LOCK_TIMEOUT_MS = 60_000
 const QMD_WRITE_LOCK_STALE_MS = 15 * 60 * 1_000
+const QMD_EMBED_SUBPROCESS_TIMEOUT_MS = 15 * 60 * 1_000
+const QMD_EMBED_SUBPROCESS_MAX_BUFFER = 4 * 1024 * 1024
+
+const execFileAsync = promisify(execFile)
+const QMD_EMBED_WORKER_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'qmd-embed-worker.mjs'
+)
+
+interface QMDEmbedWorkerDiagnostics {
+  status?: string
+  stage?: string
+  pid?: number
+  updatedAt?: string
+  result?: {
+    docsProcessed?: number
+    chunksEmbedded?: number
+    errors?: number
+    durationMs?: number
+  }
+  error?: {
+    name?: string
+    message?: string
+    stack?: string | null
+  }
+}
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -228,6 +257,100 @@ async function openExistingStore(indexName: string): Promise<QMDStore> {
   return store
 }
 
+async function runQMDStoreEmbedInSubprocess(params: {
+  indexName: string
+  force?: boolean
+}): Promise<EmbedResult> {
+  const outputDir = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), 'leon-qmd-embed-')
+  )
+  const payloadPath = path.join(outputDir, 'payload.json')
+  const outputPath = path.join(outputDir, 'result.json')
+  const diagnosticsPath = path.join(outputDir, 'diagnostics.json')
+
+  await fs.promises.writeFile(
+    payloadPath,
+    JSON.stringify({
+      dbPath: getQMDDbPath(params.indexName),
+      options:
+        typeof params.force === 'boolean'
+          ? { force: params.force }
+          : {}
+    }),
+    'utf8'
+  )
+
+  try {
+    await execFileAsync(
+      process.execPath,
+      [QMD_EMBED_WORKER_PATH, payloadPath, outputPath, diagnosticsPath],
+      {
+        cwd: process.cwd(),
+        env: process.env,
+        timeout: QMD_EMBED_SUBPROCESS_TIMEOUT_MS,
+        maxBuffer: QMD_EMBED_SUBPROCESS_MAX_BUFFER
+      }
+    )
+
+    const output = await fs.promises.readFile(outputPath, 'utf8')
+    const parsed = JSON.parse(output || '{}') as {
+      result?: EmbedResult
+    }
+    if (!parsed.result) {
+      throw new Error('QMD embed subprocess returned no result')
+    }
+
+    return parsed.result
+  } catch (error) {
+    const execError = error as NodeJS.ErrnoException & {
+      stdout?: string | Buffer
+      stderr?: string | Buffer
+      signal?: NodeJS.Signals
+      code?: number | string
+      killed?: boolean
+    }
+    const stdout = execError.stdout ? execError.stdout.toString() : ''
+    const stderr = execError.stderr ? execError.stderr.toString() : ''
+    const exitCode =
+      typeof execError.code === 'number' ? ` exit_code=${execError.code}` : ''
+    const signal = execError.signal ? ` signal=${execError.signal}` : ''
+    const timeout = execError.killed ? ' timed_out=true' : ''
+    let diagnosticsSummary = ''
+
+    try {
+      const diagnostics = JSON.parse(
+        await fs.promises.readFile(diagnosticsPath, 'utf8')
+      ) as QMDEmbedWorkerDiagnostics
+      const diagnosticsParts = [
+        diagnostics.status ? `worker_status=${diagnostics.status}` : '',
+        diagnostics.stage ? `worker_stage=${diagnostics.stage}` : '',
+        diagnostics.error?.name ? `worker_error=${diagnostics.error.name}` : '',
+        diagnostics.error?.message
+          ? `worker_message=${JSON.stringify(diagnostics.error.message)}`
+          : ''
+      ].filter(Boolean)
+
+      if (diagnosticsParts.length > 0) {
+        diagnosticsSummary = ` ${diagnosticsParts.join(' ')}`
+      }
+    } catch {
+      // Ignore diagnostics read failures; process-level details still help.
+    }
+
+    const details = [stdout.trim(), stderr.trim()]
+      .filter(Boolean)
+      .join(' | ')
+
+    throw new Error(
+      `QMD embed subprocess failed.${exitCode}${signal}${timeout}${diagnosticsSummary}${
+        details ? ` ${details}` : ''
+      }`
+    )
+  } finally {
+    await fs.promises.rm(outputDir, { recursive: true, force: true })
+  }
+}
+
 async function openConfiguredStore(
   indexName: string,
   collections: QMDCollectionDefinition[]
@@ -406,13 +529,12 @@ export async function embedQMDStore(params: {
   collections: QMDCollectionDefinition[]
   force?: boolean
 }): Promise<EmbedResult> {
-  const store = await getQMDStore(params.indexName, params.collections)
+  await getQMDStore(params.indexName, params.collections)
   return withQMDWriteLock(params.indexName, 'embed', async () => {
-    return store.embed(
-      typeof params.force === 'boolean'
-        ? { force: params.force }
-        : {}
-    )
+    return runQMDStoreEmbedInSubprocess({
+      indexName: params.indexName,
+      ...(typeof params.force === 'boolean' ? { force: params.force } : {})
+    })
   })
 }
 

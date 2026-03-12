@@ -289,20 +289,7 @@ export function stripInlineToolMarkup(text: string): string {
 }
 
 export function shouldTreatPlanningTextAsFinalAnswer(text: string): boolean {
-  const trimmedText = text.trim()
-  if (!trimmedText) {
-    return false
-  }
-
-  if (
-    /^(\{|\[)/.test(trimmedText) ||
-    /<tool_call>|<function=|<parameter=/i.test(trimmedText) ||
-    /^[a-z_]+\.[a-z_]+(?:\.[a-zA-Z_]+)?$/.test(trimmedText)
-  ) {
-    return false
-  }
-
-  return true
+  return extractPlanningMarkedFinalAnswer(text) !== null
 }
 
 export function extractPlanningMarkedFinalAnswer(text: string): string | null {

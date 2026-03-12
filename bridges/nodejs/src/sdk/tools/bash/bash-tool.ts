@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
 import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
 
@@ -17,6 +20,30 @@ interface ExecuteOptions {
   timeout?: number
   captureOutput?: boolean
 }
+
+const CRITICAL_COMMAND_PATTERNS = [
+  'rm -rf /',
+  'rm -rf /*',
+  'mkfs',
+  'format',
+  'fdisk',
+  'kill -9 -1'
+]
+
+const HIGH_RISK_COMMAND_PATTERNS = [
+  'dd if=',
+  'eval $(curl',
+  'eval $(wget'
+]
+
+const MEDIUM_RISK_COMMAND_PATTERNS: string[] = []
+
+const UNSAFE_COMMAND_PATTERNS = [
+  ...CRITICAL_COMMAND_PATTERNS,
+  ...HIGH_RISK_COMMAND_PATTERNS,
+  'fork()',
+  'while true; do'
+]
 
 export default class BashTool extends Tool {
   private static readonly TOOLKIT = 'operating_system_control'
@@ -56,6 +83,21 @@ export default class BashTool extends Tool {
     options: ExecuteOptions = {}
   ): Promise<BashResult> {
     const { cwd = process.cwd(), timeout = 30 } = options
+    const analyzedCommand = await this.resolveCommandForSafetyAnalysis(command)
+    const isSafe = await this.isSafeCommand(analyzedCommand)
+
+    if (!isSafe) {
+      const riskLevel = await this.getCommandRiskLevel(analyzedCommand)
+      const riskDescription = await this.getRiskDescription(analyzedCommand)
+
+      return {
+        success: false,
+        stdout: '',
+        stderr: `Blocked unsafe bash command (${riskLevel} risk): This command may ${riskDescription}.`,
+        returncode: -1,
+        command
+      }
+    }
 
     try {
       // Use the base tool's command execution method
@@ -127,36 +169,16 @@ export default class BashTool extends Tool {
    * Returns True if command appears safe to execute.
    */
   async isSafeCommand(command: string): Promise<boolean> {
-    // List of dangerous command patterns
-    const dangerousPatterns = [
-      'rm -rf /',
-      'rm -rf /*',
-      'mkfs',
-      'dd if=',
-      'format',
-      'fdisk',
-      '> /dev/',
-      'chmod 777 /',
-      'chown -R',
-      'kill -9 -1',
-      'killall -9',
-      'fork()',
-      'while true; do',
-      'curl | sh',
-      'wget | sh',
-      '| bash',
-      '| sh',
-      'eval $(curl',
-      'eval $(wget'
-    ]
-
     const commandLower = command.toLowerCase()
 
-    // Check for dangerous patterns
-    for (const pattern of dangerousPatterns) {
+    for (const pattern of UNSAFE_COMMAND_PATTERNS) {
       if (commandLower.includes(pattern)) {
         return false
       }
+    }
+
+    if (this.isDownloadPipedToShell(commandLower)) {
+      return false
     }
 
     return true
@@ -169,48 +191,9 @@ export default class BashTool extends Tool {
   async getCommandRiskLevel(command: string): Promise<string> {
     const commandLower = command.toLowerCase()
 
-    // Critical risk commands
-    const criticalPatterns = [
-      'rm -rf /',
-      'rm -rf /*',
-      'mkfs',
-      'format',
-      'fdisk',
-      'kill -9 -1'
-    ]
-
-    // High risk commands
-    const highRiskPatterns = [
-      'rm -rf',
-      'rm -f',
-      'chmod 777',
-      'chown -R',
-      'dd if=',
-      'killall',
-      'pkill',
-      'sudo su',
-      'curl | sh',
-      'wget | sh'
-    ]
-
-    // Medium risk commands
-    const mediumRiskPatterns = [
-      'sudo',
-      'rm ',
-      'mv ',
-      'cp ',
-      'chmod',
-      'chown',
-      'install',
-      'apt ',
-      'yum ',
-      'brew ',
-      'pip install'
-    ]
-
     let riskLevel = 'low'
 
-    for (const pattern of criticalPatterns) {
+    for (const pattern of CRITICAL_COMMAND_PATTERNS) {
       if (commandLower.includes(pattern)) {
         riskLevel = 'critical'
         break
@@ -218,7 +201,7 @@ export default class BashTool extends Tool {
     }
 
     if (riskLevel === 'low') {
-      for (const pattern of highRiskPatterns) {
+      for (const pattern of HIGH_RISK_COMMAND_PATTERNS) {
         if (commandLower.includes(pattern)) {
           riskLevel = 'high'
           break
@@ -226,8 +209,12 @@ export default class BashTool extends Tool {
       }
     }
 
+    if (riskLevel === 'low' && this.isDownloadPipedToShell(commandLower)) {
+      riskLevel = 'high'
+    }
+
     if (riskLevel === 'low') {
-      for (const pattern of mediumRiskPatterns) {
+      for (const pattern of MEDIUM_RISK_COMMAND_PATTERNS) {
         if (commandLower.includes(pattern)) {
           riskLevel = 'medium'
           break
@@ -260,6 +247,8 @@ export default class BashTool extends Tool {
       ['apt', 'yum', 'brew', 'pip'].some((pkg) => commandLower.includes(pkg))
     ) {
       return 'install or modify system packages'
+    } else if (this.isDownloadPipedToShell(commandLower)) {
+      return 'download remote content and execute it as a shell script'
     } else if (commandLower.includes('curl') || commandLower.includes('wget')) {
       return 'download content from the internet'
     } else {
@@ -271,5 +260,39 @@ export default class BashTool extends Tool {
       }
       return descriptions[riskLevel] || 'affect your system'
     }
+  }
+
+  private async resolveCommandForSafetyAnalysis(command: string): Promise<string> {
+    const trimmedCommand = command.trim()
+    if (!trimmedCommand || /\s/.test(trimmedCommand)) {
+      return command
+    }
+
+    const resolvedPath = path.resolve(trimmedCommand)
+
+    try {
+      const stats = await fs.promises.stat(resolvedPath)
+      if (!stats.isFile()) {
+        return command
+      }
+
+      const fileContent = await fs.promises.readFile(resolvedPath, 'utf8')
+      if (!fileContent.trim()) {
+        return command
+      }
+
+      return fileContent
+    } catch {
+      return command
+    }
+  }
+
+  private isDownloadPipedToShell(commandLower: string): boolean {
+    const downloadsRemoteContent =
+      commandLower.includes('curl') || commandLower.includes('wget')
+    const pipesToShell =
+      commandLower.includes('| bash') || commandLower.includes('| sh')
+
+    return downloadsRemoteContent && pipesToShell
   }
 }

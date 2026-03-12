@@ -34,7 +34,7 @@ interface CompletionResult {
   data: Record<string, unknown> | null
   functions?: Record<string, unknown> | undefined
   maxTokens: number
-  thoughtTokensBudget: number
+  thoughtTokensBudget?: number
   usedInputTokens: number
   usedOutputTokens: number
   temperature: number
@@ -89,8 +89,6 @@ const EMPTY_COMPLETION_RETRY_DELAY_MS = 750
 const MAX_LOG_SERIALIZED_LENGTH = 4_000
 const DEFAULT_TEMPERATURE = 0 // Disabled
 const DEFAULT_MAX_TOKENS = 8_192
-const DEFAULT_THOUGHT_TOKENS_BUDGET = Infinity
-
 export default class LLMProvider {
   private static instance: LLMProvider
 
@@ -1715,8 +1713,6 @@ export default class LLMProvider {
       completionParams.temperature ?? DEFAULT_TEMPERATURE
     completionParams.maxTokens =
       completionParams.maxTokens ?? DEFAULT_MAX_TOKENS
-    completionParams.thoughtTokensBudget =
-      completionParams.thoughtTokensBudget ?? DEFAULT_THOUGHT_TOKENS_BUDGET
     completionParams.remoteProviderErrorRetries =
       completionParams.remoteProviderErrorRetries ??
       DEFAULT_REMOTE_PROVIDER_ERROR_RETRIES
@@ -2346,7 +2342,9 @@ export default class LLMProvider {
       data: completionParams.data,
       functions: completionParams.functions,
       maxTokens: completionParams.maxTokens,
-      thoughtTokensBudget: completionParams.thoughtTokensBudget,
+      ...(typeof completionParams.thoughtTokensBudget === 'number'
+        ? { thoughtTokensBudget: completionParams.thoughtTokensBudget }
+        : {}),
       // Current used context size
       usedInputTokens,
       usedOutputTokens,

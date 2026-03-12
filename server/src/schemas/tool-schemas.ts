@@ -26,7 +26,12 @@ export const toolManifestSchemaObject = Type.Strict(
     toolkit_id: Type.String({ minLength: 1 }),
     name: Type.String({ minLength: 1 }),
     description: Type.String({ minLength: 8, maxLength: 272 }),
-    icon_name: Type.Optional(Type.String({ minLength: 1 })),
+    icon_name: Type.Optional(
+      Type.String({
+        minLength: 1,
+        description: 'Icon name from https://remixicon.com'
+      })
+    ),
     author: toolAuthorSchemaObject,
     binaries: Type.Optional(
       Type.Record(Type.String({ minLength: 1 }), Type.String({ minLength: 1 }))

@@ -430,10 +430,13 @@ export default class AISDKRemoteLLMProvider {
         }
       }
 
+      const reasoningBudget = this.getReasoningBudget(completionParams)
       return {
         openrouter: {
           reasoning: {
-            max_tokens: this.getReasoningBudget(completionParams, 1024) || 1024
+            ...(typeof reasoningBudget === 'number'
+              ? { max_tokens: reasoningBudget }
+              : { effort: 'high' })
           }
         }
       }
@@ -445,11 +448,17 @@ export default class AISDKRemoteLLMProvider {
 
     if (this.config.flavor === 'anthropic') {
       if (reasoningMode === 'on') {
+        const reasoningBudget = this.getReasoningBudget(
+          completionParams,
+          1024
+        )
         return {
           anthropic: {
             thinking: {
               type: 'enabled',
-              budgetTokens: this.getReasoningBudget(completionParams, 1024) || 1024
+              ...(typeof reasoningBudget === 'number'
+                ? { budgetTokens: reasoningBudget }
+                : {})
             },
             sendReasoning: true
           }
@@ -466,11 +475,17 @@ export default class AISDKRemoteLLMProvider {
 
     if (this.config.flavor === 'moonshotai') {
       if (reasoningMode === 'on') {
+        const reasoningBudget = this.getReasoningBudget(
+          completionParams,
+          1024
+        )
         return {
           moonshotai: {
             thinking: {
               type: 'enabled',
-              budgetTokens: this.getReasoningBudget(completionParams, 1024) || 1024
+              ...(typeof reasoningBudget === 'number'
+                ? { budgetTokens: reasoningBudget }
+                : {})
             },
             reasoningHistory: 'interleaved'
           }
@@ -614,7 +629,7 @@ export default class AISDKRemoteLLMProvider {
             sendReasoning: true
           }
         : {
-            thinking: { type: 'enabled', budgetTokens: 1024 },
+            thinking: { type: 'enabled' },
             sendReasoning: true
           }
     } else if (this.config.flavor === 'moonshotai') {
@@ -623,7 +638,7 @@ export default class AISDKRemoteLLMProvider {
             thinking: { type: 'disabled' }
           }
         : {
-            thinking: { type: 'enabled', budgetTokens: 1024 },
+            thinking: { type: 'enabled' },
             reasoningHistory: 'interleaved'
           }
     } else if (this.config.flavor === 'huggingface') {

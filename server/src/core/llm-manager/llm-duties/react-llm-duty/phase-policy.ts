@@ -11,8 +11,6 @@ export interface ReactPhasePolicy {
   includeMood: boolean
   // Provider-side thinking/reasoning mode (not UI rendering).
   reasoningMode: LLMReasoningMode
-  // Optional reasoning token budget for providers that support it.
-  thoughtTokensBudget?: number
   // Request streaming from the provider API.
   streamToProvider: boolean
   // Forward streamed text tokens to the user UI in real time.
@@ -27,7 +25,6 @@ const REACT_PHASE_POLICIES: Record<ReactPhase, ReactPhasePolicy> = {
     includePersonality: false,
     includeMood: false,
     reasoningMode: 'on',
-    thoughtTokensBudget: 1_024,
     streamToProvider: true,
     streamToUser: false,
     emitReasoning: true
@@ -37,7 +34,6 @@ const REACT_PHASE_POLICIES: Record<ReactPhase, ReactPhasePolicy> = {
     includePersonality: false,
     includeMood: false,
     reasoningMode: 'guarded',
-    thoughtTokensBudget: 256,
     streamToProvider: true,
     streamToUser: false,
     emitReasoning: true
@@ -47,7 +43,6 @@ const REACT_PHASE_POLICIES: Record<ReactPhase, ReactPhasePolicy> = {
     includePersonality: false,
     includeMood: false,
     reasoningMode: 'on',
-    thoughtTokensBudget: 1_024,
     streamToProvider: true,
     streamToUser: false,
     emitReasoning: true
@@ -57,7 +52,6 @@ const REACT_PHASE_POLICIES: Record<ReactPhase, ReactPhasePolicy> = {
     includePersonality: true,
     includeMood: true,
     reasoningMode: 'off',
-    thoughtTokensBudget: 0,
     streamToProvider: true,
     streamToUser: true,
     emitReasoning: false
@@ -89,5 +83,5 @@ export function formatPhasePolicyForLog(
   phase: ReactPhase,
   policy: ReactPhasePolicy
 ): string {
-  return `phase=${phase} | profile=${policy.promptProfile} | persona=${policy.includePersonality ? 'on' : 'off'} | mood=${policy.includeMood ? 'on' : 'off'} | thinking=${policy.reasoningMode} | budget=${policy.thoughtTokensBudget ?? 0} | provider_stream=${policy.streamToProvider ? 'on' : 'off'} | user_stream=${policy.streamToUser ? 'on' : 'off'} | reasoning=${policy.emitReasoning ? 'on' : 'off'}`
+  return `phase=${phase} | profile=${policy.promptProfile} | persona=${policy.includePersonality ? 'on' : 'off'} | mood=${policy.includeMood ? 'on' : 'off'} | thinking=${policy.reasoningMode} | budget=provider_default | provider_stream=${policy.streamToProvider ? 'on' : 'off'} | user_stream=${policy.streamToUser ? 'on' : 'off'} | reasoning=${policy.emitReasoning ? 'on' : 'off'}`
 }

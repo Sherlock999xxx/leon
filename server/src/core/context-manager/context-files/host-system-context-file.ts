@@ -38,7 +38,7 @@ export class HostSystemContextFile extends ContextFile {
     const bootTime = DateHelper.getDateTime(Date.now() - os.uptime() * 1_000)
 
     return [
-      `> OS/runtime identity, locale/timezone, VPN/proxy and hardware basics. Host system is ${operatingSystemNameVersion} (${os.platform()} ${os.release()}, ${os.arch()}), user ${username}, shell ${shell}, owner location ${ownerLocation.value}${vpnProxyStatus.behindVpnOrProxy ? ' (VPN/proxy detected).' : '.'}`,
+      `> OS/runtime identity, locale/timezone, VPN/proxy and hardware basics. Host system is ${operatingSystemNameVersion} (${os.platform()} ${os.release()}, ${os.arch()}), user ${username}, shell ${shell}, runtime location hint ${ownerLocation.value}${vpnProxyStatus.behindVpnOrProxy ? ' (VPN/proxy detected).' : '.'}`,
       '# HOST_SYSTEM',
       `- Generated at: ${DateHelper.getDateTime()}`,
       `- OS name and version: ${operatingSystemNameVersion}`,
@@ -49,9 +49,9 @@ export class HostSystemContextFile extends ContextFile {
       `- Hostname: ${os.hostname()}`,
       `- Locale: ${locale}`,
       `- Time zone: ${timeZone}`,
-      `- Owner location: ${ownerLocation.value}`,
-      `- Owner location source: ${ownerLocation.source}`,
-      `- Owner location confidence: ${ownerLocation.confidence}`,
+      `- Runtime location hint: ${ownerLocation.value}`,
+      `- Runtime location hint source: ${ownerLocation.source}`,
+      `- Runtime location hint confidence: ${ownerLocation.confidence}`,
       `- VPN/proxy detected: ${vpnProxyStatus.behindVpnOrProxy ? 'yes' : 'no'}`,
       `- VPN/proxy reasons: ${vpnProxyStatus.reasons.join(', ') || 'none'}`,
       `- VPN tunnel interfaces: ${vpnProxyStatus.tunnelInterfaces.join(', ') || 'none'}`,

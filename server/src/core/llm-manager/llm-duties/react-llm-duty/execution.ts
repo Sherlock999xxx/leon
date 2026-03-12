@@ -182,6 +182,8 @@ Return ONLY one of:
 Rules:
 - Base your decision strictly on observations, not assumptions.
 - If unsure, choose "replan" and provide the minimum next functions needed.
+- Treat inferred runtime signals (timezone, locale, VPN/proxy, IP/location hints) as environment hints, not confirmed owner facts.
+- If the remaining gap is a missing owner fact or a missing dedicated retrieval step before a write/report step, choose "replan" instead of assuming.
 - If the current best answer would still rely on weak hints or unresolved uncertainty that context or memory could reduce, choose "replan" and add grounding steps instead of handing off an answer.
 - For "replan", "reason" must be a short progress update in present progressive form, written in neutral or first-person phrasing, and end with "...". Example: "Checking additional context files...".
 - "draft" should be a concise handoff payload for the final answer phase.`
@@ -245,8 +247,7 @@ Rules:
     }),
     {
       phase: 'execution',
-      reasoningMode: 'off',
-      thoughtTokensBudget: 0
+      reasoningMode: 'off'
     }
   )
 
@@ -1480,6 +1481,22 @@ export async function runToolExecution(
     toolExecutionInput.parsedInput = parsedInput
   }
 
+  if (!toolExecutionInput.parsedInput) {
+    try {
+      const parsedToolInput = JSON.parse(toolInput)
+      if (
+        parsedToolInput &&
+        typeof parsedToolInput === 'object' &&
+        !Array.isArray(parsedToolInput)
+      ) {
+        toolExecutionInput.parsedInput =
+          parsedToolInput as Record<string, unknown>
+      }
+    } catch {
+      // Leave parsedInput unset; downstream validation will surface invalid JSON.
+    }
+  }
+
   // For bash commands, write the command to a temp script file so that
   // base-tool's escapeShellArg does not destroy shell metacharacters
   // (quotes, pipes, redirects, etc.). The bash tool receives a simple
@@ -1497,7 +1514,7 @@ export async function runToolExecution(
       scriptDir,
       `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.sh`
     )
-    writeFileSync(bashScriptPath, `${command}\nexit 0`, { mode: 0o755 })
+    writeFileSync(bashScriptPath, `set -e\n${command}\n`, { mode: 0o755 })
 
     // Replace the command with the script path
     toolExecutionInput.parsedInput = {

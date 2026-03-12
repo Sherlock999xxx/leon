@@ -699,7 +699,6 @@ export default class QMDBackend {
         LogHelper.debug(
           `QMD embeddings pending: ${pendingEmbeddingCount}. Running embed refresh...`
         )
-
         await embedQMDStore({
           indexName: QMD_INDEX_NAME,
           collections: SDK_COLLECTIONS
