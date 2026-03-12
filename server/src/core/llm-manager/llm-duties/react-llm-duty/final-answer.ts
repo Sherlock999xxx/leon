@@ -27,7 +27,7 @@ export async function runFinalAnswerPhase(
   LogHelper.title(`${DUTY_NAME} / final_answer`)
   LogHelper.debug('Synthesizing final answer from execution history...')
 
-  const historySection = formatExecutionHistory(executionHistory)
+  const historySection = formatExecutionHistory(executionHistory, 'complete')
   const defaultBaseSystemPrompt = `You are synthesizing a final answer from tool execution results. Provide a clear, helpful, and complete response to the user based on the observations collected.
 
     Important:

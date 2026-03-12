@@ -7,6 +7,8 @@ import type {
   FinalPhaseIntent
 } from './types'
 
+type ExecutionHistoryFormatMode = 'compact' | 'complete'
+
 export const formatFilePath = (filePath: string): string => {
   return `[FILE_PATH]${filePath}[/FILE_PATH]`
 }
@@ -20,13 +22,56 @@ function clipText(value: string, maxLength = 180): string {
   return `${normalized.slice(0, maxLength - 3).trimEnd()}...`
 }
 
-function summarizeScalar(value: unknown): string | null {
-  if (
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  ) {
+function clipMultilineText(
+  value: string,
+  maxLength: number,
+  maxLines: number
+): string {
+  const normalized = value.replace(/\r\n/g, '\n').trim()
+  if (!normalized) {
+    return ''
+  }
+
+  const lines = normalized.split('\n')
+  const clippedLines = lines.slice(0, maxLines)
+  let output = clippedLines.join('\n')
+  let wasTruncated = lines.length > maxLines
+
+  if (output.length > maxLength) {
+    output = `${output.slice(0, maxLength - 3).trimEnd()}...`
+    wasTruncated = true
+  }
+
+  if (!wasTruncated) {
+    return output
+  }
+
+  return output.endsWith('...') ? output : `${output}\n...`
+}
+
+function summarizeScalar(
+  value: unknown,
+  mode: ExecutionHistoryFormatMode = 'compact'
+): string | null {
+  if (typeof value === 'number' || typeof value === 'boolean') {
     return clipText(String(value))
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.replace(/\r\n/g, '\n').trim()
+    if (!normalized) {
+      return null
+    }
+
+    if (!normalized.includes('\n')) {
+      return clipText(normalized, mode === 'complete' ? 320 : 180)
+    }
+
+    return clipMultilineText(
+      normalized,
+      mode === 'complete' ? 4_000 : 700,
+      mode === 'complete' ? 120 : 16
+    )
   }
 
   return null
@@ -61,7 +106,11 @@ function pickRepresentativeText(record: Record<string, unknown>): string | null 
   return null
 }
 
-function summarizeArrayField(key: string, value: unknown[]): string | null {
+function summarizeArrayField(
+  key: string,
+  value: unknown[],
+  mode: ExecutionHistoryFormatMode
+): string | null {
   if (value.length === 0) {
     return `${key}=0`
   }
@@ -83,8 +132,8 @@ function summarizeArrayField(key: string, value: unknown[]): string | null {
       : `${key}=${value.length}`
   }
 
-  const scalarPreview = value
-    .map((item) => summarizeScalar(item))
+    const scalarPreview = value
+    .map((item) => summarizeScalar(item, mode))
     .filter((item): item is string => Boolean(item))
     .slice(0, 3)
     .join(', ')
@@ -96,7 +145,8 @@ function summarizeArrayField(key: string, value: unknown[]): string | null {
 
 function summarizeObjectField(
   key: string,
-  value: Record<string, unknown>
+  value: Record<string, unknown>,
+  mode: ExecutionHistoryFormatMode
 ): string | null {
   const preferredSummary = pickRepresentativeText(value)
   if (preferredSummary) {
@@ -105,7 +155,7 @@ function summarizeObjectField(
 
   const entries = Object.entries(value)
     .map(([childKey, childValue]) => {
-      const scalar = summarizeScalar(childValue)
+      const scalar = summarizeScalar(childValue, mode)
       return scalar ? `${childKey}=${scalar}` : null
     })
     .filter((entry): entry is string => Boolean(entry))
@@ -118,9 +168,12 @@ function summarizeObjectField(
   return `${key}: ${entries.join(', ')}`
 }
 
-function summarizeStructuredPayload(payload: unknown): string[] {
+function summarizeStructuredPayload(
+  payload: unknown,
+  mode: ExecutionHistoryFormatMode = 'compact'
+): string[] {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    const scalar = summarizeScalar(payload)
+    const scalar = summarizeScalar(payload, mode)
     return scalar ? [scalar] : []
   }
 
@@ -131,14 +184,16 @@ function summarizeStructuredPayload(payload: unknown): string[] {
       break
     }
 
-    const scalar = summarizeScalar(value)
+    const scalar = summarizeScalar(value, mode)
     if (scalar) {
-      summaries.push(`${key}=${scalar}`)
+      summaries.push(
+        scalar.includes('\n') ? `${key}:\n${scalar}` : `${key}=${scalar}`
+      )
       continue
     }
 
     if (Array.isArray(value)) {
-      const arraySummary = summarizeArrayField(key, value)
+      const arraySummary = summarizeArrayField(key, value, mode)
       if (arraySummary) {
         summaries.push(arraySummary)
       }
@@ -148,7 +203,8 @@ function summarizeStructuredPayload(payload: unknown): string[] {
     if (value && typeof value === 'object') {
       const objectSummary = summarizeObjectField(
         key,
-        value as Record<string, unknown>
+        value as Record<string, unknown>,
+        mode
       )
       if (objectSummary) {
         summaries.push(objectSummary)
@@ -192,9 +248,16 @@ function extractObservationPayload(
   return outputRecord
 }
 
-function formatObservationSummary(observation: string): string {
+function formatObservationSummary(
+  observation: string,
+  mode: ExecutionHistoryFormatMode = 'compact'
+): string {
   const parsed = parseToolCallArguments(observation)
   if (!parsed) {
+    if (mode === 'complete') {
+      return clipMultilineText(observation, 4_000, 120)
+    }
+
     return clipText(observation, 320)
   }
 
@@ -228,13 +291,22 @@ function formatObservationSummary(observation: string): string {
   }
 
   const payloadSummary = summarizeStructuredPayload(
-    extractObservationPayload(parsed)
+    extractObservationPayload(parsed),
+    mode
   )
   if (payloadSummary.length > 0) {
-    parts.push(payloadSummary.join(' | '))
+    parts.push(...payloadSummary)
   }
 
-  return clipText(parts.join(' | '), 700)
+  const summary = parts.some((part) => part.includes('\n'))
+    ? parts.join('\n')
+    : parts.join(' | ')
+
+  if (mode === 'complete') {
+    return clipMultilineText(summary, 6_000, 160)
+  }
+
+  return clipText(summary.replace(/\s*\n\s*/g, ' | '), 700)
 }
 
 /**
@@ -263,21 +335,35 @@ function parseFinalIntent(
   }
 }
 
-export function formatExecutionHistory(history: ExecutionRecord[]): string {
+function indentBlock(value: string, prefix: string): string {
+  return value
+    .split('\n')
+    .map((line) => `${prefix}${line}`)
+    .join('\n')
+}
+
+export function formatExecutionHistory(
+  history: ExecutionRecord[],
+  mode: ExecutionHistoryFormatMode = 'compact'
+): string {
   if (history.length === 0) {
     return 'Previous Executions: none'
   }
   return `Previous Executions:\n${history
-    .map(
-      (exec, i) =>
-        `Step ${i + 1}: ${exec.function} [${exec.status}]${
-          exec.stepLabel ? ` | Label: "${exec.stepLabel}"` : ''
-        }${
-          exec.requestedToolInput
-            ? `\n  Input: ${clipText(exec.requestedToolInput, 220)}`
-            : ''
-        }\n  Result: ${formatObservationSummary(exec.observation)}`
-    )
+    .map((exec, i) => {
+      const observationSummary = formatObservationSummary(exec.observation, mode)
+      const resultSection = observationSummary.includes('\n')
+        ? `\n  Result:\n${indentBlock(observationSummary, '    ')}`
+        : `\n  Result: ${observationSummary}`
+
+      return `Step ${i + 1}: ${exec.function} [${exec.status}]${
+        exec.stepLabel ? ` | Label: "${exec.stepLabel}"` : ''
+      }${
+        exec.requestedToolInput
+          ? `\n  Input: ${clipText(exec.requestedToolInput, 220)}`
+          : ''
+      }${resultSection}`
+    })
     .join('\n')}`
 }
 

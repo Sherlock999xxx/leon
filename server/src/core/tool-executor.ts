@@ -170,7 +170,7 @@ export default class ToolExecutor {
     })
   }
 
-  private buildResult(params: {
+  private async buildResult(params: {
     status: ToolExecutionResult['status']
     message: string
     input: string | null
@@ -178,7 +178,7 @@ export default class ToolExecutor {
     functionName?: string | null
     parsedInput?: Record<string, unknown> | null
     output?: Record<string, unknown>
-  }): ToolExecutionResult {
+  }): Promise<ToolExecutionResult> {
     const result: ToolExecutionResult = {
       status: params.status,
       message: params.message,
@@ -195,6 +195,17 @@ export default class ToolExecutor {
     if (params.resolvedTool) {
       result.toolLabel = `${params.resolvedTool.toolkitId}.${params.resolvedTool.toolId}`
     }
+
+    await TOOL_CALL_LOGGER.recordToolOutput({
+      toolkitId: result.data.toolkit_id,
+      toolId: result.data.tool_id || params.resolvedTool?.toolId || 'unknown',
+      functionName: result.data.function_name,
+      status: result.status,
+      message: result.message,
+      rawInput: result.data.input,
+      parsedInput: result.data.parsed_input,
+      output: result.data.output
+    })
 
     return result
   }
