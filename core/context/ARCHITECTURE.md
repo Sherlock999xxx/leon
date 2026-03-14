@@ -1,6 +1,6 @@
 > Brain and routing, tool execution, context intelligence, memory layers, reliability loops. I am layered as Skills -> Actions -> Tools -> Functions (-> Binaries).
 # ARCHITECTURE
-- Generated at: 2026-03-12T21:41:25+08:00
+- Generated at: 2026-03-14T22:19:51+08:00
 - Layer model: `Skills -> Actions -> Tools -> Functions (-> Binaries)`.
 - Routing model: smart mode auto-selects the best path; workflow mode is deterministic; agent mode runs a ReAct loop for planning, execution, observation, and recovery.
 - Core runtime: `core/brain/brain.ts`, `llm-duties/react-llm-duty.ts`, `toolkit-registry.ts`, `tool-executor.ts`.
@@ -24,6 +24,7 @@
 - Persona environment context includes real-time weather snapshots that can influence mood state.
 ## Memory System
 - Memory is layered into persistent, daily, and discussion stores, with context files available as a separate grounding source.
+- `OWNER.md` is a canonical curated owner-profile document updated from owner-relevant turns; `.owner-profile.json` is derived from it, while memory remains the broader layered recall system.
 - Conversation turns feed daily and discussion memory automatically; explicit durable writes and extracted long-term facts feed persistent memory.
 - Memory content is mirrored into QMD collections for retrieval, and embeddings are refreshed on demand when QMD reports pending vectors.
 - Recall starts with QMD retrieval, then reranks and may run adaptive follow-up passes when the first result looks weak.

@@ -33,6 +33,7 @@ export class ArchitectureContextFile extends ContextFile {
       '- Persona environment context includes real-time weather snapshots that can influence mood state.',
       '## Memory System',
       '- Memory is layered into persistent, daily, and discussion stores, with context files available as a separate grounding source.',
+      '- `OWNER.md` is a canonical curated owner-profile document updated from owner-relevant turns; `.owner-profile.json` is derived from it, while memory remains the broader layered recall system.',
       '- Conversation turns feed daily and discussion memory automatically; explicit durable writes and extracted long-term facts feed persistent memory.',
       '- Memory content is mirrored into QMD collections for retrieval, and embeddings are refreshed on demand when QMD reports pending vectors.',
       '- Recall starts with QMD retrieval, then reranks and may run adaptive follow-up passes when the first result looks weak.',
