@@ -18,16 +18,16 @@ export function buildCatalog(): Catalog {
     )
     if (toolFunctions) {
       for (const [fnName, fnConfig] of Object.entries(toolFunctions) as [string, FunctionConfig][]) {
-        // Include only required parameter names to keep hints concise.
+        // Include a small ordered parameter preview so the planner sees
+        // useful optional inputs such as forecast dates without bloating
+        // the catalog.
         const params = fnConfig.parameters
         const paramNames: string[] = []
         if (params && typeof params === 'object') {
-          const required = (params as Record<string, unknown>)['required']
-          if (Array.isArray(required)) {
+          const properties = (params as Record<string, unknown>)['properties']
+          if (properties && typeof properties === 'object' && !Array.isArray(properties)) {
             paramNames.push(
-              ...required.filter(
-                (value): value is string => typeof value === 'string'
-              )
+              ...Object.keys(properties as Record<string, unknown>).slice(0, 5)
             )
           }
         }

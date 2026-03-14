@@ -129,7 +129,7 @@ export async function runPlanningPhase(
   const contextManifestSection = buildContextManifestSection(
     caller.getContextManifest()
   )
-  const prompt = `<available_catalog>\n${catalog.text}${catalogNote}\n</available_catalog>\n\n<self_model>\n${selfModelSection}\n</self_model>\n\n<context_manifest>\n${contextManifestSection}\n</context_manifest>\n\n<grounding_note>\nEnvironment context is available through structured_knowledge.context tools when needed.\n</grounding_note>\n\n<user_request>\n${caller.input}\n</user_request>`
+  const prompt = `<context_manifest>\n${contextManifestSection}\n</context_manifest>\n\n<available_catalog>\n${catalog.text}${catalogNote}\n</available_catalog>\n\n<self_model>\n${selfModelSection}\n</self_model>\n\n<grounding_note>\nEnvironment context is available through structured_knowledge.context tools when needed.\n</grounding_note>\n\n<user_request>\n${caller.input}\n</user_request>`
 
   const planSchema = PLAN_RESPONSE_SCHEMA
 

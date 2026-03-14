@@ -121,17 +121,17 @@ export async function runRecoveryPlanningPhase(
           )
           .join('\n')
       : '- none'
-  const prompt = `<available_catalog>
+  const prompt = `<context_manifest>
+${contextManifestSection}
+</context_manifest>
+
+<available_catalog>
 ${catalog.text}${catalogNote}
 </available_catalog>
 
 <self_model>
 ${selfModelSection}
 </self_model>
-
-<context_manifest>
-${contextManifestSection}
-</context_manifest>
 
 <grounding_note>
 Environment context is available through structured_knowledge.context tools when needed.
