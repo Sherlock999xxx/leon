@@ -44,6 +44,19 @@ interface OwnerDocumentVerification {
   missingFacts: string[]
 }
 
+type OwnerStaticFields = Pick<
+  OwnerProfile,
+  | 'owner_first_name'
+  | 'owner_last_name'
+  | 'owner_full_name'
+  | 'owner_birth_date'
+  | 'owner_current_city'
+  | 'owner_current_country'
+  | 'owner_nationality'
+  | 'owner_current_company'
+  | 'owner_current_role'
+>
+
 const OWNER_DOCUMENT_VERIFICATION_SCHEMA = {
   type: 'object',
   properties: {
@@ -54,6 +67,33 @@ const OWNER_DOCUMENT_VERIFICATION_SCHEMA = {
     }
   },
   required: ['safe', 'missingFacts'],
+  additionalProperties: false
+} as const
+
+const OWNER_STATIC_FIELDS_SCHEMA = {
+  type: 'object',
+  properties: {
+    owner_first_name: { type: ['string', 'null'] },
+    owner_last_name: { type: ['string', 'null'] },
+    owner_full_name: { type: ['string', 'null'] },
+    owner_birth_date: { type: ['string', 'null'] },
+    owner_current_city: { type: ['string', 'null'] },
+    owner_current_country: { type: ['string', 'null'] },
+    owner_nationality: { type: ['string', 'null'] },
+    owner_current_company: { type: ['string', 'null'] },
+    owner_current_role: { type: ['string', 'null'] }
+  },
+  required: [
+    'owner_first_name',
+    'owner_last_name',
+    'owner_full_name',
+    'owner_birth_date',
+    'owner_current_city',
+    'owner_current_country',
+    'owner_nationality',
+    'owner_current_company',
+    'owner_current_role'
+  ],
   additionalProperties: false
 } as const
 
@@ -93,6 +133,68 @@ function areOwnerProfilesEquivalent(
     ...profileB,
     updatedAt: null
   }))
+}
+
+function areOwnerDocumentProfilesEquivalent(
+  profileA: OwnerProfile,
+  profileB: OwnerProfile
+): boolean {
+  return JSON.stringify(normalizeOwnerProfile({
+    ...profileA,
+    updatedAt: null,
+    owner_first_name: null,
+    owner_last_name: null,
+    owner_full_name: null,
+    owner_birth_date: null,
+    owner_current_city: null,
+    owner_current_country: null,
+    owner_nationality: null,
+    owner_current_company: null,
+    owner_current_role: null
+  })) === JSON.stringify(normalizeOwnerProfile({
+    ...profileB,
+    updatedAt: null,
+    owner_first_name: null,
+    owner_last_name: null,
+    owner_full_name: null,
+    owner_birth_date: null,
+    owner_current_city: null,
+    owner_current_country: null,
+    owner_nationality: null,
+    owner_current_company: null,
+    owner_current_role: null
+  }))
+}
+
+function extractOwnerStaticFieldsFromOutput(output: unknown): OwnerStaticFields | null {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) {
+    return null
+  }
+
+  const raw = output as Record<string, unknown>
+  const normalized = normalizeOwnerProfile({
+    owner_first_name: raw['owner_first_name'],
+    owner_last_name: raw['owner_last_name'],
+    owner_full_name: raw['owner_full_name'],
+    owner_birth_date: raw['owner_birth_date'],
+    owner_current_city: raw['owner_current_city'],
+    owner_current_country: raw['owner_current_country'],
+    owner_nationality: raw['owner_nationality'],
+    owner_current_company: raw['owner_current_company'],
+    owner_current_role: raw['owner_current_role']
+  })
+
+  return {
+    owner_first_name: normalized.owner_first_name,
+    owner_last_name: normalized.owner_last_name,
+    owner_full_name: normalized.owner_full_name,
+    owner_birth_date: normalized.owner_birth_date,
+    owner_current_city: normalized.owner_current_city,
+    owner_current_country: normalized.owner_current_country,
+    owner_nationality: normalized.owner_nationality,
+    owner_current_company: normalized.owner_current_company,
+    owner_current_role: normalized.owner_current_role
+  }
 }
 
 function extractOwnerMemoryItemsFromToolExecutions(
@@ -434,32 +536,99 @@ async function verifyOwnerDocumentPreservesFacts(
   return null
 }
 
+async function extractOwnerStaticFields(
+  ownerDocument: string,
+  currentProfile: OwnerProfile
+): Promise<OwnerStaticFields | null> {
+  const prompt = [
+    'Extract only these stable owner cache fields from OWNER.md.',
+    'Use null when a field is missing, unclear, inferred, or no longer current.',
+    'For current company and current role, only return values that are still current now, not past employment.',
+    'JSON only.',
+    '',
+    `Current static cache JSON: ${JSON.stringify({
+      owner_first_name: currentProfile.owner_first_name,
+      owner_last_name: currentProfile.owner_last_name,
+      owner_full_name: currentProfile.owner_full_name,
+      owner_birth_date: currentProfile.owner_birth_date,
+      owner_current_city: currentProfile.owner_current_city,
+      owner_current_country: currentProfile.owner_current_country,
+      owner_nationality: currentProfile.owner_nationality,
+      owner_current_company: currentProfile.owner_current_company,
+      owner_current_role: currentProfile.owner_current_role
+    })}`,
+    '',
+    'OWNER.md:',
+    ownerDocument
+  ].join('\n')
+
+  try {
+    const output = await promptForOwnerDocument(
+      prompt,
+      'Extract a tiny stable owner cache from OWNER.md without guessing.',
+      250,
+      OWNER_DOCUMENT_VERIFY_TIMEOUT_MS,
+      OWNER_STATIC_FIELDS_SCHEMA
+    )
+
+    return extractOwnerStaticFieldsFromOutput(output)
+  } catch {
+    return null
+  }
+}
+
 async function writeOwnerArtifacts(
   profile: OwnerProfile
 ): Promise<{ profileChanged: boolean, contextChanged: boolean }> {
   const currentProfile = readOwnerProfileSync()
   const normalizedProfile = normalizeOwnerProfile(profile)
-  const profilesEqual = areOwnerProfilesEquivalent(currentProfile, normalizedProfile)
   const currentDocument = readOwnerDocumentSync().trimEnd()
+  const currentDocumentProfile = parseOwnerDocument(currentDocument)
+  const updatedAt = new Date().toISOString()
+  const nextDocumentDraft = buildOwnerDocument({
+    ...normalizedProfile,
+    updatedAt
+  })
+  const extractedStaticFields = await extractOwnerStaticFields(
+    nextDocumentDraft,
+    currentProfile
+  )
+  const nextProfile = normalizeOwnerProfile({
+    ...normalizedProfile,
+    ...(extractedStaticFields || {
+      owner_first_name: currentProfile.owner_first_name,
+      owner_last_name: currentProfile.owner_last_name,
+      owner_full_name: currentProfile.owner_full_name,
+      owner_birth_date: currentProfile.owner_birth_date,
+      owner_current_city: currentProfile.owner_current_city,
+      owner_current_country: currentProfile.owner_current_country,
+      owner_nationality: currentProfile.owner_nationality,
+      owner_current_company: currentProfile.owner_current_company,
+      owner_current_role: currentProfile.owner_current_role
+    }),
+    updatedAt
+  })
+  const profilesEqual = areOwnerProfilesEquivalent(currentProfile, nextProfile)
+  const nextDocument = buildOwnerDocument(nextProfile)
+  const documentProfilesEqual = areOwnerDocumentProfilesEquivalent(
+    currentDocumentProfile,
+    nextProfile
+  )
+  const contextChanged =
+    !documentProfilesEqual || !fs.existsSync(OWNER_CONTEXT_PATH)
+  const profileChanged = !profilesEqual || !fs.existsSync(OWNER_PROFILE_PATH)
 
-  if (profilesEqual && fs.existsSync(OWNER_CONTEXT_PATH) && fs.existsSync(OWNER_PROFILE_PATH)) {
+  if (!profileChanged && !contextChanged) {
     return {
       profileChanged: false,
       contextChanged: false
     }
   }
 
-  const updatedAt = new Date().toISOString()
-  const nextProfile = normalizeOwnerProfile({
-    ...normalizedProfile,
-    updatedAt
-  })
-  const nextDocument = buildOwnerDocument(nextProfile)
-  const contextChanged = currentDocument !== nextDocument
-  const profileChanged = !profilesEqual || !fs.existsSync(OWNER_PROFILE_PATH)
-
-  await fs.promises.mkdir(path.dirname(OWNER_CONTEXT_PATH), { recursive: true })
-  await fs.promises.writeFile(OWNER_CONTEXT_PATH, `${nextDocument}\n`, 'utf8')
+  if (contextChanged) {
+    await fs.promises.mkdir(path.dirname(OWNER_CONTEXT_PATH), { recursive: true })
+    await fs.promises.writeFile(OWNER_CONTEXT_PATH, `${nextDocument}\n`, 'utf8')
+  }
   await writeOwnerProfile(nextProfile)
 
   return {

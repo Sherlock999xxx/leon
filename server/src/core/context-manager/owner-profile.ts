@@ -39,6 +39,15 @@ export type OwnerProfileSectionKey =
 
 export interface OwnerProfile {
   updatedAt: string | null
+  owner_first_name: string | null
+  owner_last_name: string | null
+  owner_full_name: string | null
+  owner_birth_date: string | null
+  owner_current_city: string | null
+  owner_current_country: string | null
+  owner_nationality: string | null
+  owner_current_company: string | null
+  owner_current_role: string | null
   identity: string[]
   homeAndImportantPlaces: string[]
   familyAndRelationships: string[]
@@ -99,6 +108,33 @@ export const OWNER_PROFILE_SECTIONS: Array<{
 export const OWNER_PROFILE_SCHEMA = {
   type: 'object',
   properties: {
+    owner_first_name: {
+      type: ['string', 'null']
+    },
+    owner_last_name: {
+      type: ['string', 'null']
+    },
+    owner_full_name: {
+      type: ['string', 'null']
+    },
+    owner_birth_date: {
+      type: ['string', 'null']
+    },
+    owner_current_city: {
+      type: ['string', 'null']
+    },
+    owner_current_country: {
+      type: ['string', 'null']
+    },
+    owner_nationality: {
+      type: ['string', 'null']
+    },
+    owner_current_company: {
+      type: ['string', 'null']
+    },
+    owner_current_role: {
+      type: ['string', 'null']
+    },
     identity: {
       type: 'array',
       items: { type: 'string' }
@@ -133,6 +169,15 @@ export const OWNER_PROFILE_SCHEMA = {
     }
   },
   required: [
+    'owner_first_name',
+    'owner_last_name',
+    'owner_full_name',
+    'owner_birth_date',
+    'owner_current_city',
+    'owner_current_country',
+    'owner_nationality',
+    'owner_current_company',
+    'owner_current_role',
     'identity',
     'homeAndImportantPlaces',
     'familyAndRelationships',
@@ -148,6 +193,15 @@ export const OWNER_PROFILE_SCHEMA = {
 export function createEmptyOwnerProfile(): OwnerProfile {
   return {
     updatedAt: null,
+    owner_first_name: null,
+    owner_last_name: null,
+    owner_full_name: null,
+    owner_birth_date: null,
+    owner_current_city: null,
+    owner_current_country: null,
+    owner_nationality: null,
+    owner_current_company: null,
+    owner_current_role: null,
     identity: [],
     homeAndImportantPlaces: [],
     familyAndRelationships: [],
@@ -185,6 +239,11 @@ function normalizeLines(value: unknown): string[] {
   return [...deduped]
 }
 
+function normalizeNullableLine(value: unknown): string | null {
+  const normalized = normalizeLine(value)
+  return normalized || null
+}
+
 export function normalizeOwnerProfile(value: unknown): OwnerProfile {
   const raw =
     value && typeof value === 'object' && !Array.isArray(value)
@@ -196,6 +255,15 @@ export function normalizeOwnerProfile(value: unknown): OwnerProfile {
       typeof raw['updatedAt'] === 'string' && raw['updatedAt'].trim()
         ? raw['updatedAt'].trim()
         : null,
+    owner_first_name: normalizeNullableLine(raw['owner_first_name']),
+    owner_last_name: normalizeNullableLine(raw['owner_last_name']),
+    owner_full_name: normalizeNullableLine(raw['owner_full_name']),
+    owner_birth_date: normalizeNullableLine(raw['owner_birth_date']),
+    owner_current_city: normalizeNullableLine(raw['owner_current_city']),
+    owner_current_country: normalizeNullableLine(raw['owner_current_country']),
+    owner_nationality: normalizeNullableLine(raw['owner_nationality']),
+    owner_current_company: normalizeNullableLine(raw['owner_current_company']),
+    owner_current_role: normalizeNullableLine(raw['owner_current_role']),
     identity: normalizeLines(raw['identity']),
     homeAndImportantPlaces: normalizeLines(raw['homeAndImportantPlaces']),
     familyAndRelationships: normalizeLines(raw['familyAndRelationships']),
@@ -293,12 +361,24 @@ export function readOwnerDocumentSync(): string {
 }
 
 export function readOwnerProfileSync(): OwnerProfile {
+  const cacheProfile = readOwnerProfileCacheSync()
   const ownerDocument = readOwnerDocumentSync()
   if (ownerDocument.trim()) {
-    return applyLegacyOwnerSeed(parseOwnerDocument(ownerDocument))
+    return applyLegacyOwnerSeed(normalizeOwnerProfile({
+      ...parseOwnerDocument(ownerDocument),
+      owner_first_name: cacheProfile.owner_first_name,
+      owner_last_name: cacheProfile.owner_last_name,
+      owner_full_name: cacheProfile.owner_full_name,
+      owner_birth_date: cacheProfile.owner_birth_date,
+      owner_current_city: cacheProfile.owner_current_city,
+      owner_current_country: cacheProfile.owner_current_country,
+      owner_nationality: cacheProfile.owner_nationality,
+      owner_current_company: cacheProfile.owner_current_company,
+      owner_current_role: cacheProfile.owner_current_role
+    }))
   }
 
-  return applyLegacyOwnerSeed(readOwnerProfileCacheSync())
+  return applyLegacyOwnerSeed(cacheProfile)
 }
 
 export async function writeOwnerProfile(profile: OwnerProfile): Promise<void> {

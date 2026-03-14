@@ -8,7 +8,8 @@ import { LogHelper } from '@/helpers/log-helper'
 import { StringHelper } from '@/helpers/string-helper'
 import { DateHelper } from '@/helpers/date-helper'
 import { SkillDomainHelper } from '@/helpers/skill-domain-helper'
-import { ContextProbeHelper } from '@/core/context-manager/context-probe-helper'
+import { ContextStateStore } from '@/core/context-manager/context-state-store'
+import { readOwnerProfileSync } from '@/core/context-manager/owner-profile'
 
 /**
  * @see https://llama.meta.com/docs/how-to-guides/prompting/
@@ -25,6 +26,12 @@ interface WeatherSnapshot {
   description: string
   temperatureC: number
   observationTime: string
+}
+
+interface WeatherCacheState {
+  fetchedAt: number | null
+  locationQuery: string | null
+  snapshot: WeatherSnapshot | null
 }
 
 interface CompactPromptOptions {
@@ -150,10 +157,16 @@ const MOODS: Mood[] = [
 ]
 const DEFAULT_MOOD = MOODS.find((mood) => mood.type === Moods.Default) as Mood
 const BAD_MOODS = [Moods.Tired, Moods.Sad, Moods.Angry]
+// 4 hours
+const WEATHER_REFRESH_INTERVAL_MS = (60_000 * 60) * 4
+const EMPTY_WEATHER_CACHE_STATE: WeatherCacheState = {
+  fetchedAt: null,
+  locationQuery: null,
+  snapshot: null
+}
 
 export default class Persona {
   private static instance: Persona
-  private readonly probeHelper = new ContextProbeHelper()
   private _mood: Mood = DEFAULT_MOOD
   private contextInfo = CONTEXT_INFO
   private ownerName: string | null = null
@@ -162,6 +175,10 @@ export default class Persona {
   private whatYouDo = WHAT_YOU_DO
   private personalityRules = PERSONALITY_RULES
   private weatherSnapshot: WeatherSnapshot | null = null
+  private readonly weatherCacheStore = new ContextStateStore<WeatherCacheState>(
+    '.persona-weather-cache.json',
+    EMPTY_WEATHER_CACHE_STATE
+  )
 
   get mood(): Mood {
     return this._mood
@@ -175,10 +192,9 @@ export default class Persona {
       Persona.instance = this
 
       this.setMood()
-      // Disabled until owner location grounding is reliable enough.
-      // setInterval(() => {
-      //   void this.syncWeatherMoodAndContext()
-      // }, 60_000 * 60)
+      setInterval(() => {
+        void this.syncWeatherMoodAndContext()
+      }, WEATHER_REFRESH_INTERVAL_MS)
 
       this.setContextInfo()
       this.setOwnerInfo()
@@ -188,8 +204,7 @@ export default class Persona {
         EVENT_EMITTER.emit('persona_new-info-set')
       }, 60_000 * 5)
 
-      // Disabled until owner location grounding is reliable enough.
-      // void this.syncWeatherMoodAndContext()
+      void this.syncWeatherMoodAndContext()
     }
   }
 
@@ -221,16 +236,22 @@ export default class Persona {
   }
 
   private async setOwnerInfo(): Promise<void> {
+    const ownerProfile = readOwnerProfileSync()
     const ownerInfo = await SkillDomainHelper.getSkillMemory(
       'leon',
       'introduction',
       'owner'
     )
 
-    if (ownerInfo) {
-      this.ownerName = StringHelper.ucFirst(ownerInfo['name'] as string)
-      this.ownerBirthDate = ownerInfo['birth_date'] as string
-    }
+    this.ownerName =
+      ownerProfile.owner_first_name ||
+      ownerProfile.owner_full_name ||
+      (ownerInfo
+        ? StringHelper.ucFirst(ownerInfo['name'] as string)
+        : null)
+    this.ownerBirthDate =
+      ownerProfile.owner_birth_date ||
+      (ownerInfo ? (ownerInfo['birth_date'] as string) : null)
 
     this.whoYouAre = StringHelper.findAndMap(WHO_YOU_ARE, {
       '%OWNER_NAME%': this.ownerName || 'the user'
@@ -252,50 +273,75 @@ export default class Persona {
     )
   }
 
-  private extractWeatherQuery(rawLocation: string): string {
-    const trimmed = rawLocation.trim()
-    if (!trimmed || trimmed.toLowerCase().startsWith('unknown')) {
-      return ''
-    }
-
-    const noMeta = trimmed.split('(')[0]?.trim() || ''
-    if (!noMeta) {
-      return ''
-    }
-
-    const parts = noMeta
-      .split(',')
-      .map((part) => part.trim())
-      .filter((part) => part.length > 0)
-
-    if (parts.length <= 2) {
-      return noMeta
-    }
-
-    const city = parts[0] || ''
-    const countryOrRegion = parts[parts.length - 1] || ''
-    return city && countryOrRegion ? `${city}, ${countryOrRegion}` : noMeta
-  }
-
   private fallbackCityFromTimezone(timeZone: string): string {
     const parts = timeZone.split('/').filter(Boolean)
     const city = parts[parts.length - 1] || ''
     return city.replaceAll('_', ' ').trim()
   }
 
+  private getOwnerWeatherLocationQuery(): string {
+    const ownerProfile = readOwnerProfileSync()
+    const city = ownerProfile.owner_current_city?.trim() || ''
+    const country = ownerProfile.owner_current_country?.trim() || ''
+
+    if (city && country) {
+      return `${city}, ${country}`
+    }
+
+    if (city) {
+      return city
+    }
+
+    return ''
+  }
+
+  private getFreshCachedWeatherSnapshot(
+    locationQuery: string
+  ): WeatherSnapshot | null {
+    const cache = this.weatherCacheStore.load()
+    if (
+      !cache.snapshot ||
+      !cache.locationQuery ||
+      cache.locationQuery !== locationQuery ||
+      typeof cache.fetchedAt !== 'number'
+    ) {
+      return null
+    }
+
+    if (Date.now() - cache.fetchedAt >= WEATHER_REFRESH_INTERVAL_MS) {
+      return null
+    }
+
+    return cache.snapshot
+  }
+
+  private saveWeatherSnapshotCache(
+    locationQuery: string,
+    snapshot: WeatherSnapshot
+  ): void {
+    this.weatherCacheStore.save({
+      fetchedAt: Date.now(),
+      locationQuery,
+      snapshot
+    })
+  }
+
   private async refreshWeatherSnapshot(): Promise<void> {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''
-    const locale = Intl.DateTimeFormat().resolvedOptions().locale || ''
-    const ownerLocation = this.probeHelper.probeOwnerLocation({
-      timeZone,
-      locale
-    })
     const weatherLocationQuery =
-      this.extractWeatherQuery(ownerLocation.value) ||
+      this.getOwnerWeatherLocationQuery() ||
       this.fallbackCityFromTimezone(timeZone)
 
     if (!weatherLocationQuery) {
       this.weatherSnapshot = null
+      return
+    }
+
+    const cachedSnapshot = this.getFreshCachedWeatherSnapshot(
+      weatherLocationQuery
+    )
+    if (cachedSnapshot) {
+      this.weatherSnapshot = cachedSnapshot
       return
     }
 
@@ -347,6 +393,7 @@ export default class Persona {
       temperatureC,
       observationTime
     }
+    this.saveWeatherSnapshotCache(weatherLocationQuery, this.weatherSnapshot)
   }
 
   private applyWeatherMoodOverride(random: number): void {
