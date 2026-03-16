@@ -544,11 +544,12 @@ export default class Chatbot {
     const tokensPerSecond = Number(
       metrics.tokensPerSecond || metrics.averagedPhaseTokensPerSecond || 0
     )
+    const tokenFormatter = new Intl.NumberFormat()
 
     return `
       <span class="bubble-metric-item">
         <i class="ri-copper-coin-line" aria-hidden="true"></i>
-        <span>${totalTokens} (i:${inputTokens}/o:${outputTokens}) tok</span>
+        <span>${tokenFormatter.format(totalTokens)} (i:${tokenFormatter.format(inputTokens)}/o:${tokenFormatter.format(outputTokens)}) tok</span>
       </span>
       <span class="bubble-metric-separator" aria-hidden="true">•</span>
       <span class="bubble-metric-item">
