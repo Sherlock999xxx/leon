@@ -68,6 +68,7 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
   private static nextServerLogResetAt = 0
   private static activeModelPath: string | null = null
   private static serverReady = false
+  private static isUsingExternalServer = false
   private static serverReadyPromise: Promise<void> | null = null
   private static instanceCount = 0
 
@@ -127,7 +128,7 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
 
     if (completionParams.shouldStream === true && isPlainTextRequest) {
       LogHelper.title('llama.cpp LLM Provider')
-      LogHelper.warning(
+      LogHelper.info(
         'Using direct llama.cpp streaming chat completion for plain-text request.'
       )
 
@@ -136,7 +137,7 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
 
     if (completionParams.shouldStream !== true && isPlainTextRequest) {
       LogHelper.title('llama.cpp LLM Provider')
-      LogHelper.warning(
+      LogHelper.info(
         'Using direct non-stream llama.cpp chat completion for plain-text request.'
       )
 
@@ -451,13 +452,25 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
   }
 
   private async ensureServerReady(): Promise<void> {
-    if (
-      LlamaCPPLLMProvider.serverReady &&
-      LlamaCPPLLMProvider.serverProcess &&
-      !LlamaCPPLLMProvider.serverProcess.killed &&
-      LlamaCPPLLMProvider.activeModelPath === this.modelPath
-    ) {
-      return
+    if (LlamaCPPLLMProvider.serverReady) {
+      if (LlamaCPPLLMProvider.isUsingExternalServer) {
+        const existingServerProbe = await LlamaCPPLLMProvider.probeServerReady()
+
+        if (existingServerProbe.ready) {
+          return
+        }
+
+        LlamaCPPLLMProvider.serverReady = false
+        LlamaCPPLLMProvider.isUsingExternalServer = false
+      }
+
+      if (
+        LlamaCPPLLMProvider.serverProcess &&
+        !LlamaCPPLLMProvider.serverProcess.killed &&
+        LlamaCPPLLMProvider.activeModelPath === this.modelPath
+      ) {
+        return
+      }
     }
 
     if (
@@ -484,6 +497,23 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
   }
 
   private static async startSharedServer(modelPath: string): Promise<void> {
+    const existingServerProbe = await this.probeServerReady()
+
+    if (existingServerProbe.ready) {
+      LogHelper.title('llama.cpp LLM Provider')
+      LogHelper.info(`Reusing existing llama-server at "${LLAMACPP_MODELS_URL}"`)
+      this.writeServerLogLine(
+        `Reusing existing llama-server at "${LLAMACPP_MODELS_URL}".`
+      )
+
+      this.serverProcess = null
+      this.activeModelPath = null
+      this.serverReady = true
+      this.isUsingExternalServer = true
+
+      return
+    }
+
     const binaryPath = getLlamaServerBinaryPath()
 
     if (!fs.existsSync(binaryPath)) {
@@ -495,13 +525,6 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
     if (!fs.existsSync(modelPath)) {
       throw new Error(
         `Cannot find llama.cpp model at "${modelPath}".`
-      )
-    }
-
-    const existingServerProbe = await this.probeServerReady()
-    if (existingServerProbe.ready) {
-      throw new Error(
-        `Cannot start llama-server because "${LLAMACPP_MODELS_URL}" is already responding.`
       )
     }
 
@@ -539,6 +562,7 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
     this.serverProcess = serverProcess
     this.activeModelPath = modelPath
     this.serverReady = false
+    this.isUsingExternalServer = false
 
     serverProcess.on('exit', (code, signal) => {
       if (this.serverProcess !== serverProcess) {
@@ -548,6 +572,7 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
       this.serverProcess = null
       this.activeModelPath = null
       this.serverReady = false
+      this.isUsingExternalServer = false
       this.serverReadyPromise = null
 
       LogHelper.title('llama.cpp LLM Provider')
@@ -657,6 +682,7 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
     this.serverProcess = null
     this.activeModelPath = null
     this.serverReady = false
+    this.isUsingExternalServer = false
     this.serverReadyPromise = null
 
     if (!serverProcess?.pid) {
