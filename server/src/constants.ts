@@ -65,7 +65,16 @@ export const LEON_FILE_PATH = path.join(process.cwd(), 'leon.json')
 export const NVIDIA_LIBS_PATH = path.join(BIN_PATH, 'nvidia')
 export const NVIDIA_CUBLAS_PATH = path.join(NVIDIA_LIBS_PATH, 'cublas')
 export const NVIDIA_CUDNN_PATH = path.join(NVIDIA_LIBS_PATH, 'cudnn')
+export const NVIDIA_CUDA_CUDART_PATH = path.join(
+  NVIDIA_LIBS_PATH,
+  'cuda_cudart'
+)
+export const NVIDIA_CUDA_CUPTI_PATH = path.join(
+  NVIDIA_LIBS_PATH,
+  'cuda_cupti'
+)
 export const NVIDIA_CUSPARSE_PATH = path.join(NVIDIA_LIBS_PATH, 'cusparse')
+export const NVIDIA_CUSPARSELT_PATH = path.join(NVIDIA_LIBS_PATH, 'cusparselt')
 export const NVIDIA_CUSPARSE_FULL_PATH = path.join(
   NVIDIA_LIBS_PATH,
   'cusparse_full'
@@ -80,6 +89,14 @@ export const NVIDIA_CUBLAS_MANIFEST_PATH = path.join(
 )
 export const NVIDIA_CUDNN_MANIFEST_PATH = path.join(
   NVIDIA_CUDNN_PATH,
+  'manifest.json'
+)
+export const NVIDIA_CUDA_CUDART_MANIFEST_PATH = path.join(
+  NVIDIA_CUDA_CUDART_PATH,
+  'manifest.json'
+)
+export const NVIDIA_CUDA_CUPTI_MANIFEST_PATH = path.join(
+  NVIDIA_CUDA_CUPTI_PATH,
   'manifest.json'
 )
 export const NVIDIA_CUSPARSE_MANIFEST_PATH = path.join(
@@ -108,6 +125,8 @@ const NVIDIA_VERSIONS = JSON.parse(
 export const NVIDIA_CUDA_VERSION = NVIDIA_VERSIONS.cuda
 export const NVIDIA_CUDNN_VERSION = NVIDIA_VERSIONS.cudnn
 export const NVIDIA_CUBLAS_VERSION = NVIDIA_VERSIONS.cublas
+export const NVIDIA_CUDA_CUDART_VERSION = NVIDIA_VERSIONS.cuda_cudart
+export const NVIDIA_CUDA_CUPTI_VERSION = NVIDIA_VERSIONS.cuda_cupti
 export const NVIDIA_CUSPARSE_VERSION = NVIDIA_VERSIONS.cusparse
 export const NVIDIA_CUSPARSE_FULL_VERSION = NVIDIA_VERSIONS.cusparse_full
 export const NVIDIA_NCCL_VERSION = NVIDIA_VERSIONS.nccl
@@ -120,6 +139,7 @@ export const NVIDIA_NVJITLINK_VERSION = NVIDIA_VERSIONS.nvjitlink
  */
 export const PYTORCH_PATH = path.join(BIN_PATH, 'pytorch')
 export const PYTORCH_TORCH_PATH = path.join(PYTORCH_PATH, 'torch')
+export const PYTORCH_NVIDIA_PATH = path.join(PYTORCH_TORCH_PATH, 'nvidia')
 export const PYTORCH_VERSIONS_PATH = path.join(PYTORCH_PATH, 'versions.json')
 export const PYTORCH_MANIFEST_PATH = path.join(
   PYTORCH_TORCH_PATH,
