@@ -122,6 +122,9 @@ export default class Client {
     this.socket.on('init-llm', (status) => {
       this.setInitStatus('llm', status)
     })
+    this.socket.on('init-llama-server-boot', (status) => {
+      this.setInitStatus('llamaServerBoot', status)
+    })
     this.socket.on('warmup-llm-duties', (status) => {
       this.setInitStatus('llmDutiesWarmUp', status)
     })

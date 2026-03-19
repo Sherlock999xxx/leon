@@ -63,6 +63,8 @@ interface Provider {
     promptOrChatHistory: PromptOrChatHistory,
     completionParams: CompletionParams
   ) => Promise<unknown>
+  boot?: () => Promise<void>
+  isServerReady?: () => boolean
   dispose?: () => void
 }
 type ProviderRole = 'workflow' | 'agent'
@@ -152,6 +154,21 @@ export default class LLMProvider {
     return 'none'
   }
 
+  public get isLlamaCPPServerReady(): boolean {
+    const providers = new Set([
+      this.workflowLLMProvider,
+      this.agentLLMProvider
+    ])
+
+    for (const provider of providers) {
+      if (provider?.isServerReady?.()) {
+        return true
+      }
+    }
+
+    return false
+  }
+
   public consumeLastProviderErrorMessage(): string | null {
     const message = this.lastProviderErrorMessage
     this.lastProviderErrorMessage = null
@@ -199,6 +216,7 @@ export default class LLMProvider {
     )
 
     this.assertLocalProviderCompatibility()
+    await this.bootLocalServerProviders()
 
     LogHelper.title('LLM Provider')
     LogHelper.success(
@@ -238,6 +256,17 @@ export default class LLMProvider {
 
     for (const provider of providers) {
       provider?.dispose?.()
+    }
+  }
+
+  private async bootLocalServerProviders(): Promise<void> {
+    const providers = new Set([
+      this.workflowLLMProvider,
+      this.agentLLMProvider
+    ])
+
+    for (const provider of providers) {
+      await provider?.boot?.()
     }
   }
 

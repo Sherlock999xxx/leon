@@ -5,6 +5,7 @@ import {
   AGENT_LLM_PROVIDER,
   LEON_VERSION,
   HAS_AFTER_SPEECH,
+  HAS_LLM,
   HAS_STT,
   HAS_TTS,
   STT_PROVIDER,
@@ -63,7 +64,7 @@ export const getInfo: FastifyPluginAsync<APIOptions> = async (
         freeVRAM,
         usedVRAM,
         llm: {
-          enabled: LLM_MANAGER.isLLMEnabled,
+          enabled: HAS_LLM,
           provider:
             AGENT_LLM_PROVIDER === WORKFLOW_LLM_PROVIDER
               ? AGENT_LLM_PROVIDER

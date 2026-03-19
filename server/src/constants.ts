@@ -134,6 +134,57 @@ export const NVIDIA_NVSHMEM_VERSION = NVIDIA_VERSIONS.nvshmem
 export const NVIDIA_NVJITLINK_VERSION = NVIDIA_VERSIONS.nvjitlink
 
 /**
+ * CMake paths and versions.
+ * Used as a common layer across tools.
+ */
+export const CMAKE_PATH = path.join(BIN_PATH, 'cmake')
+export const CMAKE_VERSIONS_PATH = path.join(CMAKE_PATH, 'versions.json')
+export const CMAKE_INSTALL_PATH = path.join(CMAKE_PATH, 'cmake')
+export const CMAKE_MANIFEST_PATH = path.join(CMAKE_INSTALL_PATH, 'manifest.json')
+const CMAKE_VERSIONS = JSON.parse(fs.readFileSync(CMAKE_VERSIONS_PATH, 'utf8'))
+export const CMAKE_VERSION = CMAKE_VERSIONS.cmake
+export const CMAKE_BIN_PATH = path.join(CMAKE_INSTALL_PATH, 'bin', 'cmake')
+
+/**
+ * Ninja paths and versions.
+ * Used as a common layer across tools.
+ */
+export const NINJA_PATH = path.join(BIN_PATH, 'ninja')
+export const NINJA_VERSIONS_PATH = path.join(NINJA_PATH, 'versions.json')
+export const NINJA_INSTALL_PATH = path.join(NINJA_PATH, 'ninja')
+export const NINJA_MANIFEST_PATH = path.join(NINJA_INSTALL_PATH, 'manifest.json')
+const NINJA_VERSIONS = JSON.parse(fs.readFileSync(NINJA_VERSIONS_PATH, 'utf8'))
+export const NINJA_VERSION = NINJA_VERSIONS.ninja
+export const NINJA_BIN_PATH = path.join(NINJA_INSTALL_PATH, 'ninja')
+
+/**
+ * llama.cpp paths and versions.
+ * Used as a common layer across tools.
+ */
+export const LLAMACPP_PATH = path.join(BIN_PATH, 'llama.cpp')
+export const LLAMACPP_VERSIONS_PATH = path.join(LLAMACPP_PATH, 'versions.json')
+export const LLAMACPP_BUILD_PATH = path.join(LLAMACPP_PATH, 'build')
+export const LLAMACPP_SOURCE_PATH = path.join(LLAMACPP_PATH, 'llama.cpp')
+export const LLAMACPP_SOURCE_BUILD_PATH = path.join(
+  LLAMACPP_SOURCE_PATH,
+  'build',
+  'bin'
+)
+export const LLAMACPP_ROOT_MANIFEST_PATH = path.join(LLAMACPP_PATH, 'manifest.json')
+export const LLAMACPP_BUILD_MANIFEST_PATH = path.join(
+  LLAMACPP_BUILD_PATH,
+  'manifest.json'
+)
+export const LLAMACPP_SOURCE_MANIFEST_PATH = path.join(
+  LLAMACPP_SOURCE_PATH,
+  'manifest.json'
+)
+const LLAMACPP_VERSIONS = JSON.parse(
+  fs.readFileSync(LLAMACPP_VERSIONS_PATH, 'utf8')
+)
+export const LLAMACPP_RELEASE_VERSION = LLAMACPP_VERSIONS['llama.cpp']
+
+/**
  * PyTorch paths and versions.
  * Used as a common layer across tools
  */
@@ -372,7 +423,7 @@ export const AGENT_LLM_PROVIDER =
 // export const LLM_VERSION = '4b-it-Q5_K_M'
 // export const LLM_VERSION = '3b-instruct-q5_k_m'
 // export const LLM_VERSION = '8B-Lexi-Uncensored.i1-Q5_K_S'
-export const LLM_VERSION = '4B-Q4_K_M'
+// export const LLM_VERSION = '4B-Q4_K_M'
 // export const LLM_VERSION = '8B-Abliterated.i1-Q5_K_S'
 // export const LLM_VERSION = '3-mini-128k-instruct.Q5_K_S'
 // export const LLM_VERSION = '3-mini-4k-instruct-q4'
@@ -386,7 +437,7 @@ export const LLM_VERSION = '4B-Q4_K_M'
 // export const LLM_NAME = 'Gemma 3 12B IT Abliterated'
 // export const LLM_NAME = 'Gemma-3-4B-IT'
 // export const LLM_NAME = 'Qwen2.5-3B-Instruct'
-export const LLM_NAME = 'Qwen3-4B'
+// export const LLM_NAME = 'Qwen3-4B'
 // export const LLM_NAME = 'Lexi-Llama-3-8B-Uncensored'
 // export const LLM_NAME = 'Llama-3-8B-Lexi-Uncensored'
 // export const LLM_NAME = 'DeepSeek-R1-Distill-Llama'
@@ -402,17 +453,37 @@ export const LLM_NAME = 'Qwen3-4B'
 // export const LLM_FILE_NAME = `supernova-lite-v1-${LLM_VERSION}.gguf`
 // export const LLM_FILE_NAME = `gemma-3-${LLM_VERSION}.gguf`
 // export const LLM_FILE_NAME = `qwen2.5-${LLM_VERSION}.gguf`
-export const LLM_FILE_NAME = `Qwen3-${LLM_VERSION}.gguf`
+// export const LLM_FILE_NAME = `Qwen3-${LLM_VERSION}.gguf`
 // export const LLM_FILE_NAME = `Llama-3-${LLM_VERSION}.gguf`
 // export const LLM_FILE_NAME = `DeepSeek-R1-Distill-Llama-${LLM_VERSION}.gguf`
 // export const LLM_FILE_NAME = `Phi-${LLM_VERSION}.gguf`
 // export const LLM_FILE_NAME = `gemma-${LLM_VERSION}.gguf`
 // export const LLM_FILE_NAME = `Meta-Llama-3-${LLM_VERSION}.gguf`
-export const LLM_NAME_WITH_VERSION = `${LLM_NAME} (${LLM_VERSION})`
 export const LLM_DIR_PATH = path.join(MODELS_PATH, 'llm')
-export const LLM_PATH = path.join(LLM_DIR_PATH, LLM_FILE_NAME)
-export const LLM_MINIMUM_TOTAL_VRAM = 8
-export const LLM_MINIMUM_FREE_VRAM = 8
+export const LLM_MANIFEST_PATH = path.join(LLM_DIR_PATH, 'manifest.json')
+const LLM_MANIFEST = fs.existsSync(LLM_MANIFEST_PATH)
+  ? JSON.parse(fs.readFileSync(LLM_MANIFEST_PATH, 'utf8'))
+  : null
+// Keep LEON_LLAMACPP_MODEL_PATH as the first-class override, and fall back to
+// the default model installed by setup when the env var is empty.
+export const DEFAULT_INSTALLED_LLM_PATH =
+  typeof LLM_MANIFEST?.defaultInstalledLLMPath === 'string'
+    ? LLM_MANIFEST.defaultInstalledLLMPath
+    : ''
+const CONFIGURED_LLAMACPP_MODEL_PATH =
+  process.env['LEON_LLAMACPP_MODEL_PATH'] || DEFAULT_INSTALLED_LLM_PATH || ''
+export const LLM_NAME = LLM_MANIFEST?.name || 'Local LLM'
+export const LLM_VERSION = LLM_MANIFEST?.version || 'unknown'
+export const LLM_FILE_NAME = CONFIGURED_LLAMACPP_MODEL_PATH
+  ? path.basename(CONFIGURED_LLAMACPP_MODEL_PATH)
+  : ''
+export const LLM_NAME_WITH_VERSION = `${LLM_NAME} (${LLM_VERSION})`
+export const LLM_PATH = CONFIGURED_LLAMACPP_MODEL_PATH
+  ? path.resolve(process.cwd(), CONFIGURED_LLAMACPP_MODEL_PATH)
+  : ''
+export const LLM_MINIMUM_TOTAL_VRAM = 6
+export const LLM_HIGH_TIER_MINIMUM_TOTAL_VRAM = 18
+export const LLM_MINIMUM_FREE_VRAM = 6
 /*export const LLM_HF_DOWNLOAD_URL =
   'https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q5_K_S.gguf?download=true'
 */
@@ -431,8 +502,9 @@ export const LLM_MINIMUM_FREE_VRAM = 8
   'https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q5_K_M.gguf?download=true'*/
 /*export const LLM_HF_DOWNLOAD_URL =
   'https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q5_k_m.gguf?download=true'*/
-export const LLM_HF_DOWNLOAD_URL =
+/*export const LLM_HF_DOWNLOAD_URL =
   'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf?download=true'
+*/
 /*export const LLM_HF_DOWNLOAD_URL =
   'https://huggingface.co/mradermacher/Llama-3-8B-Lexi-Uncensored-i1-GGUF/resolve/main/Llama-3-8B-Lexi-Uncensored.i1-Q5_K_S.gguf?download=true'*/
 /*export const LLM_HF_DOWNLOAD_URL =

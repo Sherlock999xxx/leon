@@ -13,7 +13,17 @@ import type {
   CompletionParams,
   PromptOrChatHistory
 } from '@/core/llm-manager/types'
-import { BIN_PATH, LOGS_PATH } from '@/constants'
+import {
+  DEFAULT_INSTALLED_LLM_PATH,
+  LLAMACPP_BUILD_PATH,
+  LLAMACPP_BUILD_MANIFEST_PATH,
+  LLAMACPP_PATH,
+  LLAMACPP_ROOT_MANIFEST_PATH,
+  LLAMACPP_SOURCE_BUILD_PATH,
+  LLAMACPP_SOURCE_MANIFEST_PATH,
+  LLAMACPP_SOURCE_PATH,
+  LOGS_PATH
+} from '@/constants'
 import { LogHelper } from '@/helpers/log-helper'
 import { SystemHelper } from '@/helpers/system-helper'
 
@@ -43,10 +53,68 @@ function wait(delayMs: number): Promise<void> {
   })
 }
 
+function readLlamaCPPManifest(): Record<string, unknown> | null {
+  const manifestEntries = [
+    {
+      manifestPath: LLAMACPP_SOURCE_MANIFEST_PATH,
+      runtimeBasePath: LLAMACPP_SOURCE_PATH
+    },
+    {
+      manifestPath: LLAMACPP_BUILD_MANIFEST_PATH,
+      runtimeBasePath: LLAMACPP_BUILD_PATH
+    },
+    {
+      manifestPath: LLAMACPP_ROOT_MANIFEST_PATH,
+      runtimeBasePath: LLAMACPP_PATH
+    }
+  ]
+
+  for (const manifestEntry of manifestEntries) {
+    if (!fs.existsSync(manifestEntry.manifestPath)) {
+      continue
+    }
+
+    try {
+      const manifest = JSON.parse(
+        fs.readFileSync(manifestEntry.manifestPath, 'utf8')
+      )
+
+      return {
+        ...manifest,
+        runtimeDirectoryPath:
+          typeof manifest.runtimePath === 'string' && manifest.runtimePath
+            ? path.join(manifestEntry.runtimeBasePath, manifest.runtimePath)
+            : null
+      }
+    } catch {
+      return null
+    }
+  }
+
+  return null
+}
+
+function getLlamaServerBinaryDirectoryPath(): string {
+  const binaryName = SystemHelper.isWindows() ? 'llama-server.exe' : 'llama-server'
+  const manifest = readLlamaCPPManifest()
+
+  if (
+    typeof manifest?.['runtimeDirectoryPath'] === 'string' &&
+    manifest['runtimeDirectoryPath']
+  ) {
+    return manifest['runtimeDirectoryPath']
+  }
+
+  if (fs.existsSync(path.join(LLAMACPP_SOURCE_BUILD_PATH, binaryName))) {
+    return LLAMACPP_SOURCE_BUILD_PATH
+  }
+
+  return LLAMACPP_BUILD_PATH
+}
+
 function getLlamaServerBinaryPath(): string {
   return path.join(
-    BIN_PATH,
-    'llama.cpp',
+    getLlamaServerBinaryDirectoryPath(),
     SystemHelper.isWindows() ? 'llama-server.exe' : 'llama-server'
   )
 }
@@ -82,7 +150,7 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
         apiKeyEnv: 'LEON_LLAMACPP_API_KEY',
         workflowModelEnv: 'LEON_LLAMACPP_MODEL_PATH',
         agentModelEnv: 'LEON_LLAMACPP_MODEL_PATH',
-        defaultModel: '',
+        defaultModel: DEFAULT_INSTALLED_LLM_PATH,
         baseURL: LLAMACPP_BASE_URL,
         flavor: 'openai-compatible',
         requiresApiKey: false
@@ -92,7 +160,7 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
 
     if (!this.model.trim()) {
       throw new Error(
-        'llama.cpp model path is not defined. Please define LEON_LLAMACPP_MODEL_PATH in the .env file.'
+        'llama.cpp model path is not defined. Please define LEON_LLAMACPP_MODEL_PATH in the .env file or install a default local LLM.'
       )
     }
 
@@ -102,6 +170,16 @@ export default class LlamaCPPLLMProvider extends AISDKRemoteLLMProvider {
 
   public override get modelName(): string {
     return this.modelPath
+  }
+
+  public async boot(): Promise<void> {
+    await this.ensureServerReady()
+  }
+
+  public isServerReady(): boolean {
+    return (
+      LlamaCPPLLMProvider.serverReady || LlamaCPPLLMProvider.isUsingExternalServer
+    )
   }
 
   public override dispose(): void {
