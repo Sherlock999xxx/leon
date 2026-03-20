@@ -5,7 +5,6 @@ import {
   AGENT_LLM_PROVIDER,
   LEON_VERSION,
   HAS_AFTER_SPEECH,
-  HAS_LLM,
   HAS_STT,
   HAS_TTS,
   STT_PROVIDER,
@@ -53,10 +52,6 @@ export const getInfo: FastifyPluginAsync<APIOptions> = async (
         message,
         after_speech: HAS_AFTER_SPEECH,
         telemetry: IS_TELEMETRY_ENABLED,
-        shouldWarmUpLLMDuties: LLM_MANAGER.shouldWarmUpLLMDuties,
-        isLLMActionRecognitionEnabled:
-          LLM_MANAGER.isLLMActionRecognitionEnabled,
-        isLLMNLGEnabled: LLM_MANAGER.isLLMNLGEnabled,
         timeZone: DateHelper.getTimeZone(),
         gpu: gpuDeviceNames[0],
         graphicsComputeAPI,
@@ -64,7 +59,7 @@ export const getInfo: FastifyPluginAsync<APIOptions> = async (
         freeVRAM,
         usedVRAM,
         llm: {
-          enabled: HAS_LLM,
+          enabled: LLM_MANAGER.isLLMEnabled,
           provider:
             AGENT_LLM_PROVIDER === WORKFLOW_LLM_PROVIDER
               ? AGENT_LLM_PROVIDER

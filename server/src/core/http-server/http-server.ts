@@ -17,7 +17,7 @@ import { DateHelper } from '@/helpers/date-helper'
 import { corsMidd } from '@/core/http-server/plugins/cors'
 import { otherMidd } from '@/core/http-server/plugins/other'
 import { infoPlugin } from '@/core/http-server/api/info'
-import { llmInferencePlugin } from '@/core/http-server/api/llm-inference'
+import { inferencePlugin } from '@/core/http-server/api/inference'
 import { runActionPlugin } from '@/core/http-server/api/run-action'
 import { fetchWidgetPlugin } from '@/core/http-server/api/fetch-widget'
 import { keyMidd } from '@/core/http-server/plugins/key'
@@ -76,13 +76,6 @@ export default class HTTPServer {
     const isLLMEnabled = LLM_MANAGER.isLLMEnabled ? 'enabled' : 'disabled'
     LogHelper.info(`LLM: ${isLLMEnabled}`)
 
-    const isLLMNLGEnabled = LLM_MANAGER.isLLMNLGEnabled ? 'enabled' : 'disabled'
-    LogHelper.info(`LLM NLG: ${isLLMNLGEnabled}`)
-
-    const isLLMActionRecognitionEnabled =
-      LLM_MANAGER.isLLMActionRecognitionEnabled ? 'enabled' : 'disabled'
-    LogHelper.info(`LLM action recognition: ${isLLMActionRecognitionEnabled}`)
-
     const isTelemetryEnabled = IS_TELEMETRY_ENABLED ? 'enabled' : 'disabled'
     LogHelper.info(`Telemetry: ${isTelemetryEnabled}`)
 
@@ -105,7 +98,7 @@ export default class HTTPServer {
     this.fastify.register(runActionPlugin, { apiVersion: API_VERSION })
     this.fastify.register(fetchWidgetPlugin, { apiVersion: API_VERSION })
     this.fastify.register(infoPlugin, { apiVersion: API_VERSION })
-    this.fastify.register(llmInferencePlugin, { apiVersion: API_VERSION })
+    this.fastify.register(inferencePlugin, { apiVersion: API_VERSION })
     this.fastify.register(openPathPlugin, { apiVersion: API_VERSION })
 
     if (HAS_OVER_HTTP) {

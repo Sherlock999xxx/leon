@@ -144,13 +144,7 @@ function Init() {
     else if (key === 'llamaServerBoot' && !usesLlamaCPP) {
       statuses.push('success')
     }
-    // If LLM is not enabled, we don't need to check for LLM duties warm up
-    else if (
-      key === 'llmDutiesWarmUp' &&
-      (!config.llm?.enabled || !config.shouldWarmUpLLMDuties)
-    ) {
-      statuses.push('success')
-    } else if (!config[key] || config[key].enabled) {
+    else if (!config[key] || config[key].enabled) {
       statuses.push(statusMap[key])
     }
   }
@@ -197,11 +191,6 @@ function Init() {
             )}
             {usesLlamaCPP && (
               <Item status={statusMap.llamaServerBoot}>llama-server booted</Item>
-            )}
-            {config.shouldWarmUpLLMDuties && (
-              <Item status={statusMap.llmDutiesWarmUp}>
-                LLM duties warmed up
-              </Item>
             )}
           </List>
         </WidgetWrapper>

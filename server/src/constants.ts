@@ -332,15 +332,6 @@ export const TSX_CLI_PATH = path.join(
 export const LEON_VERSION = process.env['npm_package_version']
 
 /**
- * spaCy models
- * @see Find new spaCy models: https://github.com/explosion/spacy-models/releases
- */
-export const EN_SPACY_MODEL_NAME = 'en_core_web_trf'
-export const EN_SPACY_MODEL_VERSION = '3.4.0'
-export const FR_SPACY_MODEL_NAME = 'fr_core_news_md'
-export const FR_SPACY_MODEL_VERSION = '3.4.0'
-
-/**
  * Leon environment preferences
  */
 export const LANG = process.env['LEON_LANG'] as LongLanguageCode
@@ -357,8 +348,6 @@ export const STT_PROVIDER = process.env['LEON_STT_PROVIDER']
 export const HAS_TTS = process.env['LEON_TTS'] === 'true'
 export const TTS_PROVIDER = process.env['LEON_TTS_PROVIDER']
 
-export const HAS_WARM_UP_LLM_DUTIES =
-  process.env['LEON_WARM_UP_LLM_DUTIES'] === 'true'
 export const HAS_OVER_HTTP = process.env['LEON_OVER_HTTP'] === 'true'
 export const HTTP_API_KEY = process.env['LEON_HTTP_API_KEY']
 export const HTTP_API_LANG = process.env['LEON_HTTP_API_LANG']
@@ -370,22 +359,6 @@ export const PYTHON_TCP_SERVER_PORT = Number(
 
 export const IS_TELEMETRY_ENABLED = process.env['LEON_TELEMETRY'] === 'true'
 
-/**
- * NLP models paths
- */
-export const MAIN_NLP_MODEL_PATH = path.join(MODELS_PATH, 'leon-main-model.nlp')
-export const GLOBAL_RESOLVERS_NLP_MODEL_PATH = path.join(
-  MODELS_PATH,
-  'leon-global-resolvers-model.nlp'
-)
-export const SKILLS_RESOLVERS_NLP_MODEL_PATH = path.join(
-  MODELS_PATH,
-  'leon-skills-resolvers-model.nlp'
-)
-export const LLM_ACTIONS_CLASSIFIER_PATH = path.join(
-  MODELS_PATH,
-  'leon-llm-actions-classifier.json'
-)
 export const LLM_SKILL_ROUTER_DUTY_SKILL_LIST_PATH = path.join(
   MODELS_PATH,
   'leon-skill-list.nlp'
@@ -395,12 +368,10 @@ export const LLM_SKILL_ROUTER_DUTY_SKILL_LIST_PATH = path.join(
  * LLMs
  * @see k-quants comparison: https://github.com/ggerganov/llama.cpp/pull/1684
  */
-export const HAS_LLM = process.env['LEON_LLM'] === 'true'
-export const HAS_LLM_NLG = process.env['LEON_LLM_NLG'] === 'true' && HAS_LLM
-export const HAS_LLM_ACTION_RECOGNITION =
-  process.env['LEON_LLM_ACTION_RECOGNITION'] === 'true' && HAS_LLM
+export const HAS_LLM = true
 export const LEON_ROUTING_MODE = process.env['LEON_ROUTING_MODE'] || 'smart'
 export const LEON_PULSE_ENABLED = true
+// Every 30 minutes
 export const LEON_PULSE_INTERVAL_MS = 30 * 60 * 1_000
 export const SHOULD_START_PYTHON_TCP_SERVER = !(
   LEON_ROUTING_MODE.toLowerCase() === 'agent' &&

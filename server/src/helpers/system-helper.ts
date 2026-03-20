@@ -199,7 +199,9 @@ export class SystemHelper {
    * @example getGPUDeviceNames() // ['Apple M1 Pro']
    */
   public static async getGPUDeviceNames(llama?: Llama): Promise<string[]> {
-    const llamaAPI = llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    const llamaAPI = (
+      llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    ) as Llama | null
 
     if (llamaAPI) {
       return llamaAPI.getGpuDeviceNames()
@@ -213,7 +215,9 @@ export class SystemHelper {
    * @example hasGPU() // true
    */
   public static async hasGPU(llama?: Llama): Promise<boolean> {
-    const llamaAPI = llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    const llamaAPI = (
+      llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    ) as Llama | null
 
     if (llamaAPI) {
       return !!llamaAPI.gpu
@@ -229,7 +233,9 @@ export class SystemHelper {
   public static async getGraphicsComputeAPI(
     llama?: Llama
   ): Promise<GraphicsComputeAPIs> {
-    const llamaAPI = llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    const llamaAPI = (
+      llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    ) as Llama | null
 
     if (llamaAPI && llamaAPI.gpu) {
       return llamaAPI.gpu as GraphicsComputeAPIs
@@ -243,7 +249,9 @@ export class SystemHelper {
    * @example getUsedVRAM() // 6.04
    */
   public static async getUsedVRAM(llama?: Llama): Promise<number> {
-    const llamaAPI = llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    const llamaAPI = (
+      llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    ) as Llama | null
 
     if (llamaAPI) {
       const vramState = await llamaAPI.getVramState()
@@ -259,7 +267,9 @@ export class SystemHelper {
    * @example getTotalVRAM() // 12
    */
   public static async getTotalVRAM(llama?: Llama): Promise<number> {
-    const llamaAPI = llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    const llamaAPI = (
+      llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    ) as Llama | null
 
     if (llamaAPI) {
       const vramState = await llamaAPI.getVramState()
@@ -283,7 +293,9 @@ export class SystemHelper {
    * @example getFreeVRAM() // 6
    */
   public static async getFreeVRAM(llama?: Llama): Promise<number> {
-    const llamaAPI = llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    const llamaAPI = (
+      llama ? llama : (await import('@/core')).LLM_MANAGER.llama
+    ) as Llama | null
 
     if (llamaAPI) {
       const vramState = await llamaAPI.getVramState()
