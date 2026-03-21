@@ -7,6 +7,33 @@ import { INTENT_OBJECT } from '@bridge/constants'
 import { ParamsHelper } from '@sdk/params-helper'
 import { leon } from '@sdk/leon'
 import { setToolReporter } from '@sdk/tool-reporter'
+
+const resolveActionFunction = (actionModule: unknown): ActionFunction | null => {
+  if (!actionModule || typeof actionModule !== 'object') {
+    return null
+  }
+
+  const moduleObject = actionModule as Record<string, unknown>
+
+  if (typeof moduleObject['run'] === 'function') {
+    return moduleObject['run'] as ActionFunction
+  }
+
+  const defaultExport =
+    moduleObject['default'] && typeof moduleObject['default'] === 'object'
+      ? (moduleObject['default'] as Record<string, unknown>)
+      : null
+
+  if (defaultExport && typeof defaultExport['run'] === 'function') {
+    return defaultExport['run'] as ActionFunction
+  }
+
+  if (typeof moduleObject['default'] === 'function') {
+    return moduleObject['default'] as ActionFunction
+  }
+
+  return null
+}
 ;(async (): Promise<void> => {
   setToolReporter(async (input) => {
     await leon.answer(input)
@@ -49,7 +76,14 @@ import { setToolReporter } from '@sdk/tool-reporter'
         `${action_name}.ts`
       )
     )
-    const actionFunction: ActionFunction = actionModule.run
+    const actionFunction = resolveActionFunction(actionModule)
+
+    if (!actionFunction) {
+      throw new TypeError(
+        `Action "${skill_name}:${action_name}" does not export a runnable action function`
+      )
+    }
+
     const paramsHelper = new ParamsHelper(params)
 
     await actionFunction(params, paramsHelper)

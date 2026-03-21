@@ -7,6 +7,22 @@ from constants import INTENT_OBJECT
 from sdk.params_helper import ParamsHelper
 
 
+def resolve_action_function(skill_action_module):
+    run_function = getattr(skill_action_module, 'run', None)
+    if callable(run_function):
+        return run_function
+
+    default_export = getattr(skill_action_module, 'default', None)
+    default_run_function = getattr(default_export, 'run', None)
+    if callable(default_run_function):
+        return default_run_function
+
+    if callable(default_export):
+        return default_export
+
+    return None
+
+
 def main():
     params = {
         'lang': INTENT_OBJECT['lang'],
@@ -33,7 +49,13 @@ def main():
             + INTENT_OBJECT['action_name']
         )
 
-        run_function = getattr(skill_action_module, 'run')
+        run_function = resolve_action_function(skill_action_module)
+        if not callable(run_function):
+            raise TypeError(
+                f'Action "{INTENT_OBJECT["skill_name"]}:{INTENT_OBJECT["action_name"]}" '
+                'does not export a runnable action function'
+            )
+
         params_helper = ParamsHelper(params)
 
         # Inspect to decide how many args to pass

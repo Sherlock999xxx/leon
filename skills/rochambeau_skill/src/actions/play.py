@@ -24,8 +24,12 @@ def run(params: ActionParams) -> None:
             'emoji': '✌'
         }
     }
+    raw_handsign = params.get('action_arguments', {}).get('handsign')
+    normalized_handsign = (
+        str(raw_handsign).strip().upper() if raw_handsign is not None else None
+    )
     player = {
-        'handsign': params.get('action_arguments', {}).get('handsign'),
+        'handsign': normalized_handsign,
         'points': 0
     }
     leon_player = {
@@ -35,6 +39,10 @@ def run(params: ActionParams) -> None:
 
     # Exit the loop if no handsign has been found
     if player['handsign'] is None:
+        leon.answer({'core': {'is_in_action_loop': False}})
+        return
+
+    if player['handsign'] not in handsigns:
         leon.answer({'core': {'is_in_action_loop': False}})
         return
 
