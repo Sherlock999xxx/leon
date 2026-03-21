@@ -360,7 +360,7 @@ export default class NLU {
           LogHelper.title('NLU')
           LogHelper.info(`Sending suggestions for action "${actionName}"`)
 
-          SOCKET_SERVER.socket?.emit('suggest', suggestions)
+          BRAIN.suggest(suggestions)
         }
       }
     } catch (e) {
@@ -486,14 +486,15 @@ export default class NLU {
 
       if (!BRAIN.isMuted) {
         await BRAIN.talk(
-          'I couldn\'t find a matching skill or action for this request. Do you want me to fall back to agent mode for it, or write the code for a new skill?',
+          'I couldn\'t find a matching skill or action for this request. Do you want me to fall back to agent mode for it, write the code for a new skill, or cancel?',
           true
         )
       }
 
-      SOCKET_SERVER.socket?.emit('suggest', [
+      BRAIN.suggest([
         'Fallback to agent mode',
-        'Write the skill code'
+        'Write the skill code',
+        'Cancel'
       ])
       return
     }
@@ -531,7 +532,7 @@ export default class NLU {
       input: {
         slotName: 'workflow_not_found_choice',
         slotDescription:
-          'Return exactly one of these values: "fallback_to_agent" if the owner wants Leon to handle the original request via agent mode, or "write_skill_code" if the owner wants Leon to write the code for a new skill.',
+          'Return exactly one of these values: "fallback_to_agent" if the owner wants Leon to handle the original request via agent mode, "write_skill_code" if the owner wants Leon to write the code for a new skill, or "cancel" if the owner does not want either option.',
         slotType: 'string',
         latestUtterance: utterance,
         recentUtterances: this._nluProcessResult.context.utterances.slice(-4)
@@ -569,17 +570,19 @@ export default class NLU {
       return true
     }
 
-    if (!BRAIN.isMuted) {
-      await BRAIN.talk(
-        'Please choose one of these options: fall back to agent mode, or write the skill code.',
-        true
-      )
+    this.pendingWorkflowNotFoundChoice = null
+
+    if (choiceValue === 'cancel') {
+      if (!BRAIN.isMuted) {
+        await BRAIN.talk('Alright, cancelled.', true)
+      }
+
+      return true
     }
 
-    SOCKET_SERVER.socket?.emit('suggest', [
-      'Fallback to agent mode',
-      'Write the skill code'
-    ])
+    if (!BRAIN.isMuted) {
+      await BRAIN.talk('Alright, cancelled.', true)
+    }
 
     return true
   }

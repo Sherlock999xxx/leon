@@ -60,13 +60,20 @@ type QueuedAnswer =
       llmMetrics?: LLMAnswerMetrics
     }
 
+interface QueuedSuggestions {
+  type: 'suggest'
+  suggestions: string[]
+}
+
+type QueuedOutput = QueuedAnswer | QueuedSuggestions
+
 const MIN_NB_OF_WORDS_TO_USE_LLM_NLG = 5
 
 export default class Brain {
   private static instance: Brain
   private _lang: ShortLanguageCode = 'en'
   private _isTalkingWithVoice = false
-  private answerQueue = new AnswerQueue<QueuedAnswer>()
+  private answerQueue = new AnswerQueue<QueuedOutput>()
   private answerQueueProcessTimerId: NodeJS.Timeout | undefined = undefined
   private broca: GlobalAnswersSchema = JSON.parse(
     fs.readFileSync(
@@ -213,6 +220,14 @@ export default class Brain {
       }, naturalStartTypingDelay)
       // Next answer to handle
       const answer = this.answerQueue.pop()
+      if (answer && typeof answer === 'object' && 'type' in answer) {
+        if (answer.type === 'suggest') {
+          SOCKET_SERVER.socket?.emit('suggest', answer.suggestions)
+        }
+
+        continue
+      }
+
       let textAnswer: string | undefined = ''
       let speechAnswer = ''
       const llmMetrics =
@@ -382,6 +397,29 @@ export default class Brain {
     const answerTimerCheckerId = setInterval(() => {
       if (!this.answerQueue.isProcessing && !this.answerQueue.isEmpty()) {
         this.processAnswerQueue(end)
+      } else {
+        this.cleanUpAnswerQueueTimer(answerTimerCheckerId)
+      }
+    }, 300)
+    this.answerQueueProcessTimerId = answerTimerCheckerId
+  }
+
+  /**
+   * Queue suggestions so they are emitted after any preceding answers.
+   */
+  public suggest(suggestions: string[]): void {
+    if (suggestions.length === 0) {
+      return
+    }
+
+    this.answerQueue.push({
+      type: 'suggest',
+      suggestions
+    })
+
+    const answerTimerCheckerId = setInterval(() => {
+      if (!this.answerQueue.isProcessing && !this.answerQueue.isEmpty()) {
+        this.processAnswerQueue()
       } else {
         this.cleanUpAnswerQueueTimer(answerTimerCheckerId)
       }
