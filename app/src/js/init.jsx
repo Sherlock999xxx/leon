@@ -108,8 +108,7 @@ function Init() {
       window.leonConfigInfo?.llm?.workflowProvider === 'llamacpp' ||
       window.leonConfigInfo?.llm?.agentProvider === 'llamacpp'
         ? 'loading'
-        : 'success',
-    llmDutiesWarmUp: 'loading'
+        : 'success'
   })
 
   useEffect(() => {
@@ -140,11 +139,9 @@ function Init() {
   for (let key of Object.keys(statusMap)) {
     if (key === 'tcpServerBoot' && config.tcpServer?.enabled === false) {
       statuses.push('success')
-    }
-    else if (key === 'llamaServerBoot' && !usesLlamaCPP) {
+    } else if (key === 'llamaServerBoot' && !usesLlamaCPP) {
       statuses.push('success')
-    }
-    else if (!config[key] || config[key].enabled) {
+    } else if (!config[key] || config[key].enabled) {
       statuses.push(statusMap[key])
     }
   }

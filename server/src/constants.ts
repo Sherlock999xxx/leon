@@ -373,11 +373,7 @@ export const LEON_ROUTING_MODE = process.env['LEON_ROUTING_MODE'] || 'smart'
 export const LEON_PULSE_ENABLED = true
 // Every 30 minutes
 export const LEON_PULSE_INTERVAL_MS = 30 * 60 * 1_000
-export const SHOULD_START_PYTHON_TCP_SERVER = !(
-  LEON_ROUTING_MODE.toLowerCase() === 'agent' &&
-  !HAS_STT &&
-  !HAS_TTS
-)
+export const SHOULD_START_PYTHON_TCP_SERVER = HAS_STT || HAS_TTS
 export const LEON_DISABLED_CONTEXT_FILES =
   process.env['LEON_DISABLED_CONTEXT_FILES'] || ''
 export const LLM_PROVIDER = process.env['LEON_LLM_PROVIDER'] || 'llamacpp'

@@ -46,12 +46,14 @@ export default class Client {
   }
 
   updateMood(mood) {
-    if (window.leonConfigInfo.llm.enabled) {
-      const moodContainer = document.querySelector('#mood')
+    const moodContainer = document.querySelector('#mood')
 
-      moodContainer.textContent = `Leon's mood: ${mood.emoji}`
-      moodContainer.setAttribute('title', mood.type)
+    if (!moodContainer || !mood?.emoji || !mood?.type) {
+      return
     }
+
+    moodContainer.textContent = `Leon's mood: ${mood.emoji}`
+    moodContainer.setAttribute('title', mood.type)
   }
 
   async sendInitMessages() {
