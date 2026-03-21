@@ -407,6 +407,7 @@ Rules:
         temperature: config.temperature,
         maxTokens: config.maxTokens,
         thoughtTokensBudget: config.thoughtTokensBudget,
+        disableThinking: true,
         tools: openAITools,
         toolChoice: 'auto'
       })

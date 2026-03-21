@@ -77,8 +77,10 @@ The sun is a star, it is the closest star to Earth.`
       let completionResult = await LLM_PROVIDER.prompt(prompt, {
         dutyType: LLMDuties.Paraphrase,
         systemPrompt: ParaphraseLLMDuty.finalSystemPrompt,
+        maxTokens: config?.maxTokens,
         temperature: config?.temperature,
-        thoughtTokensBudget: config?.thoughtTokensBudget
+        thoughtTokensBudget: config?.thoughtTokensBudget,
+        disableThinking: true
       })
 
       if (!completionResult) {

@@ -144,6 +144,13 @@ export default class Client {
       // Leon has finished to answer
       this._isLeonGeneratingAnswer = false
 
+      const isPlanWidget =
+        data && typeof data === 'object' && data.widget === 'PlanWidget'
+
+      if (isPlanWidget) {
+        this.chatbot.isTyping('leon', false)
+      }
+
       /**
        * Handle message replacement if replaceMessageId is provided
        */

@@ -31,6 +31,8 @@ type SkillListContent = string | null
 
 const DEFAULT_CORE_LLM_DUTIES_CONTEXT_SIZE = 2_048
 
+// Workflow duties should stay fast and deterministic. The provider layer maps
+// disableThinking to the strongest supported non-thinking / low-reasoning mode.
 const CORE_LLM_DUTIES: CoreLLMDuties = {
   [LLMDuties.SkillRouter]: {
     contextSize: 0,
@@ -39,21 +41,22 @@ const CORE_LLM_DUTIES: CoreLLMDuties = {
     temperature: 0
   },
   [LLMDuties.ActionCalling]: {
-    contextSize: 2_048,
-    maxTokens: 512,
-    thoughtTokensBudget: 64,
-    temperature: 0.8
+    contextSize: 4_096,
+    maxTokens: 384,
+    thoughtTokensBudget: 0,
+    temperature: 0.1
   },
   [LLMDuties.SlotFilling]: {
     contextSize: 1_024,
-    maxTokens: 512,
-    thoughtTokensBudget: 128,
-    temperature: 0.2
+    maxTokens: 96,
+    thoughtTokensBudget: 0,
+    temperature: 0
   },
   [LLMDuties.Paraphrase]: {
     contextSize: DEFAULT_CORE_LLM_DUTIES_CONTEXT_SIZE,
+    maxTokens: 192,
     thoughtTokensBudget: 0,
-    temperature: 0.8
+    temperature: 0.6
   }
 }
 

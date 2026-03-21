@@ -79,7 +79,8 @@ export class SkillRouterLLMDuty extends LLMDuty {
         systemPrompt: this.systemPrompt as string,
         temperature: config.temperature,
         maxTokens: config.maxTokens,
-        thoughtTokensBudget: config.thoughtTokensBudget
+        thoughtTokensBudget: config.thoughtTokensBudget,
+        disableThinking: true
       })
 
       LogHelper.title(this.name)

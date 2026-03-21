@@ -87,7 +87,8 @@ Find the following slot:
         systemPrompt: this.systemPrompt as string,
         temperature: config.temperature,
         maxTokens: config.maxTokens,
-        thoughtTokensBudget: config.thoughtTokensBudget
+        thoughtTokensBudget: config.thoughtTokensBudget,
+        disableThinking: true
       })
 
       if (completionResult?.output) {
