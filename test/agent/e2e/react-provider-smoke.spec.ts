@@ -8,8 +8,8 @@ import { PROVIDER_MATRIX } from './provider-matrix'
 
 const CURRENT_DIR = fileURLToPath(new URL('.', import.meta.url))
 const ROOT_DIR = path.resolve(CURRENT_DIR, '..', '..', '..')
-const RESULT_PREFIX = '__AGENTIC_LOOP_RESULT__'
-const PROGRESS_PREFIX = '__AGENTIC_LOOP_PROGRESS__'
+const RESULT_PREFIX = '__AGENT_RESULT__'
+const PROGRESS_PREFIX = '__AGENT_PROGRESS__'
 
 interface ProviderProgressEvent {
   provider: string
@@ -104,7 +104,7 @@ function resolveProviderMatrix(
 }
 
 const ACTIVE_PROVIDER_MATRIX = resolveProviderMatrix(
-  process.env['LEON_AGENTIC_LOOP_PROVIDER_PATTERN'] ||
+  process.env['LEON_AGENT_PROVIDER_PATTERN'] ||
     extractTestNamePattern(process.argv)
 )
 
@@ -126,7 +126,7 @@ function collectTurnTrace(
 }
 
 function formatProgressEvent(event: ProviderProgressEvent): string {
-  const prefix = `[agentic-loop:e2e:${event.provider}]`
+  const prefix = `[agent:e2e:${event.provider}]`
 
   if (event.stage === 'turn_start') {
     return `${prefix} turn ${event.turn} input=${JSON.stringify(event.data?.['input'] || '')}`
@@ -159,7 +159,7 @@ async function runProviderScenario(
     [
       '--import',
       'tsx',
-      'test/agentic-loop/e2e/run-agentic-loop-provider-scenario.ts',
+      'test/agent/e2e/run-agent-provider-scenario.ts',
       provider
     ],
     {
@@ -167,9 +167,9 @@ async function runProviderScenario(
       env: {
         ...process.env,
         LEON_NODE_ENV: 'testing',
-        LEON_LLM_PROVIDER: provider,
-        LEON_WORKFLOW_LLM_PROVIDER: provider,
-        LEON_AGENT_LLM_PROVIDER: provider
+        LEON_LLM:
+          PROVIDER_MATRIX.find((item) => item.provider === provider)?.llmTarget ||
+          provider
       },
       all: true,
       reject: false,
@@ -197,7 +197,7 @@ async function runProviderScenario(
         const event = JSON.parse(payload) as ProviderProgressEvent
         console.info(formatProgressEvent(event))
       } catch {
-        console.info(`[agentic-loop:e2e:${provider}] ${payload}`)
+        console.info(`[agent:e2e:${provider}] ${payload}`)
       }
     }
   })
@@ -213,7 +213,7 @@ async function runProviderScenario(
 
   if (!resultLine) {
     throw new Error(
-      `Missing agentic loop result marker for provider "${provider}". Output:\n${combinedOutput}`
+      `Missing agent result marker for provider "${provider}". Output:\n${combinedOutput}`
     )
   }
 
@@ -230,7 +230,7 @@ async function runProviderScenario(
   return result
 }
 
-describe('agentic loop e2e', () => {
+describe('agent e2e', () => {
   for (const { provider, requiredEnv } of ACTIVE_PROVIDER_MATRIX) {
     /**
      * Missing credentials should skip that provider cleanly rather than fail
@@ -242,7 +242,7 @@ describe('agentic loop e2e', () => {
         const result = await runProviderScenario(provider)
 
         console.info(
-          `[agentic-loop:e2e:${provider}] validating turn outputs and tool usage`
+          `[agent:e2e:${provider}] validating turn outputs and tool usage`
         )
 
         expect(result.skipped).toBe(false)

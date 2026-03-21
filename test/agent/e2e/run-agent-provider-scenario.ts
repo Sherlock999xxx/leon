@@ -2,18 +2,18 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import type { AgenticProvider } from './provider-matrix'
-import { PROVIDER_REQUIRED_ENV } from './provider-matrix'
+import type { AgentProvider } from './provider-matrix'
+import { PROVIDER_MATRIX, PROVIDER_REQUIRED_ENV } from './provider-matrix'
 
-const RESULT_PREFIX = '__AGENTIC_LOOP_RESULT__'
-const PROGRESS_PREFIX = '__AGENTIC_LOOP_PROGRESS__'
+const RESULT_PREFIX = '__AGENT_RESULT__'
+const PROGRESS_PREFIX = '__AGENT_PROGRESS__'
 const REACT_CONTINUATION_STATE_FILENAME =
   '.react-execution-continuation-state.json'
 const REACT_HISTORY_COMPACTION_STATE_FILENAME =
   '.react-history-compaction-state.json'
 
-interface AgenticProgressEvent {
-  provider: AgenticProvider
+interface AgentProgressEvent {
+  provider: AgentProvider
   stage:
     | 'bootstrap'
     | 'turn_start'
@@ -25,7 +25,7 @@ interface AgenticProgressEvent {
   data?: Record<string, unknown>
 }
 
-interface AgenticTurnResult {
+interface AgentTurnResult {
   input: string
   output: string
   finalIntent: string | null
@@ -46,15 +46,15 @@ interface AgenticTurnResult {
   }>
 }
 
-interface AgenticRunnerResult {
-  provider: AgenticProvider
+interface AgentRunnerResult {
+  provider: AgentProvider
   skipped: boolean
   reason?: string
   assetPath?: string
-  turns?: AgenticTurnResult[]
+  turns?: AgentTurnResult[]
 }
 
-function printResult(result: AgenticRunnerResult): void {
+function printResult(result: AgentRunnerResult): void {
   /**
    * A fixed marker makes it easy for the parent Vitest process to extract the
    * structured result from mixed stdout/stderr.
@@ -62,7 +62,7 @@ function printResult(result: AgenticRunnerResult): void {
   console.log(`${RESULT_PREFIX}${JSON.stringify(result)}`)
 }
 
-function printProgress(event: AgenticProgressEvent): void {
+function printProgress(event: AgentProgressEvent): void {
   console.log(`${PROGRESS_PREFIX}${JSON.stringify(event)}`)
 }
 
@@ -83,10 +83,10 @@ function summarizeValue(value: string, maxLength = 220): string {
 }
 
 async function main(): Promise<void> {
-  const providerArg = process.argv[2] as AgenticProvider | undefined
+  const providerArg = process.argv[2] as AgentProvider | undefined
   if (!providerArg || !(providerArg in PROVIDER_REQUIRED_ENV)) {
     printResult({
-      provider: (providerArg || 'openai') as AgenticProvider,
+      provider: (providerArg || 'openai') as AgentProvider,
       skipped: true,
       reason: 'invalid_provider'
     })
@@ -94,6 +94,7 @@ async function main(): Promise<void> {
   }
 
   const provider = providerArg
+  const providerConfig = PROVIDER_MATRIX.find((item) => item.provider === provider)
   const requiredEnv = PROVIDER_REQUIRED_ENV[provider]
   if (!process.env[requiredEnv]) {
     printResult({
@@ -105,13 +106,11 @@ async function main(): Promise<void> {
   }
 
   process.env['LEON_NODE_ENV'] = 'testing'
-  process.env['LEON_LLM_PROVIDER'] = provider
-  process.env['LEON_WORKFLOW_LLM_PROVIDER'] = provider
-  process.env['LEON_AGENT_LLM_PROVIDER'] = provider
+  process.env['LEON_LLM'] = providerConfig?.llmTarget || provider
 
   const tempAssetPath = path.join(
     os.tmpdir(),
-    `leon-agentic-loop-${provider}-${Date.now()}.txt`
+    `leon-agent-${provider}-${Date.now()}.txt`
   )
 
   const {
@@ -146,8 +145,8 @@ async function main(): Promise<void> {
     `There is a file waiting for you in ${tempAssetPath}, do what it asks you to do.`
   ]
 
-  const turnResults: AgenticTurnResult[] = []
-  const toolCalls: AgenticTurnResult['toolCalls'] = []
+  const turnResults: AgentTurnResult[] = []
+  const toolCalls: AgentTurnResult['toolCalls'] = []
   const originalExecuteTool = TOOL_EXECUTOR.executeTool.bind(TOOL_EXECUTOR)
 
   /**
@@ -275,7 +274,7 @@ async function main(): Promise<void> {
           result.data &&
           typeof result.data === 'object' &&
           Array.isArray(result.data['executionHistory'])
-            ? (result.data['executionHistory'] as AgenticTurnResult['executionHistory'])
+            ? (result.data['executionHistory'] as AgentTurnResult['executionHistory'])
             : [],
         toolCalls: toolCalls.slice(recordedToolCalls)
       })
@@ -316,7 +315,7 @@ void main()
   })
   .catch((error) => {
     printResult({
-      provider: (process.argv[2] || 'openai') as AgenticProvider,
+      provider: (process.argv[2] || 'openai') as AgentProvider,
       skipped: false,
       reason: String(error)
     })

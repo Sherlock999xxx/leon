@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 
-type AgenticLoopSuite = 'unit' | 'e2e'
+type AgentSuite = 'unit' | 'e2e'
 
 function extractTestNamePattern(args: string[]): string | null {
   for (let index = 0; index < args.length; index += 1) {
@@ -31,19 +31,17 @@ function extractTestNamePattern(args: string[]): string | null {
   return null
 }
 
-function resolveSuitePath(suite: AgenticLoopSuite): string {
-  return suite === 'e2e' ? 'test/agentic-loop/e2e' : 'test/agentic-loop/unit'
+function resolveSuitePath(suite: AgentSuite): string {
+  return suite === 'e2e' ? 'test/agent/e2e' : 'test/agent/unit'
 }
 
 const suiteArg = process.argv[2]
 if (suiteArg !== 'unit' && suiteArg !== 'e2e') {
-  console.error(
-    'Expected suite argument "unit" or "e2e" for run-agentic-loop-vitest.ts'
-  )
+  console.error('Expected suite argument "unit" or "e2e" for run-agent-vitest.ts')
   process.exit(1)
 }
 
-const suite = suiteArg as AgenticLoopSuite
+const suite = suiteArg as AgentSuite
 const forwardedArgs = process.argv.slice(3)
 const testNamePattern = extractTestNamePattern(forwardedArgs)
 const vitestEntrypoint = path.join(
@@ -59,7 +57,7 @@ const childProcess = spawn(
     vitestEntrypoint,
     'run',
     '--config',
-    'vitest.agentic-loop.config.ts',
+    'vitest.config.ts',
     resolveSuitePath(suite),
     ...forwardedArgs
   ],
@@ -70,7 +68,7 @@ const childProcess = spawn(
       LEON_NODE_ENV: process.env['LEON_NODE_ENV'] || 'testing',
       ...(suite === 'e2e' && testNamePattern
         ? {
-            LEON_AGENTIC_LOOP_PROVIDER_PATTERN: testNamePattern
+            LEON_AGENT_PROVIDER_PATTERN: testNamePattern
           }
         : {})
     }

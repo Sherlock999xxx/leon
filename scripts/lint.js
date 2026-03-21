@@ -10,12 +10,8 @@ const globs = [
   // TODO: put it back once tests have been reintroduced into skills
   // '"skills/**/*.js"',
   '"scripts/**/*.{ts,js}"',
-  '"server/src/**/*.{ts,js}"'
-  // TODO: put it back once tests need to be written
-  /*'"test/!*.js"',
-  '"test/e2e/!**!/!*.js"',
-  '"test/json/!**!/!*.js"',
-  '"test/unit/!**!/!*.js"'*/
+  '"server/src/**/*.{ts,js}"',
+  '"test/**/*.{ts,js}"'
 ]
 const src = globs.join(' ')
 

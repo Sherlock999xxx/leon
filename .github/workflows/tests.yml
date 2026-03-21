@@ -32,20 +32,11 @@ jobs:
       - name: Install
         run: npm install
 
-      - name: Run JSON tests
-        run: npm run test:json
+      - name: Run agent unit tests
+        run: npm run test:agent:unit
 
-      - name: Run over HTTP tests
-        run: npm run test:over-http
+      - name: Run workflow unit tests
+        run: npm run test:workflow:unit
 
-      - name: Run E2E tests
-        run: npm run test:e2e
-
-      - name: Install offline STT
-        run: npm run setup:offline-stt
-
-      - name: Install offline TTS
-        run: npm run setup:offline-tts
-
-      - name: Run unit tests
-        run: npm run test:unit
+      - name: Run workflow e2e tests
+        run: npm run test:workflow:e2e

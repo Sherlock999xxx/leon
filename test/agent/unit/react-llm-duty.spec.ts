@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 process.env['LEON_NODE_ENV'] = 'testing'
-process.env['LEON_LLM_PROVIDER'] = 'openai'
+process.env['LEON_LLM'] = 'openai/gpt-5.4'
 
 /**
  * Hoisted mocks let the imported ReAct module capture the fake phase functions
@@ -118,7 +118,7 @@ let ReActLLMDuty: typeof import('@/core/llm-manager/llm-duties/react-llm-duty').
 
 function logUnitProgress(message: string, data?: Record<string, unknown>): void {
   const serializedData = data ? ` ${JSON.stringify(data)}` : ''
-  console.info(`[agentic-loop:unit] ${message}${serializedData}`)
+  console.info(`[agent:unit] ${message}${serializedData}`)
 }
 
 async function createDuty(input: string): Promise<InstanceType<typeof ReActLLMDuty>> {
@@ -162,7 +162,7 @@ beforeEach(() => {
   coreMocks.llmProvider.consumeLastProviderErrorMessage.mockReturnValue(null)
 })
 
-describe('ReActLLMDuty agentic loop', () => {
+describe('ReActLLMDuty agent loop', () => {
   it('finalizes directly when planning returns a handoff', async () => {
     logUnitProgress('planning handoff scenario', {
       input: 'Hi there, what do you reply if I tell you "ping"?',
@@ -198,7 +198,7 @@ describe('ReActLLMDuty agentic loop', () => {
 
   it('executes a planned step and synthesizes the final answer', async () => {
     logUnitProgress('planned execution scenario', {
-      input: "What's the weather like today in Shenzhen?",
+      input: 'What\'s the weather like today in Shenzhen?',
       stepFunction: 'weather.openmeteo.getCurrentConditions'
     })
     phaseMocks.runPlanningPhase.mockResolvedValue({
@@ -224,7 +224,7 @@ describe('ReActLLMDuty agentic loop', () => {
     phaseMocks.runExecutionSelfObservationPhase.mockResolvedValue(null)
     phaseMocks.runFinalAnswerPhase.mockResolvedValue('It is 24C and sunny in Shenzhen.')
 
-    const duty = await createDuty("What's the weather like today in Shenzhen?")
+    const duty = await createDuty('What\'s the weather like today in Shenzhen?')
     const result = await duty.execute()
 
     logUnitProgress('planned execution result', {

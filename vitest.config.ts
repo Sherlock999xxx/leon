@@ -10,7 +10,6 @@ dotenv.config({ path: path.join(ROOT_DIR, '.env') })
 
 export default defineConfig({
   resolve: {
-    // Reuse Leon's TS path aliases so the ReAct code can be imported directly.
     alias: {
       '@@': ROOT_DIR,
       '@': path.join(ROOT_DIR, 'server', 'src'),
@@ -20,7 +19,6 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    // The e2e suite mutates shared runtime state and provider env vars.
     fileParallelism: false,
     disableConsoleIntercept: true,
     restoreMocks: true,
