@@ -73,6 +73,9 @@ export default class NLU {
   private hasHandledProviderFailure = false
   private _currentResponseRoute: RoutingRoute = 'workflow'
   private workflowProgress = new WorkflowProgressWidget()
+  private pendingWorkflowNotFoundChoice: {
+    originalUtterance: NLPUtterance
+  } | null = null
 
   private readonly routingRoutes: Record<RoutingRoute, RoutingRoute> = {
     workflow: 'workflow',
@@ -477,11 +480,21 @@ export default class NLU {
         return
       }
 
-      if (!BRAIN.isMuted) {
-        await BRAIN.talk(BRAIN.wernicke('skill_not_found_offer_create'), true)
+      this.pendingWorkflowNotFoundChoice = {
+        originalUtterance: utterance
       }
 
-      await this.runSkillWriterCreateSkill(utterance)
+      if (!BRAIN.isMuted) {
+        await BRAIN.talk(
+          'I couldn\'t find a matching skill or action for this request. Do you want me to fall back to agent mode for it, or write the code for a new skill?',
+          true
+        )
+      }
+
+      SOCKET_SERVER.socket?.emit('suggest', [
+        'Fallback to agent mode',
+        'Write the skill code'
+      ])
       return
     }
 
@@ -505,6 +518,70 @@ export default class NLU {
     }
 
     // TODO: core rewrite chit-chat duty / or conversation skill?
+  }
+
+  private async handlePendingWorkflowNotFoundChoice(
+    utterance: NLPUtterance
+  ): Promise<boolean> {
+    if (!this.pendingWorkflowNotFoundChoice) {
+      return false
+    }
+
+    const choiceDuty = new SlotFillingLLMDuty({
+      input: {
+        slotName: 'workflow_not_found_choice',
+        slotDescription:
+          'Return exactly one of these values: "fallback_to_agent" if the owner wants Leon to handle the original request via agent mode, or "write_skill_code" if the owner wants Leon to write the code for a new skill.',
+        slotType: 'string',
+        latestUtterance: utterance,
+        recentUtterances: this._nluProcessResult.context.utterances.slice(-4)
+      },
+      startingUtterance: this.pendingWorkflowNotFoundChoice.originalUtterance
+    })
+
+    await choiceDuty.init()
+
+    const choiceResult = await choiceDuty.execute()
+    if (!choiceResult) {
+      await this.handleProviderFailure()
+      return true
+    }
+
+    const output = choiceResult.output as unknown as SlotFillingOutput
+    const choiceValue =
+      output.status === SlotFillingStatus.Success
+        ? String(output.filled_slots['workflow_not_found_choice'] || '')
+            .trim()
+            .toLowerCase()
+        : ''
+
+    const originalUtterance = this.pendingWorkflowNotFoundChoice.originalUtterance
+
+    if (choiceValue === 'fallback_to_agent') {
+      this.pendingWorkflowNotFoundChoice = null
+      await this.runReAct(originalUtterance)
+      return true
+    }
+
+    if (choiceValue === 'write_skill_code') {
+      this.pendingWorkflowNotFoundChoice = null
+      await this.runSkillWriterCreateSkill(originalUtterance)
+      return true
+    }
+
+    if (!BRAIN.isMuted) {
+      await BRAIN.talk(
+        'Please choose one of these options: fall back to agent mode, or write the skill code.',
+        true
+      )
+    }
+
+    SOCKET_SERVER.socket?.emit('suggest', [
+      'Fallback to agent mode',
+      'Write the skill code'
+    ])
+
+    return true
   }
 
   private getLeonMode(): RoutingMode {
@@ -1085,6 +1162,15 @@ export default class NLU {
                 utterance
               }
             })
+
+            const handledWorkflowNotFoundChoice =
+              await this.handlePendingWorkflowNotFoundChoice(utterance)
+            if (this.hasHandledProviderFailure) {
+              return resolve(null)
+            }
+            if (handledWorkflowNotFoundChoice) {
+              return resolve(null)
+            }
 
             const routingDecision = this.getRoutingDecision()
             LogHelper.title('NLU')
