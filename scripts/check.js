@@ -1,15 +1,12 @@
 import fs from 'node:fs'
-import path from 'node:path'
 import os from 'node:os'
+import path from 'node:path'
 import { spawn } from 'node:child_process'
 
 import dotenv from 'dotenv'
 import { command } from 'execa'
 import semver from 'semver'
 import kill from 'tree-kill'
-import axios from 'axios'
-import osName from 'os-name'
-import getos from 'getos'
 
 import { LogHelper } from '@/helpers/log-helper'
 import { RuntimeHelper } from '@/helpers/runtime-helper'
@@ -18,506 +15,764 @@ import { shouldIgnoreTCPServerError } from '@/utilities'
 import {
   MINIMUM_REQUIRED_RAM,
   LEON_VERSION,
-  NODEJS_BRIDGE_ENTRY_PATH,
+  INSTANCE_ID,
+  NODE_VERSION,
+  PNPM_VERSION,
+  PYTHON_VERSION,
+  UV_VERSION,
   NODE_RUNTIME_BIN_PATH,
+  PNPM_RUNTIME_BIN_PATH,
+  PYTHON_RUNTIME_BIN_PATH,
+  UV_RUNTIME_BIN_PATH,
+  NODEJS_BRIDGE_ENTRY_PATH,
+  NODEJS_BRIDGE_VERSION,
   PYTHON_BRIDGE_ENTRY_PATH,
   PYTHON_BRIDGE_RUNTIME_BIN_PATH,
+  PYTHON_BRIDGE_VERSION,
   PYTHON_TCP_SERVER_ENTRY_PATH,
   PYTHON_TCP_SERVER_RUNTIME_BIN_PATH,
-  TSX_CLI_PATH,
   PYTHON_TCP_SERVER_VERSION,
-  NODEJS_BRIDGE_VERSION,
-  PYTHON_BRIDGE_VERSION,
-  INSTANCE_ID
+  PYTHON_TCP_SERVER_SETTINGS,
+  PYTHON_TCP_SERVER_TTS_MODEL_DIR_PATH,
+  PYTHON_TCP_SERVER_TTS_MODEL_PATH,
+  PYTHON_TCP_SERVER_TTS_BERT_BASE_DIR_PATH,
+  PYTHON_TCP_SERVER_ASR_MODEL_DIR_PATH,
+  AUDIO_MODELS_PATH,
+  TSX_CLI_PATH,
+  LANG,
+  HAS_STT,
+  HAS_TTS,
+  SHOULD_START_PYTHON_TCP_SERVER,
+  LEON_ROUTING_MODE,
+  WORKFLOW_LLM_TARGET,
+  AGENT_LLM_TARGET,
+  PYTORCH_TORCH_PATH,
+  NVIDIA_CUBLAS_PATH,
+  NVIDIA_CUDNN_PATH,
+  NVIDIA_CUSPARSE_PATH,
+  NVIDIA_CUSPARSE_FULL_PATH,
+  NVIDIA_NCCL_PATH,
+  NVIDIA_NVJITLINK_PATH,
+  NVIDIA_NVSHMEM_PATH
 } from '@/constants'
 
 dotenv.config()
 
-/**
- * Checking script
- * Help to figure out the setup state
- */
-;(async () => {
-  try {
-    const nodeMinRequiredVersion = '16'
-    const npmMinRequiredVersion = '8'
-    const flitePath = 'bin/flite/flite'
-    const coquiLanguageModelPath = 'bin/coqui/huge-vocabulary.scorer'
-    const amazonPath = 'core/config/voice/amazon.json'
-    const googleCloudPath = 'core/config/voice/google-cloud.json'
-    const watsonSttPath = 'core/config/voice/watson-stt.json'
-    const watsonTtsPath = 'core/config/voice/watson-tts.json'
-    const report = {
-      can_run: { title: 'Run', type: 'error', v: true },
-      can_run_skill: { title: 'Run skills', type: 'error', v: true },
-      can_text: { title: 'Reply you by texting', type: 'error', v: true },
-      can_start_python_tcp_server: {
-        title: 'Start the Python TCP server',
-        type: 'error',
-        v: true
-      },
-      can_amazon_polly_tts: {
-        title: 'Amazon Polly text-to-speech',
-        type: 'warning',
-        v: true
-      },
-      can_google_cloud_tts: {
-        title: 'Google Cloud text-to-speech',
-        type: 'warning',
-        v: true
-      },
-      can_watson_tts: {
-        title: 'Watson text-to-speech',
-        type: 'warning',
-        v: true
-      },
-      can_offline_tts: {
-        title: 'Offline text-to-speech',
-        type: 'warning',
-        v: true
-      },
-      can_google_cloud_stt: {
-        title: 'Google Cloud speech-to-text',
-        type: 'warning',
-        v: true
-      },
-      can_watson_stt: {
-        title: 'Watson speech-to-text',
-        type: 'warning',
-        v: true
-      },
-      can_offline_stt: {
-        title: 'Offline speech-to-text',
-        type: 'warning',
-        v: true
-      }
-    }
-    let reportDataInput = {
-      leonVersion: null,
-      instanceID: INSTANCE_ID || null,
-      environment: {
-        osDetails: null,
-        nodeVersion: null,
-        npmVersion: null
-      },
-      nodeJSBridge: {
-        version: null,
-        executionTime: null,
-        command: null,
-        output: null,
-        error: null
-      },
-      pythonBridge: {
-        version: null,
-        executionTime: null,
-        command: null,
-        output: null,
-        error: null
-      },
-      pythonTCPServer: {
-        version: null,
-        startTime: null,
-        command: null,
-        output: null,
-        error: null
-      },
-      report: null
-    }
+const CHECK_TMP_DIR_PATH = path.join(process.cwd(), 'scripts', 'tmp')
+const PYTHON_TCP_SERVER_TTS_MODEL_CONFIG_PATH = path.join(
+  PYTHON_TCP_SERVER_TTS_MODEL_DIR_PATH,
+  'config.json'
+)
+const PYTHON_TCP_SERVER_WAKE_WORD_MODEL_DIR_PATH = path.join(
+  AUDIO_MODELS_PATH,
+  'wake_word'
+)
+const PYTHON_TCP_SERVER_WAKE_WORD_MODEL_PATH = path.join(
+  PYTHON_TCP_SERVER_WAKE_WORD_MODEL_DIR_PATH,
+  PYTHON_TCP_SERVER_SETTINGS.wake_word.model_file_name
+)
+const PYTHON_TCP_SERVER_WAKE_WORD_MELSPEC_PATH = path.join(
+  PYTHON_TCP_SERVER_WAKE_WORD_MODEL_DIR_PATH,
+  'melspectrogram.onnx'
+)
+const PYTHON_TCP_SERVER_WAKE_WORD_EMBEDDING_PATH = path.join(
+  PYTHON_TCP_SERVER_WAKE_WORD_MODEL_DIR_PATH,
+  'embedding.onnx'
+)
 
-    LogHelper.title('Checking')
-
-    /**
-     * Leon version checking
-     */
-
-    LogHelper.info('Leon version')
-    LogHelper.success(`${LEON_VERSION}\n`)
-    reportDataInput.leonVersion = LEON_VERSION
-
-    /**
-     * Environment checking
-     */
-
-    LogHelper.info('Environment')
-
-    const osInfo = {
-      type: os.type(),
-      platform: os.platform(),
-      arch: os.arch(),
-      cpus: os.cpus().length,
-      release: os.release(),
-      osName: osName(),
-      distro: null
-    }
-    const totalRAMInGB = SystemHelper.getTotalRAM()
-    const freeRAMInGB = SystemHelper.getFreeRAM()
-
-    if (Math.round(freeRAMInGB) < MINIMUM_REQUIRED_RAM) {
-      report.can_run.v = false
-      LogHelper.error(
-        `Free RAM: ${freeRAMInGB} GB | Total RAM: ${totalRAMInGB} GB. Leon needs at least ${MINIMUM_REQUIRED_RAM} GB of RAM`
-      )
-    } else {
-      LogHelper.success(
-        `Free RAM: ${freeRAMInGB} GB | Total RAM: ${totalRAMInGB} GB`
-      )
-    }
-
-    if (osInfo.platform === 'linux') {
-      getos((e, os) => {
-        osInfo.distro = os
-        LogHelper.success(`${JSON.stringify(osInfo)}\n`)
-      })
-    } else {
-      LogHelper.success(`${JSON.stringify(osInfo)}\n`)
-    }
-
-    reportDataInput.environment.osDetails = osInfo
-    reportDataInput.environment.totalRAMInGB = totalRAMInGB
-    reportDataInput.environment.freeRAMInGB = freeRAMInGB
-    ;(
-      await Promise.all([
-        command('node --version', { shell: true }),
-        command('npm --version', { shell: true })
-      ])
-    ).forEach((p) => {
-      LogHelper.info(p.command)
-
-      if (
-        p.command.indexOf('node --version') !== -1 &&
-        !semver.satisfies(semver.clean(p.stdout), `>=${nodeMinRequiredVersion}`)
-      ) {
-        Object.keys(report).forEach((item) => {
-          if (report[item].type === 'error') report[item].v = false
-        })
-        LogHelper.error(
-          `${p.stdout}\nThe Node.js version must be >=${nodeMinRequiredVersion}. Please install it: https://nodejs.org (or use nvm)\n`
-        )
-      } else if (
-        p.command.indexOf('npm --version') !== -1 &&
-        !semver.satisfies(semver.clean(p.stdout), `>=${npmMinRequiredVersion}`)
-      ) {
-        Object.keys(report).forEach((item) => {
-          if (report[item].type === 'error') report[item].v = false
-        })
-        LogHelper.error(
-          `${p.stdout}\nThe npm version must be >=${npmMinRequiredVersion}. Please install it: https://www.npmjs.com/get-npm (or use nvm)\n`
-        )
-      } else {
-        LogHelper.success(`${p.stdout}\n`)
-        if (p.command.includes('node --version')) {
-          reportDataInput.environment.nodeVersion = p.stdout
-        } else if (p.command.includes('npm --version')) {
-          reportDataInput.environment.npmVersion = p.stdout
-        }
-      }
-    })
-
-    /**
-     * Skill execution checking with Node.js bridge
-     */
-
-    LogHelper.success(`Node.js bridge version: ${NODEJS_BRIDGE_VERSION}`)
-    reportDataInput.nodeJSBridge.version = NODEJS_BRIDGE_VERSION
-    LogHelper.info('Executing a skill...')
-
-    try {
-      const executionStart = Date.now()
-      const p = await command(
-        RuntimeHelper.buildShellCommand(NODE_RUNTIME_BIN_PATH, [
-          TSX_CLI_PATH,
-          NODEJS_BRIDGE_ENTRY_PATH,
-          path.join(
-            process.cwd(),
-            'scripts',
-            'assets',
-            'nodejs-bridge-intent-object.json'
-          )
-        ]),
-        { shell: true }
-      )
-      const executionEnd = Date.now()
-      const executionTime = executionEnd - executionStart
-      LogHelper.info(p.command)
-      reportDataInput.nodeJSBridge.command = p.command
-      LogHelper.success(p.stdout)
-      reportDataInput.nodeJSBridge.output = p.stdout
-      LogHelper.info(`Skill execution time: ${executionTime}ms\n`)
-      reportDataInput.nodeJSBridge.executionTime = `${executionTime}ms`
-    } catch (e) {
-      LogHelper.info(e.command)
-      report.can_run_skill.v = false
-      LogHelper.error(`${e}\n`)
-      reportDataInput.nodeJSBridge.error = JSON.stringify(e)
-    }
-
-    /**
-     * Skill execution checking with Python bridge
-     */
-
-    LogHelper.success(`Python bridge version: ${PYTHON_BRIDGE_VERSION}`)
-    reportDataInput.pythonBridge.version = PYTHON_BRIDGE_VERSION
-    LogHelper.info('Executing a skill...')
-
-    try {
-      const executionStart = Date.now()
-      const p = await command(
-        RuntimeHelper.buildShellCommand(PYTHON_BRIDGE_RUNTIME_BIN_PATH, [
-          PYTHON_BRIDGE_ENTRY_PATH,
-          path.join(
-            process.cwd(),
-            'scripts',
-            'assets',
-            'python-bridge-intent-object.json'
-          )
-        ]),
-        { shell: true }
-      )
-      const executionEnd = Date.now()
-      const executionTime = executionEnd - executionStart
-      LogHelper.info(p.command)
-      reportDataInput.pythonBridge.command = p.command
-      LogHelper.success(p.stdout)
-      reportDataInput.pythonBridge.output = p.stdout
-      LogHelper.info(`Skill execution time: ${executionTime}ms\n`)
-      reportDataInput.pythonBridge.executionTime = `${executionTime}ms`
-    } catch (e) {
-      LogHelper.info(e.command)
-      report.can_run_skill.v = false
-      LogHelper.error(`${e}\n`)
-      reportDataInput.pythonBridge.error = JSON.stringify(e)
-    }
-
-    /**
-     * Python TCP server startup checking
-     */
-
-    LogHelper.success(`Python TCP server version: ${PYTHON_TCP_SERVER_VERSION}`)
-    reportDataInput.pythonTCPServer.version = PYTHON_TCP_SERVER_VERSION
-
-    LogHelper.info('Starting the Python TCP server...')
-
-    const pythonTCPServerCommand = RuntimeHelper.buildShellCommand(
-      PYTHON_TCP_SERVER_RUNTIME_BIN_PATH,
-      [PYTHON_TCP_SERVER_ENTRY_PATH, 'en']
-    )
-    const pythonTCPServerStart = Date.now()
-    const p = spawn(pythonTCPServerCommand, { shell: true })
-
-    LogHelper.info(pythonTCPServerCommand)
-    reportDataInput.pythonTCPServer.command = pythonTCPServerCommand
-
-    if (osInfo.platform === 'darwin') {
-      LogHelper.info(
-        'For the first start, it may take a few minutes to cold start the Python TCP server on macOS. No worries it is a one-time thing'
-      )
-    }
-
-    let pythonTCPServerOutput = ''
-
-    p.stdout.on('data', (data) => {
-      const newData = data.toString()
-      pythonTCPServerOutput += newData
-
-      if (newData?.toLowerCase().includes('waiting for')) {
-        kill(p.pid)
-        LogHelper.success('The Python TCP server can successfully start')
-      }
-    })
-
-    p.stderr.on('data', (data) => {
-      const newData = data.toString()
-      const shouldIgnore = shouldIgnoreTCPServerError(newData)
-
-      // Ignore given warnings on stderr output
-      if (!shouldIgnore) {
-        pythonTCPServerOutput += newData
-        report.can_start_python_tcp_server.v = false
-        reportDataInput.pythonTCPServer.error = newData
-        LogHelper.error(`Cannot start the Python TCP server: ${newData}`)
-      }
-    })
-
-    const timeout = 3 * 60_000
-    // In case it takes too long, force kill
-    setTimeout(() => {
-      kill(p.pid)
-
-      const error = `The Python TCP server timed out after ${timeout}ms`
-      LogHelper.error(error)
-      reportDataInput.pythonTCPServer.error = error
-      report.can_start_python_tcp_server.v = false
-    }, timeout)
-
-    p.stdout.on('end', async () => {
-      const pythonTCPServerEnd = Date.now()
-      reportDataInput.pythonTCPServer.output = pythonTCPServerOutput
-      reportDataInput.pythonTCPServer.startTime = `${
-        pythonTCPServerEnd - pythonTCPServerStart
-      }ms`
-      LogHelper.info(
-        `Python TCP server startup time: ${reportDataInput.pythonTCPServer.startTime}\n`
-      )
-
-      /**
-       * TTS/STT checking
-       */
-
-      LogHelper.info('Amazon Polly TTS')
-
-      try {
-        const json = JSON.parse(await fs.promises.readFile(amazonPath))
-        if (
-          json.credentials.accessKeyId === '' ||
-          json.credentials.secretAccessKey === ''
-        ) {
-          report.can_amazon_polly_tts.v = false
-          LogHelper.warning('Amazon Polly TTS is not yet configured\n')
-        } else {
-          LogHelper.success('Configured\n')
-        }
-      } catch (e) {
-        report.can_amazon_polly_tts.v = false
-        LogHelper.warning(`Amazon Polly TTS is not yet configured: ${e}\n`)
-      }
-
-      LogHelper.info('Google Cloud TTS/STT')
-
-      try {
-        const json = JSON.parse(await fs.promises.readFile(googleCloudPath))
-        const results = []
-        Object.keys(json).forEach((item) => {
-          if (json[item] === '') results.push(false)
-        })
-        if (results.includes(false)) {
-          report.can_google_cloud_tts.v = false
-          report.can_google_cloud_stt.v = false
-          LogHelper.warning('Google Cloud TTS/STT is not yet configured\n')
-        } else {
-          LogHelper.success('Configured\n')
-        }
-      } catch (e) {
-        report.can_google_cloud_tts.v = false
-        report.can_google_cloud_stt.v = false
-        LogHelper.warning(`Google Cloud TTS/STT is not yet configured: ${e}\n`)
-      }
-
-      LogHelper.info('Watson TTS')
-
-      try {
-        const json = JSON.parse(await fs.promises.readFile(watsonTtsPath))
-        const results = []
-        Object.keys(json).forEach((item) => {
-          if (json[item] === '') results.push(false)
-        })
-        if (results.includes(false)) {
-          report.can_watson_tts.v = false
-          LogHelper.warning('Watson TTS is not yet configured\n')
-        } else {
-          LogHelper.success('Configured\n')
-        }
-      } catch (e) {
-        report.can_watson_tts.v = false
-        LogHelper.warning(`Watson TTS is not yet configured: ${e}\n`)
-      }
-
-      LogHelper.info('Offline TTS')
-
-      if (!fs.existsSync(flitePath)) {
-        report.can_offline_tts.v = false
-        LogHelper.warning(
-          `Cannot find ${flitePath}. You can set up the offline TTS by running: "npm run setup:offline-tts"\n`
-        )
-      } else {
-        LogHelper.success(`Found Flite at ${flitePath}\n`)
-      }
-
-      LogHelper.info('Watson STT')
-
-      try {
-        const json = JSON.parse(await fs.promises.readFile(watsonSttPath))
-        const results = []
-        Object.keys(json).forEach((item) => {
-          if (json[item] === '') results.push(false)
-        })
-        if (results.includes(false)) {
-          report.can_watson_stt.v = false
-          LogHelper.warning('Watson STT is not yet configured\n')
-        } else {
-          LogHelper.success('Configured\n')
-        }
-      } catch (e) {
-        report.can_watson_stt.v = false
-        LogHelper.warning(`Watson STT is not yet configured: ${e}`)
-      }
-
-      LogHelper.info('Offline STT')
-
-      if (!fs.existsSync(coquiLanguageModelPath)) {
-        report.can_offline_stt.v = false
-        LogHelper.warning(
-          `Cannot find ${coquiLanguageModelPath}. You can setup the offline STT by running: "npm run setup:offline-stt"`
-        )
-      } else {
-        LogHelper.success(
-          `Found Coqui language model at ${coquiLanguageModelPath}`
-        )
-      }
-
-      /**
-       * Report
-       */
-
-      LogHelper.title('Report')
-
-      LogHelper.info('Here is the diagnosis about your current setup')
-      Object.keys(report).forEach((item) => {
-        if (report[item].v === true) {
-          LogHelper.success(report[item].title)
-        } else {
-          LogHelper[report[item].type](report[item].title)
-        }
-      })
-
-      LogHelper.default('')
-      if (
-        report.can_run.v &&
-        report.can_run_skill.v &&
-        report.can_text.v &&
-        report.can_start_python_tcp_server.v
-      ) {
-        LogHelper.success('Hooray! Leon can run correctly')
-        LogHelper.info(
-          'If you have some yellow warnings, it is all good. It means some entities are not yet configured'
-        )
-      } else {
-        LogHelper.error('Please fix the errors above')
-      }
-
-      reportDataInput.report = report
-
-      reportDataInput = JSON.parse(
-        SystemHelper.sanitizeUsername(JSON.stringify(reportDataInput))
-      )
-
-      LogHelper.title('REPORT URL')
-
-      LogHelper.info('Sending report...')
-
-      try {
-        const { data } = await axios.post('https://getleon.ai/api/report', {
-          report: reportDataInput
-        })
-        const { data: responseReportData } = data
-
-        LogHelper.success(`Report URL: ${responseReportData.reportUrl}`)
-      } catch (e) {
-        LogHelper.error(`Failed to send report: ${e}`)
-      }
-
-      process.exit(0)
-    })
-  } catch (e) {
-    LogHelper.error(e)
+function createCheckResult(title, severity = 'error') {
+  return {
+    title,
+    severity,
+    ok: true,
+    details: []
   }
-})()
+}
+
+function addFailure(result, detail) {
+  result.ok = false
+  result.details.push(detail)
+}
+
+function addDetail(result, detail) {
+  result.details.push(detail)
+}
+
+function getFormattedCheckStatus(check) {
+  if (check.ok) {
+    return 'ok'
+  }
+
+  return check.severity === 'warning' ? 'warning' : 'error'
+}
+
+function extractFirstVersion(rawOutput) {
+  const match = rawOutput.match(/\d+\.\d+\.\d+/)
+  return match ? match[0] : null
+}
+
+async function getCommandVersion(executablePath, args = []) {
+  const result = await command(
+    RuntimeHelper.buildShellCommand(executablePath, args),
+    { shell: true }
+  )
+
+  return {
+    raw: result.stdout.trim(),
+    version: extractFirstVersion(result.stdout.trim())
+  }
+}
+
+async function writeCheckIntentObject(fileName, intentObject) {
+  await fs.promises.mkdir(CHECK_TMP_DIR_PATH, { recursive: true })
+
+  const filePath = path.join(CHECK_TMP_DIR_PATH, fileName)
+  await fs.promises.writeFile(filePath, JSON.stringify(intentObject, null, 2))
+
+  return filePath
+}
+
+function buildExtraContext(lang) {
+  const now = new Date()
+
+  return {
+    lang,
+    date: now.toISOString().slice(0, 10),
+    time: now.toTimeString().slice(0, 8),
+    timestamp: now.getTime(),
+    date_time: now.toISOString(),
+    week_day: now.toLocaleDateString('en-US', { weekday: 'long' })
+  }
+}
+
+async function createNodejsBridgeIntentObject() {
+  const skillConfigPath = path.join(
+    process.cwd(),
+    'skills',
+    'date_time_skill',
+    'skill.json'
+  )
+  const skillConfig = JSON.parse(await fs.promises.readFile(skillConfigPath, 'utf8'))
+
+  return writeCheckIntentObject('check-nodejs-bridge-intent-object.json', {
+    id: 'check-nodejs-bridge',
+    lang: 'en',
+    context_name: 'date_time',
+    skill_name: 'date_time_skill',
+    action_name: 'current_time',
+    skill_config: skillConfig,
+    skill_config_path: skillConfigPath,
+    utterance: 'What time is it?',
+    entities: [],
+    action_arguments: {},
+    sentiment: {
+      vote: 'neutral',
+      score: 0
+    },
+    context: {
+      utterances: ['What time is it?'],
+      action_arguments: [{}],
+      entities: [],
+      sentiments: [{ vote: 'neutral', score: 0 }],
+      data: {}
+    },
+    extra_context: buildExtraContext('en')
+  })
+}
+
+async function createPythonBridgeIntentObject() {
+  const skillConfigPath = path.join(
+    process.cwd(),
+    'skills',
+    'color_skill',
+    'skill.json'
+  )
+  const skillConfig = JSON.parse(await fs.promises.readFile(skillConfigPath, 'utf8'))
+
+  return writeCheckIntentObject('check-python-bridge-intent-object.json', {
+    id: 'check-python-bridge',
+    lang: 'en',
+    context_name: 'color',
+    skill_name: 'color_skill',
+    action_name: 'tell_hexadecimal_color',
+    skill_config: skillConfig,
+    skill_config_path: skillConfigPath,
+    utterance: 'What is the hexadecimal color for red?',
+    entities: [],
+    action_arguments: {
+      color_name: 'red'
+    },
+    sentiment: {
+      vote: 'neutral',
+      score: 0
+    },
+    context: {
+      utterances: ['What is the hexadecimal color for red?'],
+      action_arguments: [{ color_name: 'red' }],
+      entities: [],
+      sentiments: [{ vote: 'neutral', score: 0 }],
+      data: {}
+    },
+    extra_context: buildExtraContext('en')
+  })
+}
+
+async function runNodejsBridgeCheck(intentObjectPath) {
+  return command(
+    RuntimeHelper.buildShellCommand(NODE_RUNTIME_BIN_PATH, [
+      TSX_CLI_PATH,
+      NODEJS_BRIDGE_ENTRY_PATH,
+      '--runtime',
+      'skill',
+      intentObjectPath
+    ]),
+    { shell: true }
+  )
+}
+
+async function runPythonBridgeCheck(intentObjectPath) {
+  return command(
+    RuntimeHelper.buildShellCommand(PYTHON_BRIDGE_RUNTIME_BIN_PATH, [
+      PYTHON_BRIDGE_ENTRY_PATH,
+      intentObjectPath
+    ]),
+    { shell: true }
+  )
+}
+
+function buildTCPServerEnv() {
+  const env = { ...process.env }
+
+  if (SystemHelper.isLinux()) {
+    const torchLibPath = `${PYTORCH_TORCH_PATH}/lib`
+    const nvidiaLibPaths = [
+      `${NVIDIA_CUBLAS_PATH}/lib`,
+      `${NVIDIA_CUDNN_PATH}/lib`,
+      `${NVIDIA_CUSPARSE_PATH}/lib`,
+      `${NVIDIA_CUSPARSE_FULL_PATH}/lib`,
+      `${NVIDIA_NCCL_PATH}/lib`,
+      `${NVIDIA_NVSHMEM_PATH}/lib`,
+      `${NVIDIA_NVJITLINK_PATH}/lib`
+    ]
+
+    env['LD_LIBRARY_PATH'] = [torchLibPath, ...nvidiaLibPaths, env['LD_LIBRARY_PATH']]
+      .filter(Boolean)
+      .join(':')
+  }
+
+  return env
+}
+
+function startTCPServerCheck() {
+  const args = [PYTHON_TCP_SERVER_ENTRY_PATH, LANG || 'en']
+  const env = buildTCPServerEnv()
+  const commandString = RuntimeHelper.buildShellCommand(
+    PYTHON_TCP_SERVER_RUNTIME_BIN_PATH,
+    args
+  )
+
+  return new Promise((resolve) => {
+    const child = spawn(PYTHON_TCP_SERVER_RUNTIME_BIN_PATH, args, {
+      env,
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+
+    const timeoutMs = 3 * 60_000
+    let output = ''
+    let resolved = false
+
+    const finish = (result) => {
+      if (resolved) {
+        return
+      }
+
+      resolved = true
+      clearTimeout(timeoutId)
+
+      if (child.pid) {
+        kill(child.pid)
+      }
+
+      resolve({
+        command: commandString,
+        ...result
+      })
+    }
+
+    const timeoutId = setTimeout(() => {
+      finish({
+        ok: false,
+        output,
+        error: `The Python TCP server timed out after ${timeoutMs}ms`
+      })
+    }, timeoutMs)
+
+    child.stdout.on('data', (data) => {
+      const text = data.toString()
+      output += text
+
+      if (text.toLowerCase().includes('waiting for connection')) {
+        finish({
+          ok: true,
+          output,
+          error: null
+        })
+      }
+    })
+
+    child.stderr.on('data', (data) => {
+      const text = data.toString()
+
+      if (shouldIgnoreTCPServerError(text)) {
+        output += text
+        return
+      }
+
+      output += text
+      finish({
+        ok: false,
+        output,
+        error: text.trim() || 'Unknown TCP server startup error'
+      })
+    })
+
+    child.on('error', (error) => {
+      finish({
+        ok: false,
+        output,
+        error: String(error)
+      })
+    })
+
+    child.on('exit', (code) => {
+      if (!resolved) {
+        finish({
+          ok: false,
+          output,
+          error: `The Python TCP server exited before becoming ready (code: ${code ?? 'unknown'})`
+        })
+      }
+    })
+  })
+}
+
+function validateLocalLLMTarget(target, label, result) {
+  if (!target.isLocal) {
+    addDetail(result, `${label}: ${target.label}`)
+    return
+  }
+
+  if (!fs.existsSync(target.model)) {
+    addFailure(
+      result,
+      `${label}: local model not found at ${target.model}`
+    )
+    return
+  }
+
+  addDetail(result, `${label}: ${target.label}`)
+}
+
+function checkTCPServerAssets() {
+  const result = createCheckResult('Python TCP server assets')
+
+  if (HAS_TTS) {
+    if (!fs.existsSync(PYTHON_TCP_SERVER_TTS_MODEL_CONFIG_PATH)) {
+      addFailure(
+        result,
+        `Missing TTS config at ${PYTHON_TCP_SERVER_TTS_MODEL_CONFIG_PATH}`
+      )
+    }
+
+    if (!fs.existsSync(PYTHON_TCP_SERVER_TTS_MODEL_PATH)) {
+      addFailure(
+        result,
+        `Missing TTS model at ${PYTHON_TCP_SERVER_TTS_MODEL_PATH}`
+      )
+    }
+
+    if (!fs.existsSync(PYTHON_TCP_SERVER_TTS_BERT_BASE_DIR_PATH)) {
+      addFailure(
+        result,
+        `Missing TTS BERT base directory at ${PYTHON_TCP_SERVER_TTS_BERT_BASE_DIR_PATH}`
+      )
+    }
+  }
+
+  if (HAS_STT && !fs.existsSync(PYTHON_TCP_SERVER_ASR_MODEL_DIR_PATH)) {
+    addFailure(
+      result,
+      `Missing ASR model directory at ${PYTHON_TCP_SERVER_ASR_MODEL_DIR_PATH}`
+    )
+  }
+
+  if (process.env['LEON_WAKE_WORD'] === 'true') {
+    if (!fs.existsSync(PYTHON_TCP_SERVER_WAKE_WORD_MODEL_PATH)) {
+      addFailure(
+        result,
+        `Missing wake word model at ${PYTHON_TCP_SERVER_WAKE_WORD_MODEL_PATH}`
+      )
+    }
+
+    if (!fs.existsSync(PYTHON_TCP_SERVER_WAKE_WORD_MELSPEC_PATH)) {
+      addFailure(
+        result,
+        `Missing wake word melspectrogram model at ${PYTHON_TCP_SERVER_WAKE_WORD_MELSPEC_PATH}`
+      )
+    }
+
+    if (!fs.existsSync(PYTHON_TCP_SERVER_WAKE_WORD_EMBEDDING_PATH)) {
+      addFailure(
+        result,
+        `Missing wake word embedding model at ${PYTHON_TCP_SERVER_WAKE_WORD_EMBEDDING_PATH}`
+      )
+    }
+  }
+
+  if (result.ok) {
+    addDetail(
+      result,
+      `STT=${HAS_STT ? 'enabled' : 'disabled'}, TTS=${HAS_TTS ? 'enabled' : 'disabled'}, wake_word=${process.env['LEON_WAKE_WORD'] === 'true' ? 'enabled' : 'disabled'}`
+    )
+  }
+
+  return result
+}
+
+function printCheckResult(result) {
+  const status = getFormattedCheckStatus(result)
+
+  if (status === 'ok') {
+    LogHelper.success(result.title)
+  } else if (status === 'warning') {
+    LogHelper.warning(result.title)
+  } else {
+    LogHelper.error(result.title)
+  }
+
+  result.details.forEach((detail) => {
+    LogHelper.default(`- ${detail}`)
+  })
+}
+
+;(async () => {
+  const checks = {
+    canRun: createCheckResult('Run Leon'),
+    hardware: createCheckResult('Hardware'),
+    managedNode: createCheckResult('Managed Node.js runtime'),
+    managedPNPM: createCheckResult('Managed pnpm runtime'),
+    managedPython: createCheckResult('Managed Python runtime'),
+    managedUV: createCheckResult('Managed uv runtime'),
+    llmTargets: createCheckResult('LLM target configuration'),
+    nodeJSBridge: createCheckResult('Node.js bridge smoke test'),
+    pythonBridge: createCheckResult('Python bridge smoke test'),
+    pythonTCPServerAssets: createCheckResult('Python TCP server assets'),
+    pythonTCPServer: createCheckResult('Python TCP server boot')
+  }
+
+  const summary = {
+    leonVersion: LEON_VERSION || null,
+    instanceID: INSTANCE_ID || null,
+    environment: {
+      os: SystemHelper.getInformation(),
+      release: os.release(),
+      cpus: os.cpus().length,
+      totalRAMInGB: SystemHelper.getTotalRAM(),
+      freeRAMInGB: SystemHelper.getFreeRAM()
+    },
+    hardware: {},
+    runtimes: {},
+    llm: {
+      routingMode: LEON_ROUTING_MODE,
+      workflow: WORKFLOW_LLM_TARGET.label,
+      agent: AGENT_LLM_TARGET.label
+    },
+    nodeJSBridge: {},
+    pythonBridge: {},
+    pythonTCPServer: {}
+  }
+
+  LogHelper.title('Checking')
+
+  LogHelper.info('Leon version')
+  LogHelper.success(String(LEON_VERSION))
+
+  LogHelper.info('Environment')
+  LogHelper.success(JSON.stringify(summary.environment))
+
+  try {
+    const [
+      gpuDeviceNames,
+      graphicsComputeAPI,
+      totalVRAM,
+      freeVRAM,
+      usedVRAM,
+      canSupportLocalLLM
+    ] = await Promise.all([
+      SystemHelper.getGPUDeviceNames(),
+      SystemHelper.getGraphicsComputeAPI(),
+      SystemHelper.getTotalVRAM(),
+      SystemHelper.getFreeVRAM(),
+      SystemHelper.getUsedVRAM(),
+      SystemHelper.canSupportLocalLLM()
+    ])
+
+    summary.hardware = {
+      gpuDeviceNames,
+      graphicsComputeAPI,
+      totalVRAMInGB: totalVRAM,
+      freeVRAMInGB: freeVRAM,
+      usedVRAMInGB: usedVRAM,
+      canSupportLocalLLM
+    }
+
+    addDetail(
+      checks.hardware,
+      `GPU: ${gpuDeviceNames.length > 0 ? gpuDeviceNames.join(', ') : 'none'}`
+    )
+    addDetail(checks.hardware, `Compute API: ${graphicsComputeAPI}`)
+    addDetail(
+      checks.hardware,
+      `VRAM: total=${totalVRAM} GB | free=${freeVRAM} GB | used=${usedVRAM} GB`
+    )
+    addDetail(
+      checks.hardware,
+      `Local LLM support: ${canSupportLocalLLM ? 'yes' : 'no'}`
+    )
+  } catch (error) {
+    checks.hardware.severity = 'warning'
+    addFailure(
+      checks.hardware,
+      `Unable to inspect GPU/VRAM information: ${String(error)}`
+    )
+  }
+
+  if (Math.round(summary.environment.freeRAMInGB) < MINIMUM_REQUIRED_RAM) {
+    addFailure(
+      checks.canRun,
+      `Free RAM is ${summary.environment.freeRAMInGB} GB but Leon needs at least ${MINIMUM_REQUIRED_RAM} GB`
+    )
+  } else {
+    addDetail(
+      checks.canRun,
+      `Free RAM: ${summary.environment.freeRAMInGB} GB | Total RAM: ${summary.environment.totalRAMInGB} GB`
+    )
+  }
+
+  const runtimeChecks = [
+    {
+      key: 'managedNode',
+      label: 'node',
+      executablePath: NODE_RUNTIME_BIN_PATH,
+      expectedVersion: NODE_VERSION
+    },
+    {
+      key: 'managedPNPM',
+      label: 'pnpm',
+      executablePath: PNPM_RUNTIME_BIN_PATH,
+      expectedVersion: PNPM_VERSION
+    },
+    {
+      key: 'managedPython',
+      label: 'python',
+      executablePath: PYTHON_RUNTIME_BIN_PATH,
+      expectedVersion: PYTHON_VERSION
+    },
+    {
+      key: 'managedUV',
+      label: 'uv',
+      executablePath: UV_RUNTIME_BIN_PATH,
+      expectedVersion: UV_VERSION
+    }
+  ]
+
+  for (const runtimeCheck of runtimeChecks) {
+    const result = checks[runtimeCheck.key]
+
+    if (!fs.existsSync(runtimeCheck.executablePath)) {
+      addFailure(
+        result,
+        `Runtime not found at ${runtimeCheck.executablePath}`
+      )
+      continue
+    }
+
+    try {
+      const { raw, version } = await getCommandVersion(
+        runtimeCheck.executablePath,
+        ['--version']
+      )
+      summary.runtimes[runtimeCheck.label] = {
+        path: runtimeCheck.executablePath,
+        version: raw
+      }
+
+      addDetail(result, `Path: ${runtimeCheck.executablePath}`)
+      addDetail(result, `Version: ${raw}`)
+
+      const expectedVersion = extractFirstVersion(runtimeCheck.expectedVersion)
+      if (
+        expectedVersion &&
+        version &&
+        semver.valid(semver.coerce(version)) &&
+        semver.valid(semver.coerce(expectedVersion)) &&
+        semver.neq(
+          semver.coerce(version),
+          semver.coerce(expectedVersion)
+        )
+      ) {
+        addFailure(
+          result,
+          `Expected ${expectedVersion} but got ${version}`
+        )
+      }
+    } catch (error) {
+      addFailure(result, String(error))
+    }
+  }
+
+  if (!fs.existsSync(TSX_CLI_PATH)) {
+    addFailure(
+      checks.nodeJSBridge,
+      `Missing tsx CLI at ${TSX_CLI_PATH}`
+    )
+  }
+
+  validateLocalLLMTarget(WORKFLOW_LLM_TARGET, 'Workflow', checks.llmTargets)
+  validateLocalLLMTarget(AGENT_LLM_TARGET, 'Agent', checks.llmTargets)
+
+  const pythonTCPServerAssetsResult = checkTCPServerAssets()
+  checks.pythonTCPServerAssets = pythonTCPServerAssetsResult
+
+  let nodeIntentObjectPath = null
+  let pythonIntentObjectPath = null
+
+  try {
+    nodeIntentObjectPath = await createNodejsBridgeIntentObject()
+
+    const executionStart = Date.now()
+    const result = await runNodejsBridgeCheck(nodeIntentObjectPath)
+    const executionTime = Date.now() - executionStart
+    const combinedOutput = `${result.stdout}\n${result.stderr}`.trim()
+
+    summary.nodeJSBridge = {
+      version: NODEJS_BRIDGE_VERSION,
+      command: result.command,
+      executionTimeMs: executionTime,
+      output: combinedOutput
+    }
+
+    addDetail(checks.nodeJSBridge, `Version: ${NODEJS_BRIDGE_VERSION}`)
+    addDetail(checks.nodeJSBridge, `Execution time: ${executionTime}ms`)
+
+    if (
+      combinedOutput.includes('Error while running') ||
+      combinedOutput.trim() === ''
+    ) {
+      addFailure(
+        checks.nodeJSBridge,
+        combinedOutput || 'The Node.js bridge did not produce any output'
+      )
+    }
+  } catch (error) {
+    addFailure(checks.nodeJSBridge, String(error))
+  }
+
+  try {
+    pythonIntentObjectPath = await createPythonBridgeIntentObject()
+
+    const executionStart = Date.now()
+    const result = await runPythonBridgeCheck(pythonIntentObjectPath)
+    const executionTime = Date.now() - executionStart
+    const combinedOutput = `${result.stdout}\n${result.stderr}`.trim()
+
+    summary.pythonBridge = {
+      version: PYTHON_BRIDGE_VERSION,
+      command: result.command,
+      executionTimeMs: executionTime,
+      output: combinedOutput
+    }
+
+    addDetail(checks.pythonBridge, `Version: ${PYTHON_BRIDGE_VERSION}`)
+    addDetail(checks.pythonBridge, `Execution time: ${executionTime}ms`)
+
+    if (
+      combinedOutput.includes('Error while running') ||
+      combinedOutput.includes('Traceback') ||
+      combinedOutput.trim() === ''
+    ) {
+      addFailure(
+        checks.pythonBridge,
+        combinedOutput || 'The Python bridge did not produce any output'
+      )
+    }
+  } catch (error) {
+    addFailure(checks.pythonBridge, String(error))
+  }
+
+  if (SHOULD_START_PYTHON_TCP_SERVER) {
+    try {
+      const startupStart = Date.now()
+      const result = await startTCPServerCheck()
+      const startupTime = Date.now() - startupStart
+
+      summary.pythonTCPServer = {
+        version: PYTHON_TCP_SERVER_VERSION,
+        command: result.command,
+        startupTimeMs: startupTime,
+        output: result.output
+      }
+
+      addDetail(checks.pythonTCPServer, `Version: ${PYTHON_TCP_SERVER_VERSION}`)
+      addDetail(checks.pythonTCPServer, `Startup time: ${startupTime}ms`)
+
+      if (!result.ok) {
+        addFailure(
+          checks.pythonTCPServer,
+          result.error || 'The Python TCP server did not become ready'
+        )
+      }
+    } catch (error) {
+      addFailure(checks.pythonTCPServer, String(error))
+    }
+  } else {
+    checks.pythonTCPServer.severity = 'warning'
+    addDetail(
+      checks.pythonTCPServer,
+      'Skipped because neither STT nor TTS is enabled'
+    )
+  }
+
+  for (const check of Object.values(checks)) {
+    printCheckResult(check)
+  }
+
+  const criticalFailures = Object.values(checks).some(
+    (check) => check.severity === 'error' && !check.ok
+  )
+
+  LogHelper.title('Summary')
+
+  if (criticalFailures || !checks.canRun.ok) {
+    LogHelper.error('Please fix the errors above')
+  } else {
+    LogHelper.success('Hooray! Leon can run correctly')
+  }
+
+  try {
+    if (nodeIntentObjectPath) {
+      await fs.promises.rm(nodeIntentObjectPath, { force: true })
+    }
+    if (pythonIntentObjectPath) {
+      await fs.promises.rm(pythonIntentObjectPath, { force: true })
+    }
+  } catch {
+    // Ignore cleanup failures for temporary check fixtures.
+  }
+
+  process.exit(criticalFailures || !checks.canRun.ok ? 1 : 0)
+})().catch((error) => {
+  LogHelper.title('Checking')
+  LogHelper.error(`Unexpected error: ${error}`)
+  process.exit(1)
+})
