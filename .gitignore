@@ -47,6 +47,8 @@ debug.log
 .env
 .last-skill-deps-sync
 .last-nodejs-bridge-deps-sync
+bridges/python/src/.last-python-bridge-deps-sync
+tcp_server/src/.last-tcp-server-deps-sync
 skills/**/.runtime/
 leon.json
 bridges/python/src/Pipfile.lock

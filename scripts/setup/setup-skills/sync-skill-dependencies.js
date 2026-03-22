@@ -1,6 +1,5 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import os from 'node:os'
 
 import { command } from 'execa'
 
@@ -12,12 +11,9 @@ import {
 import { LogHelper } from '@/helpers/log-helper'
 import { RuntimeHelper } from '@/helpers/runtime-helper'
 
+import { getPyprojectDependencies } from '../setup-python-project-env'
+
 const SYNC_STAMP_FILE_NAME = '.last-skill-deps-sync'
-const PYTHON_DEPENDENCY_MANIFESTS = [
-  'requirements.txt',
-  'Pipfile',
-  'pyproject.toml'
-]
 
 /**
  * Stamp files let setup stay cheap on repeated boots while still re-syncing as
@@ -58,22 +54,6 @@ const markSkillDependenciesAsSynced = async (skillPath) => {
     recursive: true
   })
   await fs.promises.writeFile(getSyncStampPath(skillPath), `${Date.now()}`)
-}
-
-/**
- * Python skills can declare dependencies through a few common manifest styles.
- * Setup only needs the first one present in the skill source tree.
- */
-const getPythonManifestPath = (skillSRCPath) => {
-  for (const manifestName of PYTHON_DEPENDENCY_MANIFESTS) {
-    const manifestPath = path.join(skillSRCPath, manifestName)
-
-    if (fs.existsSync(manifestPath)) {
-      return manifestPath
-    }
-  }
-
-  return null
 }
 
 /**
@@ -125,10 +105,10 @@ const syncNodejsSkillDependencies = async (skillFriendlyName, skillPath) => {
 }
 
 /**
- * Vendor Python requirements into the skill itself so each skill remains
+ * Vendor Python dependencies into the skill itself so each skill remains
  * portable and isolated from the bridge-wide Python environment.
  */
-const installPythonRequirements = async (manifestPath, vendorPath) => {
+const installPythonDependencies = async (dependencies, vendorPath) => {
   await command(
     RuntimeHelper.buildShellCommand(UV_RUNTIME_BIN_PATH, [
       'pip',
@@ -137,27 +117,7 @@ const installPythonRequirements = async (manifestPath, vendorPath) => {
       PYTHON_RUNTIME_BIN_PATH,
       '--target',
       vendorPath,
-      '-r',
-      manifestPath
-    ]),
-    { shell: true }
-  )
-}
-
-/**
- * `pyproject.toml` skills are installed as local Python projects into the same
- * vendored target directory used by requirements-based skills.
- */
-const installPythonProject = async (skillSRCPath, vendorPath) => {
-  await command(
-    RuntimeHelper.buildShellCommand(UV_RUNTIME_BIN_PATH, [
-      'pip',
-      'install',
-      '--python',
-      PYTHON_RUNTIME_BIN_PATH,
-      '--target',
-      vendorPath,
-      skillSRCPath
+      ...dependencies
     ]),
     { shell: true }
   )
@@ -169,9 +129,9 @@ const installPythonProject = async (skillSRCPath, vendorPath) => {
  */
 const syncPythonSkillDependencies = async (skillFriendlyName, skillPath) => {
   const skillSRCPath = path.join(skillPath, 'src')
-  const manifestPath = getPythonManifestPath(skillSRCPath)
+  const manifestPath = path.join(skillSRCPath, 'pyproject.toml')
 
-  if (!manifestPath) {
+  if (!fs.existsSync(manifestPath)) {
     return
   }
 
@@ -189,38 +149,14 @@ const syncPythonSkillDependencies = async (skillFriendlyName, skillPath) => {
 
   const runtimePath = RuntimeHelper.getSkillRuntimePath(skillPath)
   const vendorPath = RuntimeHelper.getPythonSkillRuntimeVendorPath(skillPath)
-  const manifestName = path.basename(manifestPath)
+  const dependencies = await getPyprojectDependencies(skillSRCPath)
 
   await fs.promises.mkdir(runtimePath, { recursive: true })
   await fs.promises.rm(vendorPath, { recursive: true, force: true })
   await fs.promises.mkdir(vendorPath, { recursive: true })
 
-  if (manifestName === 'requirements.txt') {
-    await installPythonRequirements(manifestPath, vendorPath)
-  } else if (manifestName === 'Pipfile') {
-    // Convert Pipfile definitions into a temporary requirements file so the
-    // actual install path still goes through the same uv vendor flow.
-    const requirementsOutput = await command('pipenv requirements', {
-      shell: true,
-      cwd: skillSRCPath,
-      env: {
-        ...process.env,
-        PIPENV_PIPFILE: manifestPath
-      }
-    })
-    const tempRequirementsPath = path.join(
-      os.tmpdir(),
-      `${path.basename(skillPath)}-${Date.now()}.requirements.txt`
-    )
-
-    try {
-      await fs.promises.writeFile(tempRequirementsPath, requirementsOutput.stdout)
-      await installPythonRequirements(tempRequirementsPath, vendorPath)
-    } finally {
-      await fs.promises.rm(tempRequirementsPath, { force: true })
-    }
-  } else {
-    await installPythonProject(skillSRCPath, vendorPath)
+  if (dependencies.length > 0) {
+    await installPythonDependencies(dependencies, vendorPath)
   }
 
   await markSkillDependenciesAsSynced(skillPath)

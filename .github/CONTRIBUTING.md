@@ -180,12 +180,9 @@ Once Pyenv installed, run:
 # Install Python
 pyenv install 3.11.9 --force
 pyenv global 3.11.9
-
-# Install Pipenv
-pip install pipenv==2024.0.1
 ```
 
-Your Python environment should be ready now. Leon now runs the Python bridge and TCP server directly from source, so there is no separate binary build step for them:
+Your Python environment should be ready now. Leon uses `uv` as the Python dependency standard, and `postinstall` provisions the Python bridge and TCP server environments automatically from `pyproject.toml`:
 
 ```bash
 # Run the Python bridge

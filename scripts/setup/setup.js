@@ -13,7 +13,9 @@ import setupPNPM from './setup-pnpm'
 import setupPython from './setup-python'
 import setupUV from './setup-uv'
 import setupNodejsBridgeEnv from './setup-nodejs-bridge-env'
+import setupPythonBridgeEnv from './setup-python-bridge-env'
 import setupSkills from './setup-skills/setup-skills'
+import setupTCPServerEnv from './setup-tcp-server-env'
 import setupCMake from './setup-cmake'
 import setupNinja from './setup-ninja'
 import setupLlamaCPP from './setup-llama-cpp'
@@ -46,6 +48,8 @@ import setFfprobePermissions from './set-ffprobe-permissions'
       )
     }
     await setupNodejsBridgeEnv()
+    await setupPythonBridgeEnv()
+    await setupTCPServerEnv()
     await setupSkills()
     LoaderHelper.stop()
     if (!IS_GITHUB_ACTIONS) {
