@@ -248,7 +248,11 @@ export default class Brain {
          * (Because sometimes the LLM will not be able to generate a meaningful text,
          * and it will mislead the conversation)
          */
-        if (!hasLoopConfig && !hasSlotsConfig) {
+        if (
+          NLU.currentResponseRoute !== 'react' &&
+          !hasLoopConfig &&
+          !hasSlotsConfig
+        ) {
           if (
             speechAnswer === textAnswer ||
             typeof answer === 'string' ||

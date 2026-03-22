@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises'
-import process from 'node:process'
 
 import { createStore } from '@tobilu/qmd'
 

@@ -7,6 +7,16 @@ import {
 } from '@/constants'
 import { LogHelper } from '@/helpers/log-helper'
 import {
+  type QMDCollectionDefinition,
+  type QMDStoreRow,
+  QMDWriteLockTimeoutError,
+  runQMDStoreSearch,
+  updateQMDStore,
+  getQMDStore,
+  getQMDStoreStatus,
+  embedQMDStore
+} from '@/core/memory-manager/qmd/qmd-store'
+import {
   buildAdaptiveQueryTokenSet,
   buildHydratedBacktrackCandidates,
   buildDiscriminativeSecondPass,
@@ -25,17 +35,7 @@ import {
   rankRetrievedHits,
   resolveRequestedCollectionName,
   shouldRunAdaptiveSecondPass
-} from '@sdk/tools/memory/qmd-retrieval'
-import {
-  type QMDCollectionDefinition,
-  type QMDStoreRow,
-  QMDWriteLockTimeoutError,
-  runQMDStoreSearch,
-  updateQMDStore,
-  getQMDStore,
-  getQMDStoreStatus,
-  embedQMDStore
-} from '@sdk/tools/memory/qmd-store'
+} from '@/core/memory-manager/qmd/qmd-retrieval'
 
 import type {
   KnowledgeNamespace,

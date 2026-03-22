@@ -4,10 +4,15 @@ import { createHash, randomUUID } from 'node:crypto'
 
 import SQLite from 'better-sqlite3'
 import type { Database as SQLiteDatabase } from 'better-sqlite3'
-
-import { Tool } from '@sdk/base-tool'
-import { ToolkitConfig } from '@sdk/toolkit-config'
-
+import {
+  type QMDCollectionDefinition,
+  type QMDStoreRow,
+  QMDWriteLockTimeoutError,
+  runQMDStoreSearch,
+  updateQMDStore,
+  getQMDStore,
+  closeQMDStore
+} from '@@/server/src/core/memory-manager/qmd/qmd-store'
 import {
   buildAdaptiveQueryTokenSet,
   buildHydratedBacktrackCandidates,
@@ -28,16 +33,10 @@ import {
   rankRetrievedHits,
   resolveRequestedCollectionName,
   shouldRunAdaptiveSecondPass
-} from './qmd-retrieval'
-import {
-  type QMDCollectionDefinition,
-  type QMDStoreRow,
-  QMDWriteLockTimeoutError,
-  runQMDStoreSearch,
-  updateQMDStore,
-  getQMDStore,
-  closeQMDStore
-} from './qmd-store'
+} from '@@/server/src/core/memory-manager/qmd/qmd-retrieval'
+
+import { Tool } from '@sdk/base-tool'
+import { ToolkitConfig } from '@sdk/toolkit-config'
 
 const QMD_INDEX_NAME = 'leon-memory'
 const DEFAULT_TOP_K = 12

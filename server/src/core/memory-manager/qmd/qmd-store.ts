@@ -44,7 +44,7 @@ const QMD_EMBED_SUBPROCESS_MAX_BUFFER = 4 * 1024 * 1024
 const execFileAsync = promisify(execFile)
 const QMD_EMBED_WORKER_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  'qmd-embed-worker.mjs'
+  'qmd-embed-worker.js'
 )
 
 interface QMDEmbedWorkerDiagnostics {

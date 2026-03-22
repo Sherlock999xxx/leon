@@ -19,6 +19,29 @@ import type {
 const fileName = fileURLToPath(import.meta.url)
 const dirName = path.dirname(fileName)
 
+function resolveMemorySchemaPath(): string {
+  const candidates = [
+    path.join(dirName, 'sql', 'schema.sql'),
+    path.join(
+      process.cwd(),
+      'server',
+      'src',
+      'core',
+      'memory-manager',
+      'sql',
+      'schema.sql'
+    )
+  ]
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate
+    }
+  }
+
+  return candidates[0] as string
+}
+
 function parseJSONValue(value: unknown): Record<string, unknown> {
   if (typeof value !== 'string') {
     return {}
@@ -74,7 +97,7 @@ export default class MemoryRepository {
     await fs.promises.mkdir(path.dirname(dbPath), { recursive: true })
 
     this.db = new SQLite(dbPath)
-    const schemaPath = path.join(dirName, 'sql', 'schema.sql')
+    const schemaPath = resolveMemorySchemaPath()
     const schemaSQL = await fs.promises.readFile(schemaPath, 'utf8')
     this.db.exec(schemaSQL)
   }
