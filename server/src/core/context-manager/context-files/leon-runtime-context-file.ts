@@ -8,6 +8,7 @@ import {
   PYTHON_TCP_SERVER_VERSION
 } from '@/constants'
 import { DateHelper } from '@/helpers/date-helper'
+import { RuntimeHelper } from '@/helpers/runtime-helper'
 import { ContextFile } from '@/core/context-manager/context-file'
 import { ContextProbeHelper } from '@/core/context-manager/context-probe-helper'
 import {
@@ -35,8 +36,14 @@ export class LeonRuntimeContextFile extends ContextFile {
   }
 
   public generate(): string {
-    const npmProbe = this.probeHelper.probeCommandVersion('npm', ['--version'])
-    const pnpmProbe = this.probeHelper.probeCommandVersion('pnpm', ['--version'])
+    const nodeProbe = this.probeHelper.probeCommandVersion(
+      RuntimeHelper.getNodeBinPath(),
+      ['--version']
+    )
+    const pnpmProbe = this.probeHelper.probeCommandVersion(
+      RuntimeHelper.getPNPMBinPath(),
+      ['--version']
+    )
     const gitProbe = this.probeHelper.probeCommandVersion('git', ['--version'])
     const workflowLlmName = this.resolvers.getWorkflowLLMName()
     const agentLlmName = this.resolvers.getAgentLLMName()
@@ -53,7 +60,7 @@ export class LeonRuntimeContextFile extends ContextFile {
     )
 
     return [
-      `> Runtime versions, routing/providers, LLMs and bridge/toolchain availability. I am running Leon ${LEON_VERSION || 'unknown'} on Node ${process.version}; routing mode ${LEON_ROUTING_MODE}; ${llmDisplay.heading.toLowerCase()} ${llmDisplay.value}; local LLM ${localLlmName}; npm ${this.probeHelper.formatCommandProbe(npmProbe)}, pnpm ${this.probeHelper.formatCommandProbe(pnpmProbe)}, git ${this.probeHelper.formatCommandProbe(gitProbe)}.`,
+      `> Runtime versions, routing/providers, LLMs and bridge/toolchain availability. I am running Leon ${LEON_VERSION || 'unknown'} on Node ${process.version}; routing mode ${LEON_ROUTING_MODE}; ${llmDisplay.heading.toLowerCase()} ${llmDisplay.value}; local LLM ${localLlmName}; managed node ${this.probeHelper.formatCommandProbe(nodeProbe)}, managed pnpm ${this.probeHelper.formatCommandProbe(pnpmProbe)}, git ${this.probeHelper.formatCommandProbe(gitProbe)}.`,
       '# LEON_RUNTIME',
       `- Generated at: ${DateHelper.getDateTime()}`,
       `- Leon version: ${LEON_VERSION || 'unknown'}`,
@@ -70,8 +77,8 @@ export class LeonRuntimeContextFile extends ContextFile {
           ]
         : []),
       `- Local LLM: ${localLlmName}`,
-      `- npm: ${this.probeHelper.formatCommandProbe(npmProbe)}`,
-      `- pnpm: ${this.probeHelper.formatCommandProbe(pnpmProbe)}`,
+      `- Managed Node.js: ${this.probeHelper.formatCommandProbe(nodeProbe)}`,
+      `- Managed pnpm: ${this.probeHelper.formatCommandProbe(pnpmProbe)}`,
       `- git: ${this.probeHelper.formatCommandProbe(gitProbe)}`,
       `- Node.js bridge version: ${NODEJS_BRIDGE_VERSION}`,
       `- Python bridge version: ${PYTHON_BRIDGE_VERSION}`,
