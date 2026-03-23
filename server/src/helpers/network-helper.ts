@@ -11,6 +11,7 @@ const PARALLEL_DOWNLOAD_MIN_RANGE_BYTES = 16 * 1_024 * 1_024
 
 export interface DownloadFileOptions {
   cliProgress?: boolean
+  onProgress?: (progress: DownloadFileProgress) => void
   parallelStreams?: number
   skipExisting?: boolean
   retry?: {
@@ -25,6 +26,14 @@ export interface DownloadFileOptions {
     minTimeout?: number
     maxTimeout?: number
   }
+}
+
+export interface DownloadFileProgress {
+  downloadedBytes: number
+  totalBytes: number | null
+  percentage: number | null
+  bytesPerSecond: number
+  etaMs: number | null
 }
 
 interface DownloadProbe {
@@ -44,8 +53,9 @@ type DownloadInfoRetryOptions = Required<
 >
 type ResolvedDownloadFileOptions = Omit<
   Required<DownloadFileOptions>,
-  'retry' | 'retryFetchDownloadInfo'
+  'retry' | 'retryFetchDownloadInfo' | 'onProgress'
 > & {
+  onProgress?: DownloadFileOptions['onProgress']
   retry: RetryOptions
   retryFetchDownloadInfo: DownloadInfoRetryOptions
 }
@@ -193,7 +203,7 @@ export class NetworkHelper {
     options: ResolvedDownloadFileOptions,
     totalBytes?: number
   ): ProgressReporter {
-    if (!options.cliProgress) {
+    if (!options.cliProgress && !options.onProgress) {
       return {
         update: (): void => {},
         finish: (): void => {},
@@ -207,33 +217,63 @@ export class NetworkHelper {
     const renderIntervalMs = isTTY ? 200 : 5_000
     let lastRenderAt = 0
 
-    console.log('')
-    console.log(fileName)
+    if (options.cliProgress) {
+      console.log('')
+      console.log(fileName)
+    }
+
+    const createProgressSnapshot = (
+      downloadedBytes: number
+    ): DownloadFileProgress => {
+      const elapsedMs = Math.max(1, Date.now() - startedAt)
+      const bytesPerSecond = downloadedBytes / (elapsedMs / 1_000)
+      const etaMs =
+        typeof totalBytes === 'number' &&
+        totalBytes > downloadedBytes &&
+        bytesPerSecond > 0
+          ? ((totalBytes - downloadedBytes) / bytesPerSecond) * 1_000
+          : null
+
+      return {
+        downloadedBytes,
+        totalBytes: totalBytes ?? null,
+        percentage:
+          typeof totalBytes === 'number' && totalBytes > 0
+            ? (downloadedBytes / totalBytes) * 100
+            : null,
+        bytesPerSecond,
+        etaMs
+      }
+    }
 
     const render = (downloadedBytes: number, force = false): void => {
+      const progress = createProgressSnapshot(downloadedBytes)
       const now = Date.now()
+
+      if (options.onProgress) {
+        options.onProgress(progress)
+      }
+
+      if (!options.cliProgress) {
+        return
+      }
 
       if (!force && now - lastRenderAt < renderIntervalMs) {
         return
       }
 
       lastRenderAt = now
-
-      const elapsedMs = Math.max(1, now - startedAt)
-      const bytesPerSecond = downloadedBytes / (elapsedMs / 1_000)
       const progressPrefix =
         typeof totalBytes === 'number' && totalBytes > 0
           ? `${((downloadedBytes / totalBytes) * 100).toFixed(1)}% (${this.formatBytes(downloadedBytes)}/${this.formatBytes(totalBytes)})`
           : this.formatBytes(downloadedBytes)
       const eta =
-        typeof totalBytes === 'number' &&
-        totalBytes > downloadedBytes &&
-        bytesPerSecond > 0
-          ? ` | ${this.formatDuration(
-              ((totalBytes - downloadedBytes) / bytesPerSecond) * 1_000
-            )} left`
+        progress.etaMs !== null
+          ? ` | ${this.formatDuration(progress.etaMs)} left`
           : ''
-      const line = `${progressPrefix} ${this.formatBytes(bytesPerSecond)}/s${eta}`
+      const line = `${progressPrefix} ${this.formatBytes(
+        progress.bytesPerSecond
+      )}/s${eta}`
 
       if (isTTY) {
         readline.clearLine(process.stdout, 0)
@@ -251,18 +291,20 @@ export class NetworkHelper {
       finish: (downloadedBytes: number): void => {
         render(downloadedBytes, true)
 
-        if (isTTY) {
+        if (options.cliProgress && isTTY) {
           process.stdout.write('\n')
         }
 
-        console.log(
-          `${fileName} downloaded ${this.formatBytes(downloadedBytes)} in ${this.formatDuration(
-            Date.now() - startedAt
-          )}`
-        )
+        if (options.cliProgress) {
+          console.log(
+            `${fileName} downloaded ${this.formatBytes(downloadedBytes)} in ${this.formatDuration(
+              Date.now() - startedAt
+            )}`
+          )
+        }
       },
       fail: (): void => {
-        if (isTTY) {
+        if (options.cliProgress && isTTY) {
           readline.clearLine(process.stdout, 0)
           readline.cursorTo(process.stdout, 0)
         }
