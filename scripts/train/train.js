@@ -9,7 +9,7 @@ dotenv.config()
 /**
  * Training utterance samples script
  *
- * npm run train [en or fr]
+ * pnpm run train [en or fr]
  */
 export default (options = {}) =>
   new Promise(async (resolve, reject) => {
