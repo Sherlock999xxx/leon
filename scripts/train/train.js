@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'
 
-import { LogHelper } from '@/helpers/log-helper'
+import { createSetupStatus } from '../setup/setup-status'
 
 import trainSkillRouterDuty from './train-skill-router-duty.js'
 
@@ -13,18 +13,20 @@ dotenv.config()
  */
 export default () =>
   new Promise(async (resolve, reject) => {
+    const status = createSetupStatus('Training the skill router...').start()
+
     try {
       try {
         await trainSkillRouterDuty()
 
-        LogHelper.success('Skill router duty trained')
+        status.succeed('Skill router: ready')
         resolve()
-      } catch (e) {
-        LogHelper.error(`Failed to train skill router duty: ${e}`)
+      } catch {
+        status.fail('Failed to train the skill router')
         reject()
       }
     } catch (e) {
-      LogHelper.error(e.message)
+      status.fail('Failed to train the skill router')
       reject(e)
     }
   })
