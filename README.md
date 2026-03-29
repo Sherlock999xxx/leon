@@ -11,12 +11,15 @@ _<p align="center">Your open-source personal AI assistant.</p>_
 
 <p align="center">
   <a href="https://discord.gg/MNQqqKg"><img src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" /></a>
-  <a href="https://x.com/grenlouis"><img src="https://img.shields.io/badge/X-%40grenlouis-000000?style=for-the-badge&logo=x&logoColor=white" /></a>
   <a href="https://github.com/leon-ai/leon/blob/develop/LICENSE.md"><img src="https://img.shields.io/badge/License-MIT-1c75db?style=for-the-badge" /></a>
 </p>
 
 <p align="center">
-  <a href="https://x.com/grenlouis">@grenlouis</a> ·
+  I share Leon progress most regularly on <a href="https://x.com/grenlouis"><strong>X / @grenlouis</strong></a>
+</p>
+
+<p align="center">
+  <a href="https://x.com/grenlouis">Follow progress on X / @grenlouis</a> ·
   <a href="https://getleon.ai">Website</a> ·
   <a href="https://leonai.substack.com/subscribe">Newsletter</a> ·
   <a href="http://roadmap.getleon.ai">Roadmap</a> ·
@@ -159,7 +162,7 @@ Leon started in 2017 and has been active since 2019. If you want the longer back
 
 ## 🔔 Stay Tuned
 
-- [X / Twitter](https://x.com/grenlouis)
+- [X / Twitter](https://x.com/grenlouis) is the main place where I share Leon progress updates
 - [Newsletter](https://leonai.substack.com/subscribe)
 - [Blog](https://blog.getleon.ai)
 - [YouTube](https://www.youtube.com/channel/UCW6mk6j6nQUzFYY97r47emQ)
