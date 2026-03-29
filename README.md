@@ -164,11 +164,10 @@ git clone https://github.com/leon-ai/leon.git
 # Go to the project root
 cd leon
 
-# Install pnpm
-npm install --global pnpm@latest
+# Install
+node install.mjs
 
-# Install dependencies and run Leon
-pnpm install
+# Run Leon
 pnpm start
 ```
 
