@@ -54,7 +54,8 @@ export const getConversationHistory: FastifyPluginAsync<APIOptions> = async (
         const history = ConversationHistoryHelper.toHistoryItems(
           conversationLogs,
           {
-            supportsWidgets
+            supportsWidgets,
+            source: 'conversation_history'
           }
         )
 

@@ -254,7 +254,7 @@ export function emitPlanWidget(
     fallbackText: activeStep
       ? activeStep.label
       : 'Working on the current workflow...',
-    historyMode: 'live_only'
+    historyMode: 'system_widget'
   }
 
   if (isUpdate) {

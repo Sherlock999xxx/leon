@@ -108,7 +108,7 @@ export const run: ActionFunction = async function (
         eta: '',
         size: ''
       },
-      widgetHistoryMode: 'live_only'
+      widgetHistoryMode: 'system_widget'
     })
 
     // Track last progress update to avoid too many messages
@@ -157,7 +157,7 @@ export const run: ActionFunction = async function (
               size: progress.size || ''
             },
             replaceMessageId: progressMessageId,
-            widgetHistoryMode: 'live_only'
+            widgetHistoryMode: 'system_widget'
           })
 
           lastProgressUpdate = now
@@ -192,7 +192,7 @@ export const run: ActionFunction = async function (
         size: ''
       },
       replaceMessageId: progressMessageId,
-      widgetHistoryMode: 'live_only'
+      widgetHistoryMode: 'system_widget'
     })
 
     // Verify the downloaded file exists

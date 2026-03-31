@@ -51,7 +51,8 @@ export enum RoutingMode {
  * Logger
  */
 
-export type ConversationWidgetHistoryMode = 'persisted' | 'live_only'
+export type ConversationWidgetHistoryMode = 'persisted' | 'system_widget'
+export type ConversationItemSource = 'conversation_history' | 'system_widget'
 
 export interface ConversationWidgetData {
   actionName: string
@@ -80,5 +81,6 @@ export interface ConversationHistoryItem {
   sentAt: number
   string: string
   originalString: string
+  source: ConversationItemSource
   messageId?: string
 }

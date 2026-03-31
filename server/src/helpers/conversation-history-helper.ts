@@ -5,7 +5,7 @@ import type {
   MessageLog
 } from '@/types'
 
-const LIVE_ONLY_WIDGET_HISTORY_MODE = 'live_only'
+const SYSTEM_WIDGET_HISTORY_MODE = 'system_widget'
 
 export class ConversationHistoryHelper {
   /**
@@ -29,7 +29,7 @@ export class ConversationHistoryHelper {
   public static isWidgetPersisted(
     widget: ConversationWidgetData | null | undefined
   ): boolean {
-    return widget?.historyMode !== LIVE_ONLY_WIDGET_HISTORY_MODE
+    return widget?.historyMode !== SYSTEM_WIDGET_HISTORY_MODE
   }
 
   public static serializeWidget(widget: ConversationWidgetData): string {
@@ -40,6 +40,7 @@ export class ConversationHistoryHelper {
     conversationLogs: MessageLog[],
     options: {
       supportsWidgets: boolean
+      source?: ConversationHistoryItem['source']
     }
   ): ConversationHistoryItem[] {
     return conversationLogs.map((conversationLog) => {
@@ -53,6 +54,7 @@ export class ConversationHistoryHelper {
         sentAt: conversationLog.sentAt,
         string: bubbleString,
         originalString: bubbleString,
+        source: options.source || 'conversation_history',
         ...(conversationLog.messageId
           ? { messageId: conversationLog.messageId }
           : {})

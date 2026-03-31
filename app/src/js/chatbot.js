@@ -192,13 +192,25 @@ export default class Chatbot {
     return Boolean(data && typeof data === 'object' && data.widget === 'PlanWidget')
   }
 
-  isLiveOnlyWidgetData(data) {
+  isSystemWidgetData(data) {
     return Boolean(
       data &&
         typeof data === 'object' &&
         data.historyMode &&
-        data.historyMode === 'live_only'
+        data.historyMode === 'system_widget'
     )
+  }
+
+  getTimelineItemWeight(item) {
+    if (item.who === 'owner') {
+      return 0
+    }
+
+    if (item.source === 'system_widget') {
+      return 1
+    }
+
+    return 2
   }
 
   async hydrateFetchedWidgets() {
@@ -256,28 +268,48 @@ export default class Chatbot {
   async loadFeed() {
     WIDGETS_TO_FETCH.length = 0
 
-    const [historyResponse, liveWidgetsResponse] = await Promise.all([
+    const [historyResponse, systemWidgetsResponse] = await Promise.all([
       axios.get(
         `${this.serverURL}/api/v1/conversation-history?supports_widgets=true`
       ),
-      axios.get(`${this.serverURL}/api/v1/live-widgets`)
+      axios.get(`${this.serverURL}/api/v1/system-widgets?supports_widgets=true`)
     ])
     const history = Array.isArray(historyResponse.data?.history)
       ? historyResponse.data.history
       : []
-    const liveWidgets = Array.isArray(liveWidgetsResponse.data?.widgets)
-      ? liveWidgetsResponse.data.widgets
+    const systemWidgets = Array.isArray(systemWidgetsResponse.data?.widgets)
+      ? systemWidgetsResponse.data.widgets
       : []
+
+    const timelineItems = [...history, ...systemWidgets]
+      .map((item, index) => ({
+        ...item,
+        sortIndex: index
+      }))
+      .sort((left, right) => {
+        if (left.sentAt !== right.sentAt) {
+          return left.sentAt - right.sentAt
+        }
+
+        const leftWeight = this.getTimelineItemWeight(left)
+        const rightWeight = this.getTimelineItemWeight(right)
+
+        if (leftWeight !== rightWeight) {
+          return leftWeight - rightWeight
+        }
+
+        return left.sortIndex - right.sortIndex
+      })
 
     this.parsedBubbles = history
 
-    if (history.length === 0 && liveWidgets.length === 0) {
+    if (timelineItems.length === 0) {
       this.noBubbleMessage.classList.remove('hide')
       return
     }
 
-    for (let i = 0; i < history.length; i += 1) {
-      const bubble = history[i]
+    for (let i = 0; i < timelineItems.length; i += 1) {
+      const bubble = timelineItems[i]
 
       if (
         bubble.originalString &&
@@ -292,21 +324,6 @@ export default class Chatbot {
         save: false,
         isCreatingFromLoadingFeed: true,
         messageId: bubble.messageId
-      })
-    }
-
-    for (let i = 0; i < liveWidgets.length; i += 1) {
-      const liveWidget = liveWidgets[i]
-
-      if (!liveWidget?.widget) {
-        continue
-      }
-
-      this.createBubble({
-        who: 'leon',
-        string: JSON.stringify(liveWidget.widget),
-        save: false,
-        messageId: liveWidget.messageId
       })
     }
 
@@ -671,7 +688,7 @@ export default class Chatbot {
     const metrics =
       isTextAnswerPayload && newData.llmMetrics ? newData.llmMetrics : null
 
-    const shouldSaveMessage = !this.isLiveOnlyWidgetData(newData)
+    const shouldSaveMessage = !this.isSystemWidgetData(newData)
     const beforeElement = isPlanWidget ? null : nextSibling
 
     this.createBubble({

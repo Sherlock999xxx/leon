@@ -18,6 +18,7 @@ interface LoadParams {
 
 interface UpsertParams {
   replaceMessageId?: string | null
+  refreshSentAt?: boolean
 }
 
 /**
@@ -149,7 +150,9 @@ export class ConversationLogger {
                 ...existingConversationLog,
                 ...newRecord,
                 messageId: targetMessageId,
-                sentAt: existingConversationLog.sentAt
+                sentAt: params?.refreshSentAt
+                  ? Date.now()
+                  : existingConversationLog.sentAt
               }
             }
           } else {

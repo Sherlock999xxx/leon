@@ -206,7 +206,7 @@ export default class Client {
        * Handle widget data directly
        */
       if (data.widget || data.componentTree) {
-        const isLiveOnlyWidget = this.chatbot.isLiveOnlyWidgetData(data)
+        const isSystemWidget = this.chatbot.isSystemWidgetData(data)
         // Pass the entire widget data as JSON string for chatbot.js to handle
         const widgetString =
           typeof data === 'string' ? data : JSON.stringify(data)
@@ -214,7 +214,7 @@ export default class Client {
         this.chatbot.createBubble({
           who: 'leon',
           string: widgetString,
-          save: !isLiveOnlyWidget,
+          save: !isSystemWidget,
           messageId: data.widget?.id || data.id || `msg-${Date.now()}`
         })
 
@@ -267,7 +267,7 @@ export default class Client {
             !(
               data &&
               typeof data === 'object' &&
-              data.historyMode === 'live_only'
+              data.historyMode === 'system_widget'
             ),
           metrics: llmMetrics,
           messageId: data && typeof data === 'object' ? data.messageId : null

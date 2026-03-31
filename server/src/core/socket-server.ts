@@ -20,20 +20,20 @@ import {
   TTS,
   NLU,
   BRAIN,
-  LLM_PROVIDER
+  LLM_PROVIDER,
+  SYSTEM_WIDGET_LOGGER
 } from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
 import { LangHelper } from '@/helpers/lang-helper'
 import { Telemetry } from '@/telemetry'
 import { LLMProviders } from '@/core/llm-manager/types'
 import { StringHelper } from '@/helpers/string-helper'
-import { LIVE_WIDGET_REGISTRY } from '@/live-widget-registry'
 
 const DEFAULT_CLIENT_CAPABILITIES = {
   supportsWidgets: true
 }
 const HOTWORD_NODE_CLIENT = 'hotword-node'
-const LIVE_ONLY_WIDGET_HISTORY_MODE = 'live_only'
+const SYSTEM_WIDGET_HISTORY_MODE = 'system_widget'
 
 interface HotwordDataEvent {
   hotword: string
@@ -218,9 +218,35 @@ export default class SocketServer {
 
     if (
       answerDataRecord &&
-      answerDataRecord['historyMode'] === LIVE_ONLY_WIDGET_HISTORY_MODE
+      answerDataRecord['historyMode'] === SYSTEM_WIDGET_HISTORY_MODE
     ) {
-      LIVE_WIDGET_REGISTRY.upsert(answerDataRecord)
+      const messageId =
+        typeof answerDataRecord['replaceMessageId'] === 'string'
+          ? answerDataRecord['replaceMessageId']
+          : typeof answerDataRecord['id'] === 'string'
+            ? answerDataRecord['id']
+            : null
+      const fallbackText =
+        typeof answerDataRecord['fallbackText'] === 'string'
+          ? answerDataRecord['fallbackText']
+          : typeof answerDataRecord['answer'] === 'string'
+            ? answerDataRecord['answer']
+            : ''
+
+      if (messageId) {
+        void SYSTEM_WIDGET_LOGGER.upsert(
+          {
+            who: 'leon',
+            message: fallbackText,
+            messageId,
+            widget: answerDataRecord as never
+          },
+          {
+            replaceMessageId: messageId,
+            refreshSentAt: true
+          }
+        )
+      }
     }
 
     for (const chatClient of this.chatClients.values()) {
@@ -235,10 +261,6 @@ export default class SocketServer {
 
       chatClient.socket.emit('answer', transformedAnswerData)
     }
-  }
-
-  public clearLiveWidgets(): void {
-    LIVE_WIDGET_REGISTRY.clear()
   }
 
   private monitorLLMInitialization(
