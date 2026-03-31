@@ -49,8 +49,8 @@ export const LLM_MANAGER = new LLMManager()
 export const CONVERSATION_LOGGER = new ConversationLogger({
   loggerName: 'Conversation Logger',
   fileName: 'conversation_log.json',
-  nbOfLogsToKeep: 512,
-  nbOfLogsToLoad: 96
+  nbOfLogsToKeep: 1_024,
+  nbOfLogsToLoad: 256
 })
 export const TOOL_CALL_LOGGER = new ToolCallLogger({
   loggerName: 'Tool Call Logger',

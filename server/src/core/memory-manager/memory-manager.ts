@@ -1241,7 +1241,7 @@ Leon: ${normalizedAssistantMessage}
 
 Extract only durable personal memories worth persisting long-term.
 Keep only stable user facts/preferences/commitments likely useful in future conversations.
-Do not include transient chat content.
+Do not include temporary chat content.
 Return strictly valid JSON with this exact shape:
 {"items":[{"content":"..."}]}
 No markdown. No explanation.`
@@ -1379,7 +1379,8 @@ No markdown. No explanation.`
       parseConversationPair(entry.content).map((parsed) => ({
         who: parsed.who,
         message: parsed.message,
-        sentAt: Date.now()
+        sentAt: Date.now(),
+        isAddedToHistory: true
       }))
     )
 

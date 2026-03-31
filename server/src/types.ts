@@ -51,8 +51,37 @@ export enum RoutingMode {
  * Logger
  */
 
+export type ConversationWidgetHistoryMode = 'persisted' | 'system_widget'
+export type ConversationItemSource = 'conversation_history' | 'system_widget'
+
+export interface ConversationWidgetData {
+  actionName: string
+  widget: string
+  id: string
+  componentTree: Record<string, unknown>
+  supportedEvents: string[]
+  onFetch: {
+    widgetId?: string
+    actionName: string
+  } | null
+  fallbackText: string
+  historyMode: ConversationWidgetHistoryMode
+}
+
 export interface MessageLog {
   who: 'owner' | 'leon'
   sentAt: number
   message: string
+  isAddedToHistory: boolean
+  messageId?: string
+  widget?: ConversationWidgetData | null
+}
+
+export interface ConversationHistoryItem {
+  who: MessageLog['who']
+  sentAt: number
+  string: string
+  originalString: string
+  source: ConversationItemSource
+  messageId?: string
 }

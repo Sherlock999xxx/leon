@@ -34,6 +34,7 @@ import {
 import { ContextStateStore } from '@/core/context-manager/context-state-store'
 import { AGENT_LLM_PROVIDER as LLM_PROVIDER_NAME, LOGS_PATH } from '@/constants'
 import type { MessageLog } from '@/types'
+import { ConversationHistoryHelper } from '@/helpers/conversation-history-helper'
 
 import {
   PLAN_SYSTEM_PROMPT,
@@ -963,7 +964,9 @@ export class ReActLLMDuty extends LLMDuty {
   private async loadPreparedHistory(): Promise<PreparedReactHistory> {
     const historyConfig = this.getHistoryCompactionConfig()
     const historyScope = this.getHistoryCompactionScope()
-    const conversationLogs = await CONVERSATION_LOGGER.loadAll()
+    const conversationLogs = this.getHistoryEligibleConversationLogs(
+      await CONVERSATION_LOGGER.loadAll()
+    )
     const currentState = this.loadHistoryCompactionProviderState(historyScope)
     const synchronizedState = this.synchronizeHistoryCompactionState(
       conversationLogs,
@@ -999,6 +1002,14 @@ export class ReActLLMDuty extends LLMDuty {
       historyLimit: REACT_REMOTE_PROVIDER_HISTORY_LOGS,
       compactionBatchSize: REACT_REMOTE_PROVIDER_HISTORY_COMPACTION_POINT
     }
+  }
+
+  private getHistoryEligibleConversationLogs(
+    conversationLogs: MessageLog[]
+  ): MessageLog[] {
+    return conversationLogs.filter(
+      (conversationLog) => ConversationHistoryHelper.isAddedToHistory(conversationLog)
+    )
   }
 
   private loadHistoryCompactionProviderState(
@@ -1070,7 +1081,11 @@ export class ReActLLMDuty extends LLMDuty {
         {
           who: record['who'],
           sentAt: record['sentAt'],
-          message: record['message']
+          message: record['message'],
+          isAddedToHistory:
+            typeof record['isAddedToHistory'] === 'boolean'
+              ? record['isAddedToHistory']
+              : true
         }
       ]
     })
@@ -1248,7 +1263,9 @@ export class ReActLLMDuty extends LLMDuty {
   ): Promise<void> {
     const historyConfig = this.getHistoryCompactionConfig()
     const historyScope = this.getHistoryCompactionScope()
-    const conversationLogs = await CONVERSATION_LOGGER.loadAll()
+    const conversationLogs = this.getHistoryEligibleConversationLogs(
+      await CONVERSATION_LOGGER.loadAll()
+    )
     const currentState = this.loadHistoryCompactionProviderState(historyScope)
     const synchronizedState = this.synchronizeHistoryCompactionState(
       conversationLogs,
@@ -1303,7 +1320,8 @@ export class ReActLLMDuty extends LLMDuty {
     const summaryMessage: MessageLog = {
       who: 'leon',
       sentAt: state.summarySentAt ?? state.tail[0]?.sentAt ?? Date.now(),
-      message: buildCompactedHistoryMessage(state.summary)
+      message: buildCompactedHistoryMessage(state.summary),
+      isAddedToHistory: true
     }
 
     return [summaryMessage, ...state.tail]
@@ -1801,7 +1819,7 @@ export class ReActLLMDuty extends LLMDuty {
               }
 
               this.hasStreamedTokenEmission = true
-              SOCKET_SERVER.socket?.emit('llm-token', {
+              SOCKET_SERVER.emitToChatClients('llm-token', {
                 token,
                 generationId
               })
@@ -2042,7 +2060,7 @@ export class ReActLLMDuty extends LLMDuty {
                 }
 
                 this.hasStreamedTokenEmission = true
-                SOCKET_SERVER.socket?.emit('llm-token', {
+                SOCKET_SERVER.emitToChatClients('llm-token', {
                   token,
                   generationId
                 })
@@ -2777,7 +2795,7 @@ export class ReActLLMDuty extends LLMDuty {
 
     const chunks = token.match(/(\s+|[^\s]+)/g) || [token]
     for (const chunk of chunks) {
-      SOCKET_SERVER.socket?.emit('llm-reasoning-token', {
+      SOCKET_SERVER.emitToChatClients('llm-reasoning-token', {
         token: chunk,
         generationId,
         phase
@@ -2792,7 +2810,7 @@ export class ReActLLMDuty extends LLMDuty {
     this.hasStreamedTokenEmission = chunks.length > 0
 
     for (const token of chunks) {
-      SOCKET_SERVER.socket?.emit('llm-token', {
+      SOCKET_SERVER.emitToChatClients('llm-token', {
         token,
         generationId
       })

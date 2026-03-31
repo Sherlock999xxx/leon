@@ -56,6 +56,7 @@ class Answer(TypedDict, total=False):
     data: Optional[AnswerData]
     core: Optional[Dict[str, Any]]
     replaceMessageId: Optional[str]
+    widgetHistoryMode: Optional[Literal['persisted', 'system_widget']]
 
 
 class TextAnswer(Answer):
@@ -73,6 +74,7 @@ class AnswerInput(TypedDict, total=False):
     data: Optional[AnswerData]
     core: Optional[Dict[str, Any]]
     replaceMessageId: Optional[str]
+    widgetHistoryMode: Optional[Literal['persisted', 'system_widget']]
 
 
 class AnswerConfig(TypedDict, total=False):
