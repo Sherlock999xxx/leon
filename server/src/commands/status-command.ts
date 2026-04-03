@@ -87,6 +87,7 @@ export class StatusCommand extends BuiltInCommand {
   ): Promise<BuiltInCommandExecutionResult> {
     void context
 
+    const llmState = CONFIG_STATE.getLLMState()
     const routingModeState = CONFIG_STATE.getRoutingModeState()
     const leonMetadata = getLeonMetadata()
     const routingMode = routingModeState.getRoutingMode()
@@ -100,13 +101,12 @@ export class StatusCommand extends BuiltInCommand {
       WORKFLOW_LLM_TARGET,
       AGENT_LLM_TARGET
     )
-    const { LLM_PROVIDER } = await import('@/core')
     const currentUsedModelName =
       routingMode === 'smart'
-        ? `workflow=${LLM_PROVIDER.workflowLLMName || 'unknown'}, agent=${LLM_PROVIDER.agentLLMName || 'unknown'}`
+        ? `workflow=${llmState.getWorkflowLLMName()}, agent=${llmState.getAgentLLMName()}`
         : routingMode === 'agent'
-          ? LLM_PROVIDER.agentLLMName
-          : LLM_PROVIDER.workflowLLMName
+          ? llmState.getAgentLLMName()
+          : llmState.getWorkflowLLMName()
     const items = [
       {
         label: 'Instance ID',
@@ -144,15 +144,15 @@ export class StatusCommand extends BuiltInCommand {
       },
       {
         label: 'Workflow model name',
-        value: LLM_PROVIDER.workflowLLMName || 'unknown'
+        value: llmState.getWorkflowLLMName()
       },
       {
         label: 'Agent model name',
-        value: LLM_PROVIDER.agentLLMName || 'unknown'
+        value: llmState.getAgentLLMName()
       },
       {
         label: 'Local model name',
-        value: LLM_PROVIDER.localLLMName || 'unknown'
+        value: llmState.getLocalLLMName()
       },
       {
         label: 'STT',
