@@ -21,6 +21,7 @@ import {
 import { LogHelper } from '@/helpers/log-helper'
 import { FileHelper } from '@/helpers/file-helper'
 import { mergeStreamingChunk } from '@/core/llm-manager/streaming-chunk'
+import { CONFIG_STATE } from '@/core/config-states/config-state'
 import { BRAIN, LLM_MANAGER } from '@/core'
 import {
   type ResolvedLLMTarget,
@@ -222,6 +223,7 @@ export default class LLMProvider {
       this.disposeCurrentProviders()
       this.workflowLLMProvider = undefined
       this.agentLLMProvider = undefined
+      CONFIG_STATE.getLLMState().resetToConfiguredTargets()
 
       LogHelper.title('LLM Provider')
       LogHelper.warning(
@@ -275,6 +277,12 @@ export default class LLMProvider {
       throw error
     }
 
+    CONFIG_STATE.getLLMState().syncModelNames({
+      workflowLLMName: this.workflowLLMName,
+      agentLLMName: this.agentLLMName,
+      localLLMName: this.localLLMName
+    })
+
     LogHelper.title('LLM Provider')
     const llmDisplay = getRoutingModeLLMDisplay(
       LEON_ROUTING_MODE,
@@ -290,6 +298,7 @@ export default class LLMProvider {
     this.disposeCurrentProviders()
     this.workflowLLMProvider = undefined
     this.agentLLMProvider = undefined
+    CONFIG_STATE.getLLMState().resetToConfiguredTargets()
   }
 
   private async createProvider(target: ResolvedLLMTarget): Promise<Provider> {
