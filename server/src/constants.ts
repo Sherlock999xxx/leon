@@ -399,6 +399,7 @@ export const LLM_SKILL_ROUTER_DUTY_SKILL_LIST_PATH = path.join(
  */
 export const HAS_LLM = true
 export const LEON_ROUTING_MODE = process.env['LEON_ROUTING_MODE'] || 'smart'
+export const LEON_MOOD = process.env['LEON_MOOD'] || 'auto'
 export const LEON_PULSE_ENABLED = true
 // Every 30 minutes
 export const LEON_PULSE_INTERVAL_MS = 30 * 60 * 1_000
