@@ -369,6 +369,7 @@ export default class Chatbot {
       this.createBubble({
         who: bubble.who === 'owner' ? 'me' : bubble.who,
         string: bubble.originalString ? bubble.originalString : bubble.string,
+        metrics: bubble.llmMetrics || null,
         save: false,
         isCreatingFromLoadingFeed: true,
         messageId: bubble.messageId
