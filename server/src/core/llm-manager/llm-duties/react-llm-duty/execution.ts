@@ -234,18 +234,30 @@ function emitToolExecutionToWebApp(params: {
   SOCKET_SERVER.emitAnswerToChatClients({
     answer: inputMessage,
     isToolOutput: true,
+    toolDisplayMode: 'activity_card',
+    toolPhase: 'input',
     toolkitName,
     toolName,
     toolGroupId,
-    key: `${params.toolkitId}.${params.toolId}.${params.functionName}`
+    key: `${params.toolkitId}.${params.toolId}.${params.functionName}`,
+    functionName: params.functionName,
+    toolInput: params.toolInput,
+    ...(params.stepLabel ? { stepLabel: params.stepLabel } : {})
   })
   SOCKET_SERVER.emitAnswerToChatClients({
     answer: outputMessage,
     isToolOutput: true,
+    toolDisplayMode: 'activity_card',
+    toolPhase: 'output',
     toolkitName,
     toolName,
     toolGroupId,
-    key: `${params.toolkitId}.${params.toolId}.${params.functionName}`
+    key: `${params.toolkitId}.${params.toolId}.${params.functionName}`,
+    functionName: params.functionName,
+    status: params.status,
+    message: params.message,
+    output: params.output,
+    ...(params.stepLabel ? { stepLabel: params.stepLabel } : {})
   })
 }
 
