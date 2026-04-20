@@ -1,6 +1,7 @@
 import path from 'node:path'
 
 import {
+  APP_ROOT_PATH,
   CONTEXT_PATH,
   GLOBAL_DATA_PATH,
   LOGS_PATH,
@@ -23,7 +24,7 @@ export class HomeContextFile extends ContextFile {
   }
 
   public generate(): string {
-    const projectRoot = process.cwd()
+    const projectRoot = APP_ROOT_PATH
     const serverSourcePath = path.join(projectRoot, 'server', 'src')
 
     return [

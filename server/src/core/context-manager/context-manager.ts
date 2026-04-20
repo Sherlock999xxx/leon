@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
 import {
+  APP_ROOT_PATH,
   CONTEXT_PATH,
   LEON_DISABLED_CONTEXT_FILES,
   NODE_RUNTIME_BIN_PATH,
@@ -29,7 +30,7 @@ const CONTEXT_FILES_RUNTIME_DIR = path.join(
   'context-files'
 )
 const CONTEXT_FILES_SOURCE_DIR = path.join(
-  process.cwd(),
+  APP_ROOT_PATH,
   'server',
   'src',
   'core',
@@ -440,7 +441,7 @@ export default class ContextManager {
     return [
       TSX_CLI_PATH,
       '--tsconfig',
-      path.join(process.cwd(), 'tsconfig.json'),
+      path.join(APP_ROOT_PATH, 'tsconfig.json'),
       CONTEXT_REFRESH_WORKER_SRC_PATH
     ]
   }
@@ -466,7 +467,7 @@ export default class ContextManager {
 
     try {
       const { stdout } = await execFileAsync(NODE_RUNTIME_BIN_PATH, workerArgs, {
-        cwd: process.cwd(),
+        cwd: APP_ROOT_PATH,
         maxBuffer: CONTEXT_REFRESH_WORKER_MAX_BUFFER
       })
       const parsed = JSON.parse(String(stdout || '{}')) as {

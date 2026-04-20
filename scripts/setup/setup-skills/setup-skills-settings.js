@@ -1,12 +1,15 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { getProfileSkillSettingsPath } from '@/constants'
+
 /**
  * Set up skills settings
  */
 export default async function (skillFriendlyName, currentSkill) {
+  const skillName = path.basename(currentSkill.path)
   const skillSrcPath = path.join(currentSkill.path, 'src')
-  const settingsPath = path.join(skillSrcPath, 'settings.json')
+  const settingsPath = getProfileSkillSettingsPath(skillName)
   const settingsSamplePath = path.join(skillSrcPath, 'settings.sample.json')
 
   // If there is a bridge set from the skill settings
@@ -43,6 +46,7 @@ export default async function (skillFriendlyName, currentSkill) {
           }
         }
 
+        await fs.promises.mkdir(path.dirname(settingsPath), { recursive: true })
         await fs.promises.writeFile(
           settingsPath,
           `${JSON.stringify(settings, null, 2)}\n`
@@ -55,9 +59,8 @@ export default async function (skillFriendlyName, currentSkill) {
       )
     } else {
       // Duplicate settings.sample.json of the current skill to settings.json
-      fs.createReadStream(settingsSamplePath).pipe(
-        fs.createWriteStream(`${skillSrcPath}/settings.json`)
-      )
+      await fs.promises.mkdir(path.dirname(settingsPath), { recursive: true })
+      await fs.promises.copyFile(settingsSamplePath, settingsPath)
     }
   }
 }

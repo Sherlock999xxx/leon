@@ -4,7 +4,7 @@ import inspect
 from traceback import print_exc
 from importlib import import_module
 
-from constants import INTENT_OBJECT
+from constants import INTENT_OBJECT, get_profile_skill_runtime_path
 from sdk.params_helper import ParamsHelper
 
 
@@ -27,14 +27,9 @@ def resolve_action_function(skill_action_module):
 
 
 def main():
-    skill_src_path = os.path.join(
-        'skills', INTENT_OBJECT['skill_name'], 'src'
-    )
     skill_vendor_path = os.path.abspath(
         os.path.join(
-            'skills',
-            INTENT_OBJECT['skill_name'],
-            '.runtime',
+            get_profile_skill_runtime_path(INTENT_OBJECT['skill_name']),
             'vendor'
         )
     )

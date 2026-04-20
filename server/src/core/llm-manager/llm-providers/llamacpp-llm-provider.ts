@@ -14,6 +14,7 @@ import type {
   PromptOrChatHistory
 } from '@/core/llm-manager/types'
 import {
+  APP_ROOT_PATH,
   LLAMACPP_BUILD_PATH,
   LLAMACPP_BUILD_MANIFEST_PATH,
   LLAMACPP_PATH,
@@ -169,7 +170,7 @@ function resolveModelPath(modelPath: string): string {
 
   return path.isAbsolute(normalizedModelPath)
     ? normalizedModelPath
-    : path.resolve(process.cwd(), normalizedModelPath)
+    : path.resolve(APP_ROOT_PATH, normalizedModelPath)
 }
 
 /**

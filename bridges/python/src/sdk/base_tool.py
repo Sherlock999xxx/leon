@@ -16,7 +16,13 @@ from .utils import (
     format_file_path,
     extract_archive,
 )
-from ..constants import TOOLKITS_PATH, NVIDIA_LIBS_PATH, PYTORCH_TORCH_PATH
+from ..constants import (
+    TOOLKITS_PATH,
+    NVIDIA_LIBS_PATH,
+    PYTORCH_TORCH_PATH,
+    get_profile_tool_settings_path,
+    get_toolkit_assets_path,
+)
 import subprocess
 import sys
 import time
@@ -98,12 +104,7 @@ class BaseTool(ABC):
 
     def _get_settings_path(self, tool_name: Optional[str] = None) -> str:
         resolved_tool_name = tool_name or self.tool_name
-        return os.path.join(
-            TOOLKITS_PATH,
-            self.toolkit,
-            "settings",
-            f"{resolved_tool_name}.settings.json",
-        )
+        return get_profile_tool_settings_path(resolved_tool_name)
 
     def _check_required_settings(self, tool_name: Optional[str] = None) -> None:
         if not self.required_settings:
@@ -607,7 +608,7 @@ class BaseTool(ABC):
             else actual_filename
         )
 
-        bins_path = os.path.join(TOOLKITS_PATH, self.toolkit, "bins")
+        bins_path = get_toolkit_assets_path(self.toolkit)
 
         # Ensure toolkit bins directory exists
         if not os.path.exists(bins_path):
@@ -663,7 +664,7 @@ class BaseTool(ABC):
             )
             raise Exception(f"No download URLs found for resource '{resource_name}'")
 
-        resource_path = os.path.join(TOOLKITS_PATH, self.toolkit, "bins", resource_name)
+        resource_path = os.path.join(get_toolkit_assets_path(self.toolkit), resource_name)
 
         # Ensure resource directory exists
         if not os.path.exists(resource_path):
@@ -887,7 +888,7 @@ class BaseTool(ABC):
         """Download binary on-demand if not found"""
 
         try:
-            bins_path = os.path.join(TOOLKITS_PATH, self.toolkit, "bins")
+            bins_path = get_toolkit_assets_path(self.toolkit)
             binary_path = os.path.join(bins_path, executable)
 
             self.report("bridges.tools.binary_not_found", {"binary_name": binary_name})

@@ -8,6 +8,7 @@ import { LogHelper } from '@/helpers/log-helper'
 interface ConversationLoggerSettings {
   loggerName: string
   fileName: string
+  filePath?: string
   nbOfLogsToKeep: number
   nbOfLogsToLoad: number
 }
@@ -46,7 +47,8 @@ export class ConversationLogger {
     LogHelper.success('New instance')
 
     this.settings = settings
-    this.conversationLogPath = path.join(LOGS_PATH, this.settings.fileName)
+    this.conversationLogPath =
+      this.settings.filePath || path.join(LOGS_PATH, this.settings.fileName)
   }
 
   private enqueue<T>(operation: () => Promise<T>): Promise<T> {
@@ -63,6 +65,9 @@ export class ConversationLogger {
   private async createConversationLogFile(): Promise<void> {
     try {
       if (!fs.existsSync(this.conversationLogPath)) {
+        await fs.promises.mkdir(path.dirname(this.conversationLogPath), {
+          recursive: true
+        })
         await fs.promises.writeFile(this.conversationLogPath, '[]', 'utf-8')
       }
     } catch (e) {

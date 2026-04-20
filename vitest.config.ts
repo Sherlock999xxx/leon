@@ -4,9 +4,15 @@ import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import { defineConfig } from 'vitest/config'
 
+import {
+  resolveProfileDotEnvPath,
+  syncLeonHomeEnvironment
+} from './server/src/helpers/leon-home-helper.ts'
+
 const ROOT_DIR = fileURLToPath(new URL('.', import.meta.url))
 
-dotenv.config({ path: path.join(ROOT_DIR, '.env') })
+syncLeonHomeEnvironment()
+dotenv.config({ path: resolveProfileDotEnvPath() })
 
 export default defineConfig({
   resolve: {

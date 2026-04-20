@@ -5,7 +5,11 @@ import { createRequire, registerHooks } from 'node:module'
 import { FileHelper } from '@/helpers/file-helper'
 
 import type { ActionFunction, ActionParams } from '@sdk/types'
-import { INTENT_OBJECT } from '@bridge/constants'
+import {
+  INTENT_OBJECT,
+  getProfileSkillRuntimePath,
+  SKILLS_PATH
+} from '@bridge/constants'
 import { ParamsHelper } from '@sdk/params-helper'
 import { leon } from '@sdk/leon'
 import { setToolReporter } from '@sdk/tool-reporter'
@@ -52,10 +56,8 @@ const isLeonAliasImport = (specifier: string): boolean => {
 }
 
 const registerSkillRuntimeNodeModules = (skillName: string): void => {
-  const skillPath = path.join(process.cwd(), 'skills', skillName)
   const runtimeNodeModulesPath = path.join(
-    skillPath,
-    '.runtime',
+    getProfileSkillRuntimePath(skillName),
     'node_modules'
   )
 
@@ -125,8 +127,7 @@ const registerSkillRuntimeNodeModules = (skillName: string): void => {
   try {
     const actionModule = await FileHelper.dynamicImportFromFile(
       path.join(
-        process.cwd(),
-        'skills',
+        SKILLS_PATH,
         skill_name,
         'src',
         'actions',

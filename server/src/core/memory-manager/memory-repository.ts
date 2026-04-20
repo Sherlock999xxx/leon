@@ -8,6 +8,7 @@ import type {
   Database as SQLiteDatabase
 } from 'better-sqlite3'
 
+import { APP_ROOT_PATH } from '@/constants'
 import { LogHelper } from '@/helpers/log-helper'
 
 import type {
@@ -23,7 +24,7 @@ function resolveMemorySchemaPath(): string {
   const candidates = [
     path.join(dirName, 'sql', 'schema.sql'),
     path.join(
-      process.cwd(),
+      APP_ROOT_PATH,
       'server',
       'src',
       'core',

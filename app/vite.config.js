@@ -4,8 +4,13 @@ import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import {
+  resolveProfileDotEnvPath,
+  syncLeonHomeEnvironment
+} from '../server/src/helpers/leon-home-helper.ts'
 
-dotenv.config()
+syncLeonHomeEnvironment()
+dotenv.config({ path: resolveProfileDotEnvPath() })
 
 dns.setDefaultResultOrder('verbatim')
 

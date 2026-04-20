@@ -1,8 +1,11 @@
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import { getPlatformName } from '@sdk/utils'
-import { TOOLKITS_PATH } from '@bridge/constants'
+import {
+  getProfileToolSettingsPath,
+  TOOLKITS_PATH
+} from '@bridge/constants'
 
 interface ToolConfig {
   tool_id: string
@@ -82,8 +85,8 @@ export class ToolkitConfig {
       return this.settingsCache.get(cacheKey) || {}
     }
 
-    const settingsDir = join(TOOLKITS_PATH, toolkitName, 'settings')
-    const settingsPath = join(settingsDir, `${toolName}.settings.json`)
+    const settingsPath = getProfileToolSettingsPath(toolName)
+    const settingsDir = dirname(settingsPath)
 
     mkdirSync(settingsDir, { recursive: true })
 

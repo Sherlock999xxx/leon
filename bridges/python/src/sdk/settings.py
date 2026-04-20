@@ -3,12 +3,12 @@ import os
 from os import path
 from typing import Union, Any, overload
 
-from ..constants import SKILL_PATH
+from ..constants import SKILL_PATH, get_profile_skill_settings_path
 
 
 class Settings:
     def __init__(self):
-        self.settings_path = path.join(SKILL_PATH, 'src', 'settings.json')
+        self.settings_path = get_profile_skill_settings_path(path.basename(SKILL_PATH))
         self.settings_sample_path = path.join(SKILL_PATH, 'src', 'settings.sample.json')
 
     def is_setting_set(self, key: str) -> bool:
@@ -82,6 +82,7 @@ class Settings:
             else:
                 new_settings = {**settings, key_or_settings: value}
 
+            os.makedirs(path.dirname(self.settings_path), exist_ok=True)
             with open(self.settings_path, 'w') as file:
                 json.dump(new_settings, file, indent=2)
 
