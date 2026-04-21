@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { getProfileSkillSettingsPath } from '@/constants'
+import { PROFILE_SKILLS_PATH } from '@/constants'
 
 /**
  * Set up skills settings
@@ -9,7 +9,11 @@ import { getProfileSkillSettingsPath } from '@/constants'
 export default async function (skillFriendlyName, currentSkill) {
   const skillName = path.basename(currentSkill.path)
   const skillSrcPath = path.join(currentSkill.path, 'src')
-  const settingsPath = getProfileSkillSettingsPath(skillName)
+  const settingsPath = path.join(
+    PROFILE_SKILLS_PATH,
+    skillName,
+    'settings.json'
+  )
   const settingsSamplePath = path.join(skillSrcPath, 'settings.sample.json')
 
   // If there is a bridge set from the skill settings

@@ -1,9 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { resolveProfileDotEnvPath } from '@/helpers/leon-home-helper'
+import { PROFILE_DOT_ENV_PATH } from '@/leon-roots'
 
-const DOT_ENV_PATH = resolveProfileDotEnvPath()
+const DOT_ENV_PATH = PROFILE_DOT_ENV_PATH
 const ENV_LINE_SEPARATOR_PATTERN = /\r?\n/
 const ENV_VARIABLE_NAME_PATTERN = /^[A-Z0-9_]+$/
 

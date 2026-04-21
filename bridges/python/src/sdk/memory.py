@@ -2,7 +2,7 @@ import json
 import os
 from typing import TypedDict, Any
 
-from ..constants import PROFILE_SKILLS_PATH, SKILL_PATH, get_profile_skill_memory_file_path
+from ..constants import PROFILE_SKILLS_PATH, SKILL_PATH
 
 SKILL_NAME_SUFFIX = "_skill"
 
@@ -24,9 +24,11 @@ class Memory:
     def __init__(self, options: MemoryOptions):
         self.name = options['name']
         self.default_memory = options['default_memory'] if 'default_memory' in options else None
-        self.memory_path = get_profile_skill_memory_file_path(
+        self.memory_path = os.path.join(
+            PROFILE_SKILLS_PATH,
             os.path.basename(SKILL_PATH),
-            self.name
+            'memory',
+            f'{self.name}.json'
         )
         self.__is_from_another_skill = False
 

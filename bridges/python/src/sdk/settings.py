@@ -3,12 +3,16 @@ import os
 from os import path
 from typing import Union, Any, overload
 
-from ..constants import SKILL_PATH, get_profile_skill_settings_path
+from ..constants import PROFILE_SKILLS_PATH, SKILL_PATH
 
 
 class Settings:
     def __init__(self):
-        self.settings_path = get_profile_skill_settings_path(path.basename(SKILL_PATH))
+        self.settings_path = path.join(
+            PROFILE_SKILLS_PATH,
+            path.basename(SKILL_PATH),
+            'settings.json'
+        )
         self.settings_sample_path = path.join(SKILL_PATH, 'src', 'settings.sample.json')
 
     def is_setting_set(self, key: str) -> bool:

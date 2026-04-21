@@ -6,7 +6,7 @@ import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 
 import {
-  APP_ROOT_PATH,
+  CODEBASE_PATH,
   API_VERSION,
   LEON_VERSION,
   LEON_NODE_ENV,
@@ -164,7 +164,7 @@ export default class HTTPServer {
   private async bootstrap(): Promise<void> {
     // Render the web app
     this.fastify.register(fastifyStatic, {
-      root: join(APP_ROOT_PATH, 'app', 'dist'),
+      root: join(CODEBASE_PATH, 'app', 'dist'),
       prefix: '/'
     })
     this.fastify.get('/', (_request, reply) => {

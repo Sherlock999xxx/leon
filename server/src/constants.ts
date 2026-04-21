@@ -5,13 +5,13 @@ import dotenv from 'dotenv'
 
 import type { LongLanguageCode } from '@/types'
 import {
-  resolveLeonAppRoot,
-  resolveLeonHome,
-  resolveLeonProfile,
-  resolveLeonProfilePath,
-  resolveProfileDotEnvPath,
-  syncLeonHomeEnvironment
-} from '@/helpers/leon-home-helper'
+  CODEBASE_PATH,
+  LEON_HOME_PATH,
+  LEON_PROFILE_NAME,
+  LEON_PROFILES_PATH,
+  LEON_PROFILE_PATH,
+  PROFILE_DOT_ENV_PATH
+} from '@/leon-roots'
 import { RuntimeHelper } from '@/helpers/runtime-helper'
 import { SystemHelper } from '@/helpers/system-helper'
 import {
@@ -19,8 +19,16 @@ import {
   resolveConfiguredLLMTarget
 } from '@/core/llm-manager/llm-routing'
 
-syncLeonHomeEnvironment()
-dotenv.config({ path: resolveProfileDotEnvPath() })
+dotenv.config({ path: PROFILE_DOT_ENV_PATH })
+
+export {
+  CODEBASE_PATH,
+  LEON_HOME_PATH,
+  LEON_PROFILE_NAME,
+  LEON_PROFILES_PATH,
+  LEON_PROFILE_PATH,
+  PROFILE_DOT_ENV_PATH
+}
 
 const PRODUCTION_ENV = 'production'
 const DEVELOPMENT_ENV = 'development'
@@ -45,14 +53,8 @@ export const IS_TESTING_ENV = LEON_NODE_ENV === TESTING_ENV
 /**
  * Paths
  */
-export const APP_ROOT_PATH = resolveLeonAppRoot()
-export const LEON_HOME_PATH = resolveLeonHome()
-export const LEON_PROFILE_NAME = resolveLeonProfile()
-export const LEON_PROFILES_PATH = path.join(LEON_HOME_PATH, 'profiles')
-export const LEON_PROFILE_PATH = resolveLeonProfilePath()
 export const CACHE_PATH = path.join(LEON_HOME_PATH, 'cache')
 export const LEON_TOOLKITS_PATH = path.join(LEON_HOME_PATH, 'toolkits')
-export const PROFILE_DOT_ENV_PATH = resolveProfileDotEnvPath()
 export const PROFILE_CONTEXT_PATH = path.join(LEON_PROFILE_PATH, 'context')
 export const PROFILE_MEMORY_PATH = path.join(LEON_PROFILE_PATH, 'memory')
 export const PROFILE_LOGS_PATH = path.join(LEON_PROFILE_PATH, 'logs')
@@ -64,18 +66,18 @@ export const PROFILE_CONVERSATION_LOG_PATH = path.join(
 )
 
 export const BIN_PATH = path.join(LEON_HOME_PATH, 'bin')
-export const APP_BIN_PATH = path.join(APP_ROOT_PATH, 'bin')
+export const CODEBASE_BIN_PATH = path.join(CODEBASE_PATH, 'bin')
 export const NODE_INSTALL_PATH = path.join(BIN_PATH, 'node')
 export const PNPM_INSTALL_PATH = path.join(BIN_PATH, 'pnpm')
 export const PYTHON_INSTALL_PATH = path.join(BIN_PATH, 'python')
 export const UV_INSTALL_PATH = path.join(BIN_PATH, 'uv')
-export const LOGS_PATH = PROFILE_LOGS_PATH
-export const SKILLS_PATH = path.join(APP_ROOT_PATH, 'skills')
-export const GLOBAL_CORE_PATH = path.join(APP_ROOT_PATH, 'core')
+export const SKILLS_PATH = path.join(CODEBASE_PATH, 'skills')
+export const GLOBAL_CORE_PATH = path.join(CODEBASE_PATH, 'core')
 export const GLOBAL_DATA_PATH = path.join(GLOBAL_CORE_PATH, 'data')
-export const CONTEXT_PATH = PROFILE_CONTEXT_PATH
-export const MEMORY_PATH = PROFILE_MEMORY_PATH
-export const MEMORY_DB_PATH = path.join(MEMORY_PATH, 'index.sqlite')
+export const PROFILE_MEMORY_DB_PATH = path.join(
+  PROFILE_MEMORY_PATH,
+  'index.sqlite'
+)
 export const MODELS_PATH = path.join(LEON_HOME_PATH, 'models')
 export const AUDIO_MODELS_PATH = path.join(MODELS_PATH, 'audio')
 export const VOICE_CONFIG_PATH = path.join(
@@ -84,72 +86,21 @@ export const VOICE_CONFIG_PATH = path.join(
   'voice'
 )
 export const SERVER_PATH = path.join(
-  APP_ROOT_PATH,
+  CODEBASE_PATH,
   'server',
   IS_PRODUCTION_ENV ? 'dist' : 'src'
 )
 export const TMP_PATH = path.join(LEON_HOME_PATH, 'tmp')
 export const SERVER_CORE_PATH = path.join(SERVER_PATH, 'core')
 export const LEON_FILE_PATH = path.join(LEON_HOME_PATH, 'leon.json')
-export const ERRORS_FILE_PATH = path.join(LOGS_PATH, 'errors.log')
-export const RECENTLY_USED_COMMANDS_FILE_PATH = path.join(
+export const PROFILE_ERRORS_FILE_PATH = path.join(
+  PROFILE_LOGS_PATH,
+  'errors.log'
+)
+export const PROFILE_RECENTLY_USED_COMMANDS_FILE_PATH = path.join(
   LEON_PROFILE_PATH,
   'recently-used-commands.txt'
 )
-
-/**
- * Resolve the root directory that stores one profile's mutable data for a
- * given skill.
- */
-export function getProfileSkillPath(skillName: string): string {
-  return path.join(PROFILE_SKILLS_PATH, skillName)
-}
-
-/**
- * Resolve the per-profile settings file path for a given skill.
- */
-export function getProfileSkillSettingsPath(skillName: string): string {
-  return path.join(getProfileSkillPath(skillName), 'settings.json')
-}
-
-/**
- * Resolve the per-profile memory directory for a given skill.
- */
-export function getProfileSkillMemoryDirPath(skillName: string): string {
-  return path.join(getProfileSkillPath(skillName), 'memory')
-}
-
-/**
- * Resolve the path of a single memory file owned by a given skill.
- */
-export function getProfileSkillMemoryFilePath(
-  skillName: string,
-  memoryName: string
-): string {
-  return path.join(getProfileSkillMemoryDirPath(skillName), `${memoryName}.json`)
-}
-
-/**
- * Resolve the runtime artifact directory for a given skill.
- */
-export function getProfileSkillRuntimePath(skillName: string): string {
-  return path.join(getProfileSkillPath(skillName), '.runtime')
-}
-
-/**
- * Resolve the shared assets directory for a toolkit. This is intentionally
- * outside profiles so large binaries and models can be reused across them.
- */
-export function getToolkitAssetsPath(toolkitName: string): string {
-  return path.join(LEON_TOOLKITS_PATH, toolkitName, 'assets')
-}
-
-/**
- * Resolve the flat per-profile settings file path for a given tool.
- */
-export function getProfileToolSettingsPath(toolName: string): string {
-  return path.join(PROFILE_TOOLS_PATH, `${toolName}.settings.json`)
-}
 
 /**
  * NVIDIA paths and versions.
@@ -180,7 +131,7 @@ export const NVIDIA_NCCL_PATH = path.join(NVIDIA_LIBS_PATH, 'nccl')
 export const NVIDIA_NVSHMEM_PATH = path.join(NVIDIA_LIBS_PATH, 'nvshmem')
 export const NVIDIA_NVJITLINK_PATH = path.join(NVIDIA_LIBS_PATH, 'nvjitlink')
 export const NVIDIA_VERSIONS_PATH = path.join(
-  APP_BIN_PATH,
+  CODEBASE_BIN_PATH,
   'nvidia',
   'versions.json'
 )
@@ -239,7 +190,11 @@ export const NVIDIA_NVJITLINK_VERSION = NVIDIA_VERSIONS.nvjitlink
  * Used as a common layer across tools.
  */
 export const CMAKE_PATH = path.join(BIN_PATH, 'cmake')
-export const CMAKE_VERSIONS_PATH = path.join(APP_BIN_PATH, 'cmake', 'versions.json')
+export const CMAKE_VERSIONS_PATH = path.join(
+  CODEBASE_BIN_PATH,
+  'cmake',
+  'versions.json'
+)
 export const CMAKE_INSTALL_PATH = path.join(CMAKE_PATH, 'cmake')
 export const CMAKE_MANIFEST_PATH = path.join(CMAKE_INSTALL_PATH, 'manifest.json')
 const CMAKE_VERSIONS = JSON.parse(fs.readFileSync(CMAKE_VERSIONS_PATH, 'utf8'))
@@ -251,7 +206,11 @@ export const CMAKE_BIN_PATH = path.join(CMAKE_INSTALL_PATH, 'bin', 'cmake')
  * Used as a common layer across tools.
  */
 export const NINJA_PATH = path.join(BIN_PATH, 'ninja')
-export const NINJA_VERSIONS_PATH = path.join(APP_BIN_PATH, 'ninja', 'versions.json')
+export const NINJA_VERSIONS_PATH = path.join(
+  CODEBASE_BIN_PATH,
+  'ninja',
+  'versions.json'
+)
 export const NINJA_INSTALL_PATH = path.join(NINJA_PATH, 'ninja')
 export const NINJA_MANIFEST_PATH = path.join(NINJA_INSTALL_PATH, 'manifest.json')
 const NINJA_VERSIONS = JSON.parse(fs.readFileSync(NINJA_VERSIONS_PATH, 'utf8'))
@@ -262,18 +221,26 @@ export const NINJA_BIN_PATH = path.join(NINJA_INSTALL_PATH, 'ninja')
  * Portable runtime paths and versions.
  * Used as a common layer across skills, bridges and setup scripts.
  */
-export const NODE_VERSIONS_PATH = path.join(APP_BIN_PATH, 'node', 'versions.json')
+export const NODE_VERSIONS_PATH = path.join(
+  CODEBASE_BIN_PATH,
+  'node',
+  'versions.json'
+)
 export const NODE_MANIFEST_PATH = path.join(NODE_INSTALL_PATH, 'manifest.json')
 const NODE_VERSIONS = JSON.parse(fs.readFileSync(NODE_VERSIONS_PATH, 'utf8'))
 export const NODE_VERSION = NODE_VERSIONS.node
 
-export const PNPM_VERSIONS_PATH = path.join(APP_BIN_PATH, 'pnpm', 'versions.json')
+export const PNPM_VERSIONS_PATH = path.join(
+  CODEBASE_BIN_PATH,
+  'pnpm',
+  'versions.json'
+)
 export const PNPM_MANIFEST_PATH = path.join(PNPM_INSTALL_PATH, 'manifest.json')
 const PNPM_VERSIONS = JSON.parse(fs.readFileSync(PNPM_VERSIONS_PATH, 'utf8'))
 export const PNPM_VERSION = PNPM_VERSIONS.pnpm
 
 export const PYTHON_VERSIONS_PATH = path.join(
-  APP_BIN_PATH,
+  CODEBASE_BIN_PATH,
   'python',
   'versions.json'
 )
@@ -286,7 +253,11 @@ const PYTHON_VERSIONS = JSON.parse(
 )
 export const PYTHON_VERSION = PYTHON_VERSIONS.python
 
-export const UV_VERSIONS_PATH = path.join(APP_BIN_PATH, 'uv', 'versions.json')
+export const UV_VERSIONS_PATH = path.join(
+  CODEBASE_BIN_PATH,
+  'uv',
+  'versions.json'
+)
 export const UV_MANIFEST_PATH = path.join(UV_INSTALL_PATH, 'manifest.json')
 const UV_VERSIONS = JSON.parse(fs.readFileSync(UV_VERSIONS_PATH, 'utf8'))
 export const UV_VERSION = UV_VERSIONS.uv
@@ -297,7 +268,7 @@ export const UV_VERSION = UV_VERSIONS.uv
  */
 export const LLAMACPP_PATH = path.join(BIN_PATH, 'llama.cpp')
 export const LLAMACPP_VERSIONS_PATH = path.join(
-  APP_BIN_PATH,
+  CODEBASE_BIN_PATH,
   'llama.cpp',
   'versions.json'
 )
@@ -330,7 +301,7 @@ export const PYTORCH_PATH = path.join(BIN_PATH, 'pytorch')
 export const PYTORCH_TORCH_PATH = path.join(PYTORCH_PATH, 'torch')
 export const PYTORCH_NVIDIA_PATH = path.join(PYTORCH_TORCH_PATH, 'nvidia')
 export const PYTORCH_VERSIONS_PATH = path.join(
-  APP_BIN_PATH,
+  CODEBASE_BIN_PATH,
   'pytorch',
   'versions.json'
 )
@@ -347,12 +318,12 @@ export const PYTORCH_VERSION = PYTORCH_VERSIONS.torch
  * Binaries / distribution
  */
 export const BINARIES_FOLDER_NAME = SystemHelper.getBinariesFolderName()
-export const BRIDGES_PATH = path.join(APP_ROOT_PATH, 'bridges')
+export const BRIDGES_PATH = path.join(CODEBASE_PATH, 'bridges')
 export const TOOLKITS_PATH = path.join(BRIDGES_PATH, 'toolkits')
 export const NODEJS_BRIDGE_ROOT_PATH = path.join(BRIDGES_PATH, 'nodejs')
 export const PYTHON_BRIDGE_ROOT_PATH = path.join(BRIDGES_PATH, 'python')
 export const PYTHON_TCP_SERVER_ROOT_PATH = path.join(
-  APP_ROOT_PATH,
+  CODEBASE_PATH,
   'tcp_server'
 )
 
@@ -444,7 +415,7 @@ export const PYTHON_TCP_SERVER_ENTRY_PATH = path.join(
   'main.py'
 )
 export const TSX_CLI_PATH = path.join(
-  APP_ROOT_PATH,
+  CODEBASE_PATH,
   'node_modules',
   'tsx',
   'dist',
@@ -543,7 +514,7 @@ export const LLM_NAME_WITH_VERSION = `${LLM_NAME} (${LLM_VERSION})`
 export const LLM_PATH = DEFAULT_INSTALLED_LLM_PATH
   ? path.isAbsolute(DEFAULT_INSTALLED_LLM_PATH)
     ? DEFAULT_INSTALLED_LLM_PATH
-    : path.resolve(APP_ROOT_PATH, DEFAULT_INSTALLED_LLM_PATH)
+    : path.resolve(CODEBASE_PATH, DEFAULT_INSTALLED_LLM_PATH)
   : ''
 export const LLM_MINIMUM_TOTAL_VRAM = 6
 export const LLM_HIGH_TIER_MINIMUM_TOTAL_VRAM = 18

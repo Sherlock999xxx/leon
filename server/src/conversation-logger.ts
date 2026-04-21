@@ -2,7 +2,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 
 import type { ConversationWidgetData, LLMAnswerMetrics, MessageLog } from '@/types'
-import { LOGS_PATH } from '@/constants'
+import { PROFILE_LOGS_PATH } from '@/constants'
 import { LogHelper } from '@/helpers/log-helper'
 
 interface ConversationLoggerSettings {
@@ -48,7 +48,8 @@ export class ConversationLogger {
 
     this.settings = settings
     this.conversationLogPath =
-      this.settings.filePath || path.join(LOGS_PATH, this.settings.fileName)
+      this.settings.filePath ||
+      path.join(PROFILE_LOGS_PATH, this.settings.fileName)
   }
 
   private enqueue<T>(operation: () => Promise<T>): Promise<T> {

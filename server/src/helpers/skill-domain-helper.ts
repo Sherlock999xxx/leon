@@ -13,8 +13,7 @@ import type {
 import {
   GLOBAL_DATA_PATH,
   PROFILE_SKILLS_PATH,
-  SKILLS_PATH,
-  getProfileSkillMemoryFilePath
+  SKILLS_PATH
 } from '@/constants'
 import { FileHelper } from '@/helpers/file-helper'
 
@@ -376,7 +375,6 @@ export class SkillDomainHelper {
   ): Promise<Record<string, unknown> | null> {
     const normalizedSkillName = this.normalizeSkillName(skill)
     const skillMemoryCandidates = [
-      getProfileSkillMemoryFilePath(normalizedSkillName, memory),
       path.join(PROFILE_SKILLS_PATH, normalizedSkillName, 'memory', `${memory}.json`)
     ]
     const skillMemoryPath = skillMemoryCandidates.find((candidate) =>

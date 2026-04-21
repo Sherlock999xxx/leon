@@ -4,17 +4,15 @@ import path from 'node:path'
 import type { SkillLocaleConfigSchema } from '@/schemas/skill-schemas'
 import type { IntentObject, NLPAction } from '@sdk/types'
 import {
-  APP_ROOT_PATH,
+  CODEBASE_PATH,
   LEON_HOME_PATH,
   LEON_PROFILE_PATH,
   LEON_TOOLKITS_PATH,
+  PROFILE_CONTEXT_PATH,
+  PROFILE_MEMORY_DB_PATH,
+  PROFILE_MEMORY_PATH,
   PROFILE_SKILLS_PATH,
-  PROFILE_TOOLS_PATH,
-  getProfileSkillRuntimePath,
-  getProfileSkillSettingsPath,
-  getProfileSkillMemoryFilePath,
-  getProfileToolSettingsPath,
-  getToolkitAssetsPath
+  PROFILE_TOOLS_PATH
 } from '@@/server/src/constants'
 
 const args = process.argv.slice(2)
@@ -36,21 +34,19 @@ export const LEON_VERSION = process.env['npm_package_version']
 export const RUNTIME = runtime
 
 export {
-  APP_ROOT_PATH,
+  CODEBASE_PATH,
   LEON_HOME_PATH,
   LEON_PROFILE_PATH,
   LEON_TOOLKITS_PATH,
+  PROFILE_CONTEXT_PATH,
+  PROFILE_MEMORY_DB_PATH,
+  PROFILE_MEMORY_PATH,
   PROFILE_SKILLS_PATH,
-  PROFILE_TOOLS_PATH,
-  getProfileSkillRuntimePath,
-  getProfileSkillSettingsPath,
-  getProfileSkillMemoryFilePath,
-  getProfileToolSettingsPath,
-  getToolkitAssetsPath
+  PROFILE_TOOLS_PATH
 }
 
 const BIN_PATH = path.join(LEON_HOME_PATH, 'bin')
-const BRIDGES_PATH = path.join(APP_ROOT_PATH, 'bridges')
+const BRIDGES_PATH = path.join(CODEBASE_PATH, 'bridges')
 const NODEJS_BRIDGE_ROOT_PATH = path.join(BRIDGES_PATH, 'nodejs')
 const NODEJS_BRIDGE_SRC_PATH = path.join(NODEJS_BRIDGE_ROOT_PATH, 'src')
 const NODEJS_BRIDGE_VERSION_FILE_PATH = path.join(
@@ -83,7 +79,7 @@ export const NVIDIA_LIBS_PATH = path.join(BIN_PATH, 'nvidia')
 export const PYTORCH_PATH = path.join(BIN_PATH, 'pytorch')
 export const PYTORCH_TORCH_PATH = path.join(PYTORCH_PATH, 'torch')
 
-export const SKILLS_PATH = path.join(APP_ROOT_PATH, 'skills')
+export const SKILLS_PATH = path.join(CODEBASE_PATH, 'skills')
 export const SKILL_PATH =
   runtime === 'skill' && parsedIntentObject
     ? path.join(SKILLS_PATH, parsedIntentObject.skill_name)

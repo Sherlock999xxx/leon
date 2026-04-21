@@ -1,17 +1,18 @@
 import path from 'node:path'
 import fs from 'node:fs'
 
-import {
-  getProfileSkillSettingsPath,
-  SKILL_PATH
-} from '@bridge/constants'
+import { PROFILE_SKILLS_PATH, SKILL_PATH } from '@bridge/constants'
 
 export class Settings<T extends Record<string, unknown>> {
   private readonly settingsPath: string
   private readonly settingsSamplePath: string
 
   constructor() {
-    this.settingsPath = getProfileSkillSettingsPath(path.basename(SKILL_PATH))
+    this.settingsPath = path.join(
+      PROFILE_SKILLS_PATH,
+      path.basename(SKILL_PATH),
+      'settings.json'
+    )
     this.settingsSamplePath = path.join(
       SKILL_PATH,
       'src',

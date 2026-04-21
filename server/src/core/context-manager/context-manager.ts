@@ -6,10 +6,10 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
 import {
-  APP_ROOT_PATH,
-  CONTEXT_PATH,
+  CODEBASE_PATH,
   LEON_DISABLED_CONTEXT_FILES,
   NODE_RUNTIME_BIN_PATH,
+  PROFILE_CONTEXT_PATH,
   TSX_CLI_PATH
 } from '@/constants'
 import { TOOLKIT_REGISTRY, LLM_PROVIDER } from '@/core'
@@ -30,7 +30,7 @@ const CONTEXT_FILES_RUNTIME_DIR = path.join(
   'context-files'
 )
 const CONTEXT_FILES_SOURCE_DIR = path.join(
-  APP_ROOT_PATH,
+  CODEBASE_PATH,
   'server',
   'src',
   'core',
@@ -126,7 +126,7 @@ export default class ContextManager {
     }
 
     try {
-      await fs.promises.mkdir(CONTEXT_PATH, { recursive: true })
+      await fs.promises.mkdir(PROFILE_CONTEXT_PATH, { recursive: true })
       this.cleanupDisabledContextFiles()
       this.cleanupRetiredContextFiles()
       this.refreshContextFilesAtBootInBackground()
@@ -282,7 +282,7 @@ export default class ContextManager {
   }
 
   private getContextFilePath(filename: string): string {
-    return path.join(CONTEXT_PATH, filename)
+    return path.join(PROFILE_CONTEXT_PATH, filename)
   }
 
   private normalizeFilename(filename: string): string {
@@ -441,7 +441,7 @@ export default class ContextManager {
     return [
       TSX_CLI_PATH,
       '--tsconfig',
-      path.join(APP_ROOT_PATH, 'tsconfig.json'),
+      path.join(CODEBASE_PATH, 'tsconfig.json'),
       CONTEXT_REFRESH_WORKER_SRC_PATH
     ]
   }
@@ -467,7 +467,7 @@ export default class ContextManager {
 
     try {
       const { stdout } = await execFileAsync(NODE_RUNTIME_BIN_PATH, workerArgs, {
-        cwd: APP_ROOT_PATH,
+        cwd: CODEBASE_PATH,
         maxBuffer: CONTEXT_REFRESH_WORKER_MAX_BUFFER
       })
       const parsed = JSON.parse(String(stdout || '{}')) as {
@@ -482,7 +482,7 @@ export default class ContextManager {
 
       const filePath = this.getContextFilePath(definition.filename)
       const content = this.ensureTrailingNewline(parsed.content)
-      fs.mkdirSync(CONTEXT_PATH, { recursive: true })
+      fs.mkdirSync(PROFILE_CONTEXT_PATH, { recursive: true })
       fs.writeFileSync(filePath, content, 'utf-8')
       this.metadata.set(definition.filename, {
         lastGeneratedAt: Date.now()
@@ -650,7 +650,7 @@ export default class ContextManager {
     try {
       const content = this.ensureTrailingNewline(definition.generate())
 
-      fs.mkdirSync(CONTEXT_PATH, { recursive: true })
+      fs.mkdirSync(PROFILE_CONTEXT_PATH, { recursive: true })
       fs.writeFileSync(filePath, content, 'utf-8')
       this.metadata.set(definition.filename, {
         lastGeneratedAt: Date.now()

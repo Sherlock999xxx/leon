@@ -7,7 +7,7 @@ import { FileHelper } from '@/helpers/file-helper'
 import type { ActionFunction, ActionParams } from '@sdk/types'
 import {
   INTENT_OBJECT,
-  getProfileSkillRuntimePath,
+  PROFILE_SKILLS_PATH,
   SKILLS_PATH
 } from '@bridge/constants'
 import { ParamsHelper } from '@sdk/params-helper'
@@ -57,7 +57,9 @@ const isLeonAliasImport = (specifier: string): boolean => {
 
 const registerSkillRuntimeNodeModules = (skillName: string): void => {
   const runtimeNodeModulesPath = path.join(
-    getProfileSkillRuntimePath(skillName),
+    PROFILE_SKILLS_PATH,
+    skillName,
+    '.runtime',
     'node_modules'
   )
 
@@ -91,7 +93,7 @@ const registerSkillRuntimeNodeModules = (skillName: string): void => {
   })
 }
 
-;(async (): Promise<void> => {
+async function main(): Promise<void> {
   setToolReporter(async (input) => {
     await leon.answer(input)
   })
@@ -151,4 +153,6 @@ const registerSkillRuntimeNodeModules = (skillName: string): void => {
       e
     )
   }
-})()
+}
+
+void main()

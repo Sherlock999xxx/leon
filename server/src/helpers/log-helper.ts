@@ -1,11 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { ERRORS_FILE_PATH } from '@/constants'
+import { PROFILE_ERRORS_FILE_PATH } from '@/constants'
 import { DateHelper } from '@/helpers/date-helper'
 
 export class LogHelper {
-  static readonly ERRORS_FILE_PATH = ERRORS_FILE_PATH
+  static readonly ERRORS_FILE_PATH = PROFILE_ERRORS_FILE_PATH
 
   /**
    * This one looks obvious :)

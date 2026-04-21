@@ -3,7 +3,6 @@ import fs from 'node:fs'
 
 import {
   PROFILE_SKILLS_PATH,
-  getProfileSkillMemoryFilePath,
   SKILL_PATH
 } from '@bridge/constants'
 
@@ -31,9 +30,11 @@ export class Memory<T = unknown> {
 
     this.name = name
     this.defaultMemory = defaultMemory
-    this.memoryPath = getProfileSkillMemoryFilePath(
+    this.memoryPath = path.join(
+      PROFILE_SKILLS_PATH,
       path.basename(SKILL_PATH),
-      this.name
+      'memory',
+      `${this.name}.json`
     )
     this.isFromAnotherSkill = false
 

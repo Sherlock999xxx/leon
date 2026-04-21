@@ -38,7 +38,7 @@ import {
   PYTHON_TCP_SERVER_TTS_BERT_BASE_DIR_PATH,
   PYTHON_TCP_SERVER_ASR_MODEL_DIR_PATH,
   AUDIO_MODELS_PATH,
-  APP_ROOT_PATH,
+  CODEBASE_PATH,
   PROFILE_DOT_ENV_PATH,
   TSX_CLI_PATH,
   LANG,
@@ -146,7 +146,7 @@ function buildExtraContext(lang) {
 
 async function createNodejsBridgeIntentObject() {
   const skillConfigPath = path.join(
-    APP_ROOT_PATH,
+    CODEBASE_PATH,
     'skills',
     'date_time_skill',
     'skill.json'
@@ -181,7 +181,7 @@ async function createNodejsBridgeIntentObject() {
 
 async function createPythonBridgeIntentObject() {
   const skillConfigPath = path.join(
-    APP_ROOT_PATH,
+    CODEBASE_PATH,
     'skills',
     'color_skill',
     'skill.json'

@@ -2,7 +2,7 @@ import json
 import os
 from typing import Dict, Any, Optional
 
-from ..constants import TOOLKITS_PATH, get_profile_tool_settings_path
+from ..constants import PROFILE_TOOLS_PATH, TOOLKITS_PATH
 from .utils import get_platform_name
 
 
@@ -82,7 +82,7 @@ class ToolkitConfig:
         if cache_key in cls._settings_cache:
             return cls._settings_cache[cache_key]
 
-        settings_path = get_profile_tool_settings_path(tool_name)
+        settings_path = os.path.join(PROFILE_TOOLS_PATH, f"{tool_name}.settings.json")
         settings_dir = os.path.dirname(settings_path)
         os.makedirs(settings_dir, exist_ok=True)
 
