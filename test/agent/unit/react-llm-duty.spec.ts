@@ -233,7 +233,7 @@ describe('ReActLLMDuty agent loop', () => {
       input: 'Awesome, thanks',
       history: [],
       agentSkillCatalog:
-        '1. web-research: Search, fetch, crawl, inspect, or follow web pages.',
+        '1. tiny-web-crawler: Crawl from starting web pages, fetch readable content, search within pages, and follow relevant links.',
       setAgentSkillContext: vi.fn(),
       getAgentSkillContext: vi.fn(),
       getContextFileContent: vi.fn(() => null),
@@ -388,12 +388,12 @@ describe('ReActLLMDuty agent loop', () => {
 
   it('keeps a selected Agent Skill active during execution', async () => {
     const agentSkillContext = {
-      id: 'web-research',
-      name: 'web-research',
+      id: 'tiny-web-crawler',
+      name: 'tiny-web-crawler',
       description: 'Fetch and crawl web pages.',
-      rootPath: '/tmp/web-research',
-      skillPath: '/tmp/web-research/SKILL.md',
-      instructions: '# Web Research'
+      rootPath: '/tmp/tiny-web-crawler',
+      skillPath: '/tmp/tiny-web-crawler/SKILL.md',
+      instructions: '# Tiny Web Crawler'
     }
 
     phaseMocks.runPlanningPhase.mockImplementation(async (caller) => {
@@ -426,7 +426,7 @@ describe('ReActLLMDuty agent loop', () => {
     phaseMocks.runFinalAnswerPhase.mockResolvedValue('Fetched with skill script.')
 
     const duty = await createDuty(
-      'Use the web-research skill to inspect a page.'
+      'Use the tiny-web-crawler skill to inspect a page.'
     )
     const result = await duty.execute()
 
