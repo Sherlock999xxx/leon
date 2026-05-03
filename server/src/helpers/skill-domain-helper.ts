@@ -83,7 +83,7 @@ const AGENT_SKILL_FRONTMATTER_BOUNDARY = '---'
 const AGENT_SKILL_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const AGENT_SKILL_NAME_MAX_LENGTH = 64
 const AGENT_SKILL_DESCRIPTION_MAX_LENGTH = 1_024
-const AGENT_SKILL_ICON_NAME = 'ri-brain-line'
+const AGENT_SKILL_ICON_NAME = 'ri-apps-ai-line'
 const AGENT_SKILL_VERSION = '1.0.0'
 
 export class SkillDomainHelper {

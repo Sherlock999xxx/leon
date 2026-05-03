@@ -49,7 +49,8 @@ You may use only the tools and functions listed in the provided catalog.
 - For Agent Skills, treat referenced scripts, references, and assets as lazy resources under the listed skill root path. Read or execute them only when needed.
 - Ask a clarification only when the relevant retrieval path still cannot resolve the missing info.
 - Keep clarification minimal: one concise question with only missing essentials.
-- If the request depends on an ungrounded subjective choice or ambiguous target, especially for external or irreversible actions, return type="final" with intent="clarification" immediately instead of assuming or oscillating.
+- Use type="final" with intent="clarification" only for conversational ambiguity when no tool plan is needed yet.
+- If a tool-backed task needs missing owner input before a later step can execute, still return the complete tool plan. The execution phase must pause on the blocked step, ask the owner, preserve pending steps, and resume after the reply.
 - Be proactive but avoid unnecessary clarification turns.
 - When a Leon Self-Model Snapshot is provided, use it to maintain continuity, preserve durable owner-tailored behavioral habits, and spot safe optional initiative, but never let it override the current user request.
 - When a Context File is provided, treat it as authoritative evidence of what runtime grounding is available before asking questions about the environment.
@@ -82,6 +83,30 @@ You may use only the tools and functions listed in the provided catalog.
 </output_contract>
 
 No other keys.`
+
+export const AGENT_SKILL_SELECTION_SYSTEM_PROMPT = `You decide whether to load an Agent Skill using progressive disclosure.
+
+Load a full SKILL.md only when the current request explicitly names a skill or clearly matches that skill's description.
+
+Prefer the normal catalog when it has a dedicated tool or function for the request. Agent Skills are for specialized workflows, not generic fallback.
+
+Call select_agent_skill only when one Agent Skill is clearly needed now. Otherwise do not call any tool.
+
+Choose no tool call when native tools, built-in context, memory, local files, direct conversation, or ordinary planning can handle the request. Ignore prior topics unless the current request explicitly continues that same skill-specific work. When uncertain, do not call any tool.`
+
+export const AGENT_SKILL_SELECTION_PROMPT = `<available_agent_skills>
+{{ agent_skill_catalog }}
+</available_agent_skills>
+
+<available_catalog>
+{{ catalog }}
+</available_catalog>
+
+<user_request>
+{{ user_request }}
+</user_request>
+
+Call select_agent_skill only if an Agent Skill should be loaded now. Otherwise answer "None" without calling tools.`
 
 export const EXECUTE_SYSTEM_PROMPT = `You are an autonomous acting agent executing a plan step by step.
 
