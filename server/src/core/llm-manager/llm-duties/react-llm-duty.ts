@@ -789,9 +789,16 @@ export class ReActLLMDuty extends LLMDuty {
               `Continuing after intermediate tool answer handoff; ${pendingSteps.length} pending step(s) remain`
             )
           } else {
-            // Mark all remaining as completed
-            for (const ts of trackedSteps) {
-              ts.status = 'completed'
+            if (
+              stepResult.execution.status === 'error' &&
+              currentStepIndex < trackedSteps.length
+            ) {
+              trackedSteps[currentStepIndex]!.status = 'error'
+            } else {
+              // Mark all remaining as completed
+              for (const ts of trackedSteps) {
+                ts.status = 'completed'
+              }
             }
             currentExecutingFunction = null
             emitPlanWidget(
@@ -806,41 +813,65 @@ export class ReActLLMDuty extends LLMDuty {
           }
         }
 
-        // Update plan widget: mark current step as completed, next as in_progress
-        if (currentStepIndex < trackedSteps.length) {
-          trackedSteps[currentStepIndex]!.status = 'completed'
-        }
-        const nextTrackedIndex = currentStepIndex + 1
-        if (nextTrackedIndex < trackedSteps.length) {
-          trackedSteps[nextTrackedIndex]!.status = 'in_progress'
-        }
-        currentExecutingFunction = null
-        emitPlanWidget(
-          trackedSteps,
-          currentStepIndex,
-          planWidgetIdValue,
-          true,
-          currentExecutingFunction
-        )
-        currentStepIndex = nextTrackedIndex
-
         if (stepResult.execution.status === 'error') {
           if (replanCount >= MAX_REPLANS) {
             LogHelper.title(this.name)
             LogHelper.warning(
               'Recovery replanning skipped: max re-plans reached'
             )
-            continue
+            if (currentStepIndex < trackedSteps.length) {
+              trackedSteps[currentStepIndex]!.status = 'error'
+            }
+            currentExecutingFunction = null
+            emitPlanWidget(
+              trackedSteps,
+              null,
+              planWidgetIdValue,
+              true,
+              currentExecutingFunction
+            )
+
+            return await finalizeFromSignal({
+              intent: 'error',
+              draft:
+                'The task failed after exhausting recovery attempts. Summarize the failed tool observation and what input or setup is needed next.',
+              source: 'recovery'
+            })
           }
 
-          const recoveryPlanResult = await runRecoveryPlanningPhase(
-            caller,
-            catalog,
-            history,
-            executionHistory,
-            currentStep,
-            pendingSteps
-          )
+          let recoveryPlanResult = null
+          try {
+            recoveryPlanResult = await runRecoveryPlanningPhase(
+              caller,
+              catalog,
+              history,
+              executionHistory,
+              currentStep,
+              pendingSteps
+            )
+          } catch (error) {
+            LogHelper.title(this.name)
+            LogHelper.error(`Recovery planning failed: ${error}`)
+            if (currentStepIndex < trackedSteps.length) {
+              trackedSteps[currentStepIndex]!.status = 'error'
+            }
+            currentExecutingFunction = null
+            emitPlanWidget(
+              trackedSteps,
+              null,
+              planWidgetIdValue,
+              true,
+              currentExecutingFunction
+            )
+
+            return await finalizeFromSignal({
+              intent: 'error',
+              draft: `Recovery planning failed after the tool error: ${
+                (error as Error).message || String(error)
+              }`,
+              source: 'recovery'
+            })
+          }
 
           if (recoveryPlanResult?.type === 'handoff') {
             LogHelper.title(this.name)
@@ -849,7 +880,7 @@ export class ReActLLMDuty extends LLMDuty {
             )
 
             if (recoveryPlanResult.signal.intent === 'clarification') {
-              const retryStepIndex = Math.max(0, currentStepIndex - 1)
+              const retryStepIndex = currentStepIndex
               const pausedTrackedSteps =
                 trackedSteps.length > 0
                   ? buildPausedTrackedSteps(trackedSteps, retryStepIndex)
@@ -922,9 +953,9 @@ export class ReActLLMDuty extends LLMDuty {
               )
             }
 
-            const completedSteps = trackedSteps.filter(
-              (s) => s.status === 'completed'
-            )
+            const completedSteps = trackedSteps
+              .slice(0, currentStepIndex)
+              .filter((s) => s.status === 'completed')
             const newSteps: TrackedPlanStep[] = pendingSteps.map((s) => ({
               label: s.label,
               status: 'pending' as PlanStepStatus
@@ -943,8 +974,47 @@ export class ReActLLMDuty extends LLMDuty {
               true,
               currentExecutingFunction
             )
+            continue
           }
+
+          if (currentStepIndex < trackedSteps.length) {
+            trackedSteps[currentStepIndex]!.status = 'error'
+          }
+          currentExecutingFunction = null
+          emitPlanWidget(
+            trackedSteps,
+            null,
+            planWidgetIdValue,
+            true,
+            currentExecutingFunction
+          )
+
+          return await finalizeFromSignal({
+            intent: 'error',
+            draft:
+              'The tool step failed and recovery could not find another executable path. Explain the failure from execution history and ask for the missing artifact or configuration needed to continue.',
+            source: 'recovery'
+          })
         }
+
+        // Update plan widget after a successful step: mark current step as completed,
+        // then move the next step to in_progress.
+        if (currentStepIndex < trackedSteps.length) {
+          trackedSteps[currentStepIndex]!.status = 'completed'
+        }
+        const nextTrackedIndex = currentStepIndex + 1
+        if (nextTrackedIndex < trackedSteps.length) {
+          trackedSteps[nextTrackedIndex]!.status = 'in_progress'
+        }
+        currentExecutingFunction = null
+        emitPlanWidget(
+          trackedSteps,
+          currentStepIndex,
+          planWidgetIdValue,
+          true,
+          currentExecutingFunction
+        )
+        currentStepIndex = nextTrackedIndex
 
         if (
           stepResult.execution.status === 'success' &&

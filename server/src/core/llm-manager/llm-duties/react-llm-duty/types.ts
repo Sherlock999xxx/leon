@@ -46,7 +46,7 @@ export interface ExecutionRecord {
   requestedToolInput?: string
 }
 
-export type PlanStepStatus = 'pending' | 'in_progress' | 'completed'
+export type PlanStepStatus = 'pending' | 'in_progress' | 'completed' | 'error'
 
 export interface TrackedPlanStep {
   label: string
