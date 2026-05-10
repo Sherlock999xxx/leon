@@ -103,35 +103,24 @@ import {
   deriveLLMMetrics,
   observeCompletionMetrics
 } from './react-llm-duty/metrics'
+import {
+  buildPausedTrackedSteps,
+  buildResumedExecutionInput,
+  createExecutionContinuationState,
+  createIntermediateAnswerExecutionRecord,
+  isExecutionContinuationStateValid,
+  shouldContinueAfterIntermediateAnswerHandoff,
+  type ReactExecutionContinuationPayload,
+  type ReactExecutionContinuationState
+} from './react-llm-duty/human-in-the-loop'
 
 const REACT_CONTINUATION_STATE_FILENAME = '.react-execution-continuation-state.json'
 const REACT_HISTORY_COMPACTION_STATE_FILENAME =
   '.react-history-compaction-state.json'
 const REACT_SESSION_STATE_FILENAME_SEPARATOR = '--'
-const REACT_CONTINUATION_MAX_AGE_MS = 30 * 60 * 1_000
 const REACT_PROMPTS_LOG_DIR = path.join(PROFILE_LOGS_PATH, 'prompts')
 
 type ReactHistoryCompactionScope = 'local' | 'remote'
-
-interface ReactExecutionContinuationState {
-  version: 1
-  phase: 'execution'
-  planWidgetId: string
-  originalInput: string
-  clarificationQuestion: string
-  pendingSteps: PlanStep[]
-  executionHistory: ExecutionRecord[]
-  trackedSteps: TrackedPlanStep[]
-  currentStepIndex: number
-  replanCount: number
-  executionCount: number
-  createdAt: number
-}
-
-interface ReactExecutionContinuationPayload {
-  state: ReactExecutionContinuationState
-  resumedInput: string
-}
 
 interface PreparedReactHistory {
   messageLogs: MessageLog[]
@@ -447,7 +436,7 @@ export class ReActLLMDuty extends LLMDuty {
             Math.max(continuation.state.currentStepIndex, 0),
             Math.max(trackedSteps.length - 1, 0)
           )
-          trackedSteps = this.buildPausedTrackedSteps(
+          trackedSteps = buildPausedTrackedSteps(
             trackedSteps,
             currentStepIndex
           )
@@ -607,7 +596,7 @@ export class ReActLLMDuty extends LLMDuty {
           )
 
           if (stepResult.signal.intent === 'clarification') {
-            const pausedTrackedSteps = this.buildPausedTrackedSteps(
+            const pausedTrackedSteps = buildPausedTrackedSteps(
               trackedSteps,
               currentStepIndex
             )
@@ -637,6 +626,41 @@ export class ReActLLMDuty extends LLMDuty {
               `Execution paused for clarification at step "${currentStep.label}"`
             )
             return await finalizeFromSignal(stepResult.signal)
+          }
+
+          if (
+            shouldContinueAfterIntermediateAnswerHandoff(
+              stepResult.signal,
+              pendingSteps
+            )
+          ) {
+            LogHelper.debug(
+              `Continuing after intermediate answer handoff; ${pendingSteps.length} pending step(s) remain`
+            )
+            executionHistory.push(
+              createIntermediateAnswerExecutionRecord(
+                currentStep,
+                stepResult.signal
+              )
+            )
+
+            if (currentStepIndex < trackedSteps.length) {
+              trackedSteps[currentStepIndex]!.status = 'completed'
+            }
+            const nextTrackedIndex = currentStepIndex + 1
+            if (nextTrackedIndex < trackedSteps.length) {
+              trackedSteps[nextTrackedIndex]!.status = 'in_progress'
+            }
+            currentExecutingFunction = null
+            emitPlanWidget(
+              trackedSteps,
+              currentStepIndex,
+              planWidgetIdValue,
+              true,
+              currentExecutingFunction
+            )
+            currentStepIndex = nextTrackedIndex
+            continue
           }
 
           // Mark all remaining steps as completed in the widget
@@ -723,7 +747,7 @@ export class ReActLLMDuty extends LLMDuty {
           )
 
           if (stepResult.handoffSignal.intent === 'clarification') {
-            const pausedTrackedSteps = this.buildPausedTrackedSteps(
+            const pausedTrackedSteps = buildPausedTrackedSteps(
               trackedSteps,
               currentStepIndex
             )
@@ -755,20 +779,31 @@ export class ReActLLMDuty extends LLMDuty {
             return await finalizeFromSignal(stepResult.handoffSignal)
           }
 
-          // Mark all remaining as completed
-          for (const ts of trackedSteps) {
-            ts.status = 'completed'
-          }
-          currentExecutingFunction = null
-          emitPlanWidget(
-            trackedSteps,
-            null,
-            planWidgetIdValue,
-            true,
-            currentExecutingFunction
-          )
+          if (
+            shouldContinueAfterIntermediateAnswerHandoff(
+              stepResult.handoffSignal,
+              pendingSteps
+            )
+          ) {
+            LogHelper.debug(
+              `Continuing after intermediate tool answer handoff; ${pendingSteps.length} pending step(s) remain`
+            )
+          } else {
+            // Mark all remaining as completed
+            for (const ts of trackedSteps) {
+              ts.status = 'completed'
+            }
+            currentExecutingFunction = null
+            emitPlanWidget(
+              trackedSteps,
+              null,
+              planWidgetIdValue,
+              true,
+              currentExecutingFunction
+            )
 
-          return await finalizeFromSignal(stepResult.handoffSignal)
+            return await finalizeFromSignal(stepResult.handoffSignal)
+          }
         }
 
         // Update plan widget: mark current step as completed, next as in_progress
@@ -817,7 +852,7 @@ export class ReActLLMDuty extends LLMDuty {
               const retryStepIndex = Math.max(0, currentStepIndex - 1)
               const pausedTrackedSteps =
                 trackedSteps.length > 0
-                  ? this.buildPausedTrackedSteps(trackedSteps, retryStepIndex)
+                  ? buildPausedTrackedSteps(trackedSteps, retryStepIndex)
                   : [
                       {
                         label: currentStep.label,
@@ -1661,14 +1696,7 @@ export class ReActLLMDuty extends LLMDuty {
       return null
     }
 
-    const isExpired =
-      !state.createdAt || Date.now() - state.createdAt > REACT_CONTINUATION_MAX_AGE_MS
-    if (isExpired) {
-      this.getContinuationStateStore().save(null)
-      return null
-    }
-
-    if (state.phase !== 'execution' || !Array.isArray(state.pendingSteps)) {
+    if (!isExecutionContinuationStateValid(state)) {
       this.getContinuationStateStore().save(null)
       return null
     }
@@ -1698,7 +1726,11 @@ export class ReActLLMDuty extends LLMDuty {
 
     this.clearExecutionContinuation()
 
-    const resumedInput = `${state.originalInput}\n\nPrevious clarification request: "${state.clarificationQuestion}"\nClarification reply: "${ownerReply}"`
+    const resumedInput = buildResumedExecutionInput(
+      state.originalInput,
+      state.clarificationQuestion,
+      ownerReply
+    )
 
     return { state, resumedInput }
   }
@@ -1715,51 +1747,7 @@ export class ReActLLMDuty extends LLMDuty {
     replanCount: number
     executionCount: number
   }): void {
-    this.saveExecutionContinuation({
-      version: 1,
-      phase: 'execution',
-      planWidgetId: params.planWidgetId,
-      originalInput: params.originalInput,
-      clarificationQuestion: params.clarificationQuestion,
-      pendingSteps: [params.currentStep, ...params.pendingSteps].map((step) => ({
-        function: step.function,
-        label: step.label
-      })),
-      executionHistory: params.executionHistory.map((item) => ({ ...item })),
-      trackedSteps: params.trackedSteps.map((step) => ({ ...step })),
-      currentStepIndex:
-        params.trackedSteps.length > 0
-          ? Math.min(params.currentStepIndex, params.trackedSteps.length - 1)
-          : 0,
-      replanCount: params.replanCount,
-      executionCount: params.executionCount,
-      createdAt: Date.now()
-    })
-  }
-
-  private buildPausedTrackedSteps(
-    trackedSteps: TrackedPlanStep[],
-    inProgressIndex: number
-  ): TrackedPlanStep[] {
-    if (trackedSteps.length === 0) {
-      return []
-    }
-
-    const normalizedIndex = Math.min(
-      Math.max(inProgressIndex, 0),
-      trackedSteps.length - 1
-    )
-
-    return trackedSteps.map((step, index) => {
-      if (index < normalizedIndex) {
-        return { ...step, status: 'completed' as PlanStepStatus }
-      }
-      if (index === normalizedIndex) {
-        return { ...step, status: 'in_progress' as PlanStepStatus }
-      }
-
-      return { ...step, status: 'pending' as PlanStepStatus }
-    })
+    this.saveExecutionContinuation(createExecutionContinuationState(params))
   }
 
   // ---------------------------------------------------------------------------
