@@ -390,6 +390,7 @@ Use only the user request and collected observations to decide whether the reque
   - {"type":"replan","steps":[{"function":"toolkit_id.tool_id.function_name","label":"Short verb-first label"}],"reason":"..."} when more tool steps are still needed.
 - Treat the task as complete only when every requested deliverable is already satisfied or explicitly blocked by the observations.
 - If any requested artifact, transformation, verification, write step, or follow-up action is still missing, choose "replan".
+- Do not add fallback/alternative steps after the primary path already satisfied the deliverable.
 - If a read, probe, or discovery step reveals another instruction or subtask to carry out, the task is still incomplete until that revealed instruction is executed or explicitly blocked.
 - Reading, quoting, or summarizing an instruction does not count as completing the instruction itself.
 - Base your decision strictly on observations, not assumptions.

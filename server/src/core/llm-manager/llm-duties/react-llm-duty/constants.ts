@@ -60,7 +60,7 @@ You may use only the tools and functions listed in the provided catalog.
 
 <plan_completeness_check>
 - Before returning a plan, run a quick completeness check for required execution inputs.
-- Always create a complete plan with ALL steps needed upfront. Do not return only the first step.
+- Create a complete primary-path plan; leave fallback/alternative steps for recovery after failure.
 - If the user asks to "find a file and process it", include ALL steps: find, probe, process.
 - If the request mentions or depends on an input local file and you do not already have a confirmed existing path, the plan must first add steps to search for it and confirm the path exists before any tool step that uses that file.
 </plan_completeness_check>
