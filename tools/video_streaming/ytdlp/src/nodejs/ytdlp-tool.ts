@@ -33,11 +33,25 @@ const IGNORED_MEDIA_OUTPUT_EXTENSIONS = new Set([
 const LANGUAGE_CODE_SEPARATOR = ','
 const SUBTITLE_OUTPUT_TYPE = 'subtitle'
 const TYPED_OUTPUT_SEPARATOR = ':'
+const SUBTITLE_METADATA_LANGUAGE_FIELDS = [
+  'language',
+  'language_code',
+  'original_language'
+]
+const IGNORED_SUBTITLE_LANGUAGE_CODES = new Set(['live_chat'])
 
 interface OutputTarget {
   directoryPath: string
   outputTemplate: string
   predictedFilePath?: string
+}
+
+interface VideoMetadata {
+  language?: unknown
+  language_code?: unknown
+  original_language?: unknown
+  subtitles?: unknown
+  automatic_captions?: unknown
 }
 
 export default class YtdlpTool extends Tool {
@@ -194,6 +208,102 @@ export default class YtdlpTool extends Tool {
     return parsedPath
   }
 
+  private static asRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null
+    }
+
+    return value as Record<string, unknown>
+  }
+
+  private static getMetadataLanguageCodes(value: unknown): string[] {
+    const record = this.asRecord(value)
+    if (!record) {
+      return []
+    }
+
+    return Object.keys(record)
+      .map((languageCode) => languageCode.trim())
+      .filter((languageCode) =>
+        Boolean(languageCode) &&
+        !IGNORED_SUBTITLE_LANGUAGE_CODES.has(languageCode)
+      )
+  }
+
+  private static getVideoLanguageCandidates(metadata: VideoMetadata): string[] {
+    const languageCodes = SUBTITLE_METADATA_LANGUAGE_FIELDS
+      .map((field) => metadata[field as keyof VideoMetadata])
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean)
+
+    return [...new Set(languageCodes)]
+  }
+
+  private static selectMatchingLanguage(
+    requestedLanguageCode: string,
+    availableLanguageCodes: string[]
+  ): string | null {
+    const normalizedRequested = requestedLanguageCode.trim().toLowerCase()
+    if (!normalizedRequested) {
+      return null
+    }
+
+    return (
+      availableLanguageCodes.find((languageCode) => {
+        const normalizedLanguageCode = languageCode.toLowerCase()
+        return (
+          normalizedLanguageCode === normalizedRequested ||
+          normalizedLanguageCode.startsWith(`${normalizedRequested}-`) ||
+          normalizedRequested.startsWith(`${normalizedLanguageCode}-`)
+        )
+      }) || null
+    )
+  }
+
+  private static selectSubtitleLanguage(
+    metadata: VideoMetadata,
+    requestedLanguageCode?: string
+  ): string {
+    const subtitleLanguageCodes = this.getMetadataLanguageCodes(
+      metadata.subtitles
+    )
+    const automaticCaptionLanguageCodes = this.getMetadataLanguageCodes(
+      metadata.automatic_captions
+    )
+    const requested = requestedLanguageCode?.trim()
+
+    if (requested) {
+      return (
+        this.selectMatchingLanguage(requested, subtitleLanguageCodes) ||
+        this.selectMatchingLanguage(requested, automaticCaptionLanguageCodes) ||
+        requested
+      )
+    }
+
+    for (const languageCode of this.getVideoLanguageCandidates(metadata)) {
+      const matchingLanguageCode =
+        this.selectMatchingLanguage(languageCode, subtitleLanguageCodes) ||
+        this.selectMatchingLanguage(languageCode, automaticCaptionLanguageCodes)
+
+      if (matchingLanguageCode) {
+        return matchingLanguageCode
+      }
+    }
+
+    if (subtitleLanguageCodes.length > 0) {
+      return subtitleLanguageCodes[0]!
+    }
+
+    if (automaticCaptionLanguageCodes.length > 0) {
+      return automaticCaptionLanguageCodes[0]!
+    }
+
+    throw new Error(
+      'No subtitles or automatic captions are available for this video.'
+    )
+  }
+
   /**
    * Finds the newest file created or updated in the output directory.
    */
@@ -284,6 +394,19 @@ export default class YtdlpTool extends Tool {
     }
 
     throw new Error('yt-dlp completed but no subtitle file was created')
+  }
+
+  /**
+   * Loads video metadata to select the best available subtitle language.
+   */
+  private async getVideoMetadata(videoUrl: string): Promise<VideoMetadata> {
+    const output = await this.executeCommand({
+      binaryName: 'yt-dlp',
+      args: [...this.getConfigArgs(), videoUrl, '--dump-single-json', '--skip-download'],
+      options: { sync: true }
+    })
+
+    return JSON.parse(output.trim()) as VideoMetadata
   }
 
   /**
@@ -490,18 +613,22 @@ export default class YtdlpTool extends Tool {
    * Downloads the subtitles for a video.
    * @param videoUrl The URL of the video.
    * @param outputPath The directory to save the subtitle file in.
-   * @param languageCode The language code for the desired subtitles (e.g., 'en', 'es').
+   * @param languageCode Optional language code for the desired subtitles (e.g., 'en', 'fr').
    * @returns A promise that resolves with the file path of the downloaded subtitle file.
    */
   async downloadSubtitles(
     videoUrl: string,
     outputPath: string,
-    languageCode: string
+    languageCode?: string
   ): Promise<string> {
     try {
+      const resolvedLanguageCode = YtdlpTool.selectSubtitleLanguage(
+        await this.getVideoMetadata(videoUrl),
+        languageCode
+      )
       const target = YtdlpTool.resolveSubtitleOutputTarget(
         outputPath,
-        languageCode
+        resolvedLanguageCode
       )
       mkdirSync(target.directoryPath, { recursive: true })
 
@@ -513,7 +640,7 @@ export default class YtdlpTool extends Tool {
           '--write-subs',
           '--write-auto-subs',
           '--sub-langs',
-          languageCode,
+          resolvedLanguageCode,
           '--sub-format',
           SUBTITLE_FORMAT,
           '--convert-subs',
