@@ -175,6 +175,7 @@ A previous plan step failed. Your job is to decide the next best structured acti
 - Use only functions/tools listed in the catalog.
 - If recovery is possible, return steps that continue from now. Do not repeat already successful work unless needed.
 - Add discovery or verification steps when required to resolve missing or invalid inputs.
+- When recovering from a failed bash command, verify the executable's accepted arguments or environment before trying another command with nearby arguments.
 - Keep steps ordered, concrete, and minimal.
 - If an active Agent Skill is provided, keep recovery inside that skill's SKILL.md workflow before switching to generic overlapping tools.
 - If a listed Agent Skill is needed for a recovery step, set that step's "agent_skill_id" to the exact skill id. Otherwise omit it.

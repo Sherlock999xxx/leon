@@ -67,6 +67,8 @@ const TOOL_ARGUMENT_LLM_OPTIONS = {
   streamToProvider: false
 } satisfies LLMCallOptions
 
+const BASH_EXECUTE_FUNCTION = 'operating_system_control.bash.executeBashCommand'
+
 const TOOL_PREPARATION_STARTED_REPORT_KEYS = new Set([
   'bridges.tools.creating_bins_directory',
   'bridges.tools.binary_not_found',
@@ -1489,6 +1491,10 @@ async function executeFunctionWithNativeTools(
     }
 
     if (toolResult.execution.status === 'error') {
+      if (qualifiedName === BASH_EXECUTE_FUNCTION) {
+        return toolResult
+      }
+
       if (toolFailureRetries < MAX_TOOL_FAILURE_RETRIES) {
         toolFailureRetries += 1
         lastError = extractFailureMessageFromObservation(
@@ -1891,6 +1897,10 @@ async function executeFunctionWithJSONMode(
       }
 
       if (toolResult.execution.status === 'error') {
+        if (qualifiedName === BASH_EXECUTE_FUNCTION) {
+          return toolResult
+        }
+
         if (toolFailureRetries < MAX_TOOL_FAILURE_RETRIES) {
           toolFailureRetries += 1
           lastError = extractFailureMessageFromObservation(
