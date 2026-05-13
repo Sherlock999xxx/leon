@@ -9,6 +9,7 @@ const REQUIRED_SETTINGS: string[] = []
 
 interface BashResult {
   success: boolean
+  error?: string
   stdout: string
   stderr: string
   returncode: number
@@ -21,6 +22,13 @@ interface ExecuteOptions {
   timeoutUnit?: 'seconds' | 'milliseconds'
   timeoutRetries?: number
   captureOutput?: boolean
+}
+
+interface ProcessExecutionError extends Error {
+  stdout?: Buffer | string
+  stderr?: Buffer | string
+  status?: number
+  code?: number | string | null
 }
 
 const DEFAULT_TIMEOUT_SECONDS = 30
@@ -116,6 +124,7 @@ export default class BashTool extends Tool {
 
       return {
         success: false,
+        error: `Blocked unsafe bash command (${riskLevel} risk): This command may ${riskDescription}.`,
         stdout: '',
         stderr: `Blocked unsafe bash command (${riskLevel} risk): This command may ${riskDescription}.`,
         returncode: -1,
@@ -174,6 +183,7 @@ export default class BashTool extends Tool {
         }
       } catch (error: unknown) {
         const errorMessage = (error as Error).message
+        const processError = BashTool.readProcessError(error)
         const timedOut = BashTool.isTimeoutErrorMessage(errorMessage)
 
         if (timedOut && attempt < effectiveTimeoutRetries) {
@@ -182,28 +192,43 @@ export default class BashTool extends Tool {
         }
 
         if (timedOut) {
+          const timeoutMessage = `Command timed out after ${BashTool.formatTimeoutMs(timeoutMs)} (${attempt + 1} attempt${attempt === 0 ? '' : 's'})`
+
           return {
             success: false,
+            error: timeoutMessage,
             stdout: '',
-            stderr: `Command timed out after ${BashTool.formatTimeoutMs(timeoutMs)} (${attempt + 1} attempt${attempt === 0 ? '' : 's'})`,
+            stderr: timeoutMessage,
             returncode: -1,
             command
           }
         }
 
-        if (errorMessage.includes('failed with exit code')) {
+        if (
+          errorMessage.includes('failed with exit code') ||
+          processError.exitCode !== -1
+        ) {
           const exitCodeMatch = errorMessage.match(/exit code (\d+)/)
           const exitCode =
-            exitCodeMatch && exitCodeMatch[1]
-              ? parseInt(exitCodeMatch[1], 10)
-              : -1
+            processError.exitCode !== -1
+              ? processError.exitCode
+              : exitCodeMatch && exitCodeMatch[1]
+                ? parseInt(exitCodeMatch[1], 10)
+                : -1
           const stderrMatch = errorMessage.match(/exit code \d+: (.+)$/)
-          const stderr =
-            stderrMatch && stderrMatch[1] ? stderrMatch[1] : errorMessage
+          const stderr = processError.stderr ||
+            (stderrMatch && stderrMatch[1] ? stderrMatch[1] : errorMessage)
+          const failureOutput = BashTool.joinOutput([
+            processError.stdout,
+            stderr
+          ]) || errorMessage
 
           return {
             success: false,
-            stdout: '',
+            error: requiresVisibleTerminal
+              ? `Command failed in the visible terminal with exit code ${exitCode}. Review that terminal for details.`
+              : failureOutput,
+            stdout: processError.stdout,
             stderr: requiresVisibleTerminal
               ? `Command failed in the visible terminal with exit code ${exitCode}. Review that terminal for details.`
               : stderr,
@@ -214,8 +239,12 @@ export default class BashTool extends Tool {
 
         return {
           success: false,
-          stdout: '',
-          stderr: errorMessage,
+          error: BashTool.joinOutput([
+            processError.stdout,
+            processError.stderr
+          ]) || errorMessage,
+          stdout: processError.stdout,
+          stderr: processError.stderr || errorMessage,
           returncode: -1,
           command
         }
@@ -224,6 +253,7 @@ export default class BashTool extends Tool {
 
     return {
       success: false,
+      error: 'Command failed without an execution result.',
       stdout: '',
       stderr: 'Command failed without an execution result.',
       returncode: -1,
@@ -292,6 +322,41 @@ export default class BashTool extends Tool {
       normalizedErrorMessage.includes('timeout') ||
       normalizedErrorMessage.includes('etimedout')
     )
+  }
+
+  private static readProcessError(error: unknown): {
+    stdout: string
+    stderr: string
+    exitCode: number
+  } {
+    const processError = error as ProcessExecutionError
+    const exitCode =
+      typeof processError.status === 'number'
+        ? processError.status
+        : typeof processError.code === 'number'
+          ? processError.code
+          : -1
+
+    return {
+      stdout: BashTool.toOutputString(processError.stdout),
+      stderr: BashTool.toOutputString(processError.stderr),
+      exitCode
+    }
+  }
+
+  private static toOutputString(output?: Buffer | string): string {
+    if (!output) {
+      return ''
+    }
+
+    return output.toString().trim()
+  }
+
+  private static joinOutput(outputs: string[]): string {
+    return outputs
+      .map((output) => output.trim())
+      .filter((output) => output.length > 0)
+      .join('\n')
   }
 
   async isSafeCommand(command: string): Promise<boolean> {
