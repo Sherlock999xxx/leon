@@ -1944,12 +1944,15 @@ export class ReActLLMDuty extends LLMDuty {
 
   /**
    * Whether the current LLM provider supports native OpenAI-style tool calling.
-   * All remote providers support the OpenAI-compatible tools API.
-   * The local provider (node-llama-cpp) uses a different function calling
-   * mechanism and stays on grammar-based JSON mode.
+   * Local OpenAI-compatible servers can expose the tools API but still perform
+   * better on the grammar-based JSON path.
    */
   private get supportsNativeTools(): boolean {
-    return getLLMProviderName() !== LLMProviders.Local
+    return ![
+      LLMProviders.Local,
+      LLMProviders.LlamaCPP,
+      LLMProviders.SGLang
+    ].includes(getLLMProviderName())
   }
 
   /**
