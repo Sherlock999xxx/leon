@@ -27,7 +27,7 @@
               },
               "timeout": {
                 "type": "number",
-                "description": "Command timeout. Use seconds by default. Large legacy values such as 30000 or 60000 are interpreted as milliseconds unless timeoutUnit is provided."
+                "description": "Total allowed runtime. Use seconds by default. Set for commands likely to run longer than the default."
               },
               "timeoutUnit": {
                 "type": "string",
@@ -39,7 +39,7 @@
               },
               "timeoutRetries": {
                 "type": "number",
-                "description": "Number of timeout-only retries. Each retry doubles the previous timeout. Defaults to 2 and is capped internally."
+                "description": "Timeout-only retries. For expected long runs, prefer one realistic timeout with 0 retries."
               },
               "captureOutput": {
                 "type": "boolean"

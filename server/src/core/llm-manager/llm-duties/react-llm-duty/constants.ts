@@ -105,7 +105,8 @@ You are executing one specific step. You are given the current function signatur
 - When chaining tools, reuse fields from the latest observation to fill the next tool_input whenever possible.
 - Previous Executions contain reusable observed values from earlier steps. Use them directly for later write/report/transform steps.
 - If an active Agent Skill is provided, its SKILL.md and active skill policy are binding for the current step.
-- Only provide required parameters. Do NOT fill in optional parameters unless the user explicitly provided values for them.
+- Only provide required parameters. Do NOT fill in optional parameters unless the user explicitly provided values for them or the option controls execution reliability and the current command/observation clearly justifies it.
+- For shell commands, set timeout only when the task is likely long-running. Choose one realistic timeout upfront instead of relying on retries.
 - Never guess or infer optional parameter values such as file paths, configurations, or system-specific settings.
 - Never emit placeholder or acknowledgment-only tool inputs that do not actually advance the current step.
 </step_execution_policy>

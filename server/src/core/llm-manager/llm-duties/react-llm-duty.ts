@@ -46,6 +46,28 @@ function getLLMProviderName(): LLMProviders {
   return CONFIG_STATE.getModelState().getAgentProvider()
 }
 
+const RECOVERY_FAILURE_OBSERVATION_MAX_CHARS = 360
+
+function clipObservationForUser(value: string): string {
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= RECOVERY_FAILURE_OBSERVATION_MAX_CHARS) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, RECOVERY_FAILURE_OBSERVATION_MAX_CHARS - 3).trimEnd()}...`
+}
+
+function buildExecutionFailureDraft(execution: ExecutionRecord): string {
+  const observation = StringHelper.redactSecrets(
+    clipObservationForUser(execution.observation)
+  )
+  const statusText = execution.status === 'error'
+    ? `${execution.function} failed`
+    : `${execution.function} stopped making progress`
+
+  return `I couldn't complete the task because ${statusText}. Latest observation: ${observation || 'No detailed observation was returned.'}`
+}
+
 import {
   PLAN_SYSTEM_PROMPT,
   REACT_TEMPERATURE,
@@ -834,8 +856,7 @@ export class ReActLLMDuty extends LLMDuty {
           return await finalizeFromSignal({
             intent:
               stepResult.execution.status === 'error' ? 'error' : 'blocked',
-            draft:
-              'Execution stopped because the same tool result repeated without new progress. Summarize the repeated observation and explain the next concrete input or setup needed.',
+            draft: `${buildExecutionFailureDraft(stepResult.execution)} Execution stopped because the same tool result repeated without new progress.`,
             source: 'execution'
           })
         }
@@ -948,8 +969,7 @@ export class ReActLLMDuty extends LLMDuty {
 
             return await finalizeFromSignal({
               intent: 'error',
-              draft:
-                'The task failed after exhausting recovery attempts. Summarize the failed tool observation and what input or setup is needed next.',
+              draft: `${buildExecutionFailureDraft(stepResult.execution)} Recovery attempts were exhausted.`,
               source: 'recovery'
             })
           }
@@ -1106,8 +1126,7 @@ export class ReActLLMDuty extends LLMDuty {
 
           return await finalizeFromSignal({
             intent: 'error',
-            draft:
-              'The tool step failed and recovery could not find another executable path. Explain the failure from execution history and ask for the missing artifact or configuration needed to continue.',
+            draft: `${buildExecutionFailureDraft(stepResult.execution)} Recovery could not find another executable path.`,
             source: 'recovery'
           })
         }
@@ -2710,14 +2729,14 @@ export class ReActLLMDuty extends LLMDuty {
       return ''
     }
 
-    return JSON.stringify(
+    return StringHelper.redactSecrets(JSON.stringify(
       history.map((log) => ({
         who: log.who,
         message: log.message
       })),
       null,
       2
-    )
+    ))
   }
 
   private buildLogTitle(context?: string): string {
@@ -2771,10 +2790,10 @@ export class ReActLLMDuty extends LLMDuty {
       ]
       const sectionLines = [
         '--- SYSTEM_PROMPT ---',
-        params.systemPrompt,
+        StringHelper.redactSecrets(params.systemPrompt),
         '',
         '--- PHASE_INPUT ---',
-        params.prompt,
+        StringHelper.redactSecrets(params.prompt),
         ''
       ]
 
