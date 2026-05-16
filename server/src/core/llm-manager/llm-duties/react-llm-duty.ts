@@ -22,7 +22,8 @@ import {
   CONVERSATION_LOGGER,
   BRAIN,
   SOCKET_SERVER,
-  TOOL_CALL_LOGGER
+  TOOL_CALL_LOGGER,
+  POST_TURN_MAINTENANCE_QUEUE
 } from '@/core'
 import {
   LLMDuties,
@@ -471,17 +472,13 @@ export class ReActLLMDuty extends LLMDuty {
           ...item
         }))
         const dutyResult = this.makeDutyResult(finalAnswer)
-        try {
-          await this.maybeCompactHistoryAfterAnswer(
+        POST_TURN_MAINTENANCE_QUEUE.enqueue(
+          'react history compaction',
+          () => this.maybeCompactHistoryAfterAnswer(
             planWidgetIdValue,
             trackedSteps
           )
-        } catch (error) {
-          LogHelper.title(this.name)
-          LogHelper.warning(
-            `Post-answer history compaction failed: ${String(error)}`
-          )
-        }
+        )
         return dutyResult
       }
       const finalizeFromSignal = async (

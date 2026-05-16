@@ -27,7 +27,8 @@ import {
   LLM_PROVIDER,
   TOOL_CALL_LOGGER,
   SELF_MODEL_MANAGER,
-  PULSE_MANAGER
+  PULSE_MANAGER,
+  POST_TURN_MAINTENANCE_QUEUE
 } from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
 import Conversation from '@/core/nlp/conversation'
@@ -892,37 +893,36 @@ export default class NLU {
         LogHelper.title('NLU')
         LogHelper.warning(`Failed to store turn memory: ${error}`)
       })
-      void SELF_MODEL_MANAGER.observeTurn({
-        userMessage: utterance,
-        assistantMessage: String(output),
-        sentAt,
-        route: 'react',
-        finalIntent,
-        toolExecutions
-      }).catch((error: unknown) => {
-        LogHelper.title('NLU')
-        LogHelper.warning(`Failed to update self model: ${error}`)
-      })
-      void syncOwnerProfileFromTurn(
-        utterance,
-        String(output),
-        toolExecutions
-      ).catch((error: unknown) => {
-        LogHelper.title('NLU')
-        LogHelper.warning(`Failed to sync owner profile from turn: ${error}`)
-      })
-
-      if (!hasExplicitMemoryWrite) {
-        void MEMORY_MANAGER.savePersistentMemoryCandidatesFromTurn(
+      POST_TURN_MAINTENANCE_QUEUE.enqueue(
+        'react self-model reflection',
+        () => SELF_MODEL_MANAGER.observeTurn({
+          userMessage: utterance,
+          assistantMessage: String(output),
+          sentAt,
+          route: 'react',
+          finalIntent,
+          toolExecutions
+        })
+      )
+      POST_TURN_MAINTENANCE_QUEUE.enqueue(
+        'owner profile sync',
+        () => syncOwnerProfileFromTurn(
           utterance,
           String(output),
-          sentAt
-        ).catch((error: unknown) => {
-          LogHelper.title('NLU')
-          LogHelper.warning(
-            `Failed to save persistent memory candidates: ${error}`
+          toolExecutions
+        ).then(() => undefined)
+      )
+
+      if (!hasExplicitMemoryWrite) {
+        POST_TURN_MAINTENANCE_QUEUE.enqueue(
+          'persistent memory extraction',
+          () => MEMORY_MANAGER.savePersistentMemoryCandidatesFromTurn(
+            utterance,
+            String(output),
+            sentAt
           )
-        })
+            .then(() => undefined)
+        )
       } else {
         LogHelper.title('NLU')
         LogHelper.debug(
