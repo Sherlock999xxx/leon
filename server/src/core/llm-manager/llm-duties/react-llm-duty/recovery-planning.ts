@@ -5,7 +5,8 @@ import type { MessageLog } from '@/types'
 import {
   RECOVERY_PLAN_SYSTEM_PROMPT,
   DUTY_NAME,
-  REACT_FOCUSED_RECOVERY_MAX_TOKENS
+  REACT_FOCUSED_RECOVERY_MAX_TOKENS,
+  READ_TOOL_ARTIFACT_FUNCTION
 } from './constants'
 import type {
   Catalog,
@@ -260,6 +261,16 @@ export async function runRecoveryPlanningPhase(
   const agentSkillSection =
     activeAgentSkillSection || buildAgentSkillDiscoverySection(caller)
   const historySection = formatExecutionHistory(executionHistory)
+  const previousToolArtifacts =
+    (await caller.getPreviousToolArtifacts?.())?.trim() || ''
+  const previousToolArtifactsSection = previousToolArtifacts
+    ? `<previous_tool_artifacts>
+Use these exact outputLogPath values with ${READ_TOOL_ARTIFACT_FUNCTION} when a previous tool result is truncated or missing detail. Do not invent output file paths.
+${previousToolArtifacts}
+</previous_tool_artifacts>
+
+`
+    : ''
   const pendingStepsSection =
     pendingSteps.length > 0
       ? pendingSteps
@@ -285,7 +296,7 @@ ${catalog.text}${catalogNote}
 ${selfModelSection}
 </self_model>
 
-<grounding_note>
+${previousToolArtifactsSection}<grounding_note>
 Environment context is available through structured_knowledge.context tools when needed.
 </grounding_note>
 

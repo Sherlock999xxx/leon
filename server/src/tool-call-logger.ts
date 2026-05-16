@@ -354,12 +354,16 @@ export class ToolCallLogger {
     })
   }
 
-  public async recordToolOutput(input: ToolOutputLogInput): Promise<void> {
+  public async recordToolOutput(
+    input: ToolOutputLogInput
+  ): Promise<string | null> {
     const outputLogPath = await this.queueToolOutputPersist(input)
 
     if (outputLogPath) {
       this.attachToolOutputToActiveRecord(input, outputLogPath)
     }
+
+    return outputLogPath
   }
 
   public async getRecentArtifactManifest(): Promise<string> {

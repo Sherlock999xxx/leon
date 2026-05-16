@@ -19,7 +19,8 @@ import {
   EXECUTE_SYSTEM_PROMPT,
   MAX_RETRIES_PER_FUNCTION,
   MAX_TOOL_FAILURE_RETRIES,
-  DUTY_NAME
+  DUTY_NAME,
+  READ_TOOL_ARTIFACT_FUNCTION
 } from './constants'
 import type {
   PlanStep,
@@ -74,9 +75,6 @@ const SHELL_REPAIR_MAX_TOKENS = 512
 const MAX_SHELL_REPAIR_ATTEMPTS = 1
 
 const SHELL_EXECUTE_FUNCTION = 'operating_system_control.shell.executeCommand'
-const READ_TOOL_ARTIFACT_FUNCTION =
-  'operating_system_control.file.readToolArtifact'
-
 interface ShellCommandProbe {
   executable: string
   hasOptions: boolean
@@ -119,18 +117,13 @@ async function buildExecutionMemorySection(
 }
 
 async function buildPreviousToolArtifactsExecutionSection(
-  caller: LLMCaller,
-  qualifiedName: string
+  caller: LLMCaller
 ): Promise<string> {
-  if (qualifiedName !== READ_TOOL_ARTIFACT_FUNCTION) {
-    return ''
-  }
-
   const previousToolArtifacts =
     (await caller.getPreviousToolArtifacts?.())?.trim() || ''
 
   return previousToolArtifacts
-    ? `\n\n<previous_tool_artifacts>\n${previousToolArtifacts}\n</previous_tool_artifacts>`
+    ? `\n\n<previous_tool_artifacts>\nUse these exact outputLogPath values with ${READ_TOOL_ARTIFACT_FUNCTION} when a previous tool result is truncated or missing detail. Do not invent output file paths.\n${previousToolArtifacts}\n</previous_tool_artifacts>`
     : ''
 }
 
@@ -1409,6 +1402,8 @@ async function resolveToolFunctionWithNativeTools(
     caller,
     toolkitId
   )
+  const previousToolArtifactsSection =
+    await buildPreviousToolArtifactsExecutionSection(caller)
   const contextManifestSection = buildExecutionContextManifestSection(
     caller,
     toolkitId,
@@ -1433,7 +1428,7 @@ async function resolveToolFunctionWithNativeTools(
     })
   )
 
-  const prompt = `<tool>\n${toolkitId}.${toolId}\n</tool>\n\n<current_plan_step>\n${stepLabel}\n</current_plan_step>\n\n${activeAgentSkillSection ? `${activeAgentSkillSection}\n\n` : ''}${toolkitContextSection}${contextManifestSection ? `\n\n${contextManifestSection}` : ''}\n\n${executionMemorySection}\n\n<execution_history>\n${historySection}\n</execution_history>\n\n<user_request>\n${caller.input}\n</user_request>\n\n<task>\nSelect the appropriate function for the current plan step and provide arguments.\n</task>`
+  const prompt = `<tool>\n${toolkitId}.${toolId}\n</tool>\n\n<current_plan_step>\n${stepLabel}\n</current_plan_step>\n\n${activeAgentSkillSection ? `${activeAgentSkillSection}\n\n` : ''}${toolkitContextSection}${contextManifestSection ? `\n\n${contextManifestSection}` : ''}\n\n${executionMemorySection}${previousToolArtifactsSection}\n\n<execution_history>\n${historySection}\n</execution_history>\n\n<user_request>\n${caller.input}\n</user_request>\n\n<task>\nSelect the appropriate function for the current plan step and provide arguments.\n</task>`
 
   const result = await caller.callLLMWithTools(
     prompt,
@@ -1602,6 +1597,8 @@ async function resolveToolFunctionWithJSONMode(
     caller,
     effectiveToolkitId
   )
+  const previousToolArtifactsSection =
+    await buildPreviousToolArtifactsExecutionSection(caller)
   const contextManifestSection = buildExecutionContextManifestSection(
     caller,
     effectiveToolkitId,
@@ -1621,7 +1618,7 @@ async function resolveToolFunctionWithJSONMode(
     RESOLVE_FUNCTION_SYSTEM_PROMPT,
     'execution'
   )
-  const prompt = `<tool>\n${effectiveToolkitId}.${effectiveToolId}\n</tool>\n\n<current_plan_step>\n${stepLabel}\n</current_plan_step>\n\n${activeAgentSkillSection ? `${activeAgentSkillSection}\n\n` : ''}${toolkitContextSection}${contextManifestSection ? `\n\n${contextManifestSection}` : ''}\n\n${executionMemorySection}\n\n<available_functions>\n${functionsSection}\n</available_functions>\n\n<execution_history>\n${historySection}\n</execution_history>\n\n<user_request>\n${caller.input}\n</user_request>\n\n<task>\nSelect the appropriate function for the current plan step and provide tool_input.\n</task>`
+  const prompt = `<tool>\n${effectiveToolkitId}.${effectiveToolId}\n</tool>\n\n<current_plan_step>\n${stepLabel}\n</current_plan_step>\n\n${activeAgentSkillSection ? `${activeAgentSkillSection}\n\n` : ''}${toolkitContextSection}${contextManifestSection ? `\n\n${contextManifestSection}` : ''}\n\n${executionMemorySection}${previousToolArtifactsSection}\n\n<available_functions>\n${functionsSection}\n</available_functions>\n\n<execution_history>\n${historySection}\n</execution_history>\n\n<user_request>\n${caller.input}\n</user_request>\n\n<task>\nSelect the appropriate function for the current plan step and provide tool_input.\n</task>`
 
   const resolveSchema = {
     type: 'object',
@@ -1868,7 +1865,7 @@ async function executeFunctionWithNativeTools(
     'execution'
   )
   const previousToolArtifactsSection =
-    await buildPreviousToolArtifactsExecutionSection(caller, qualifiedName)
+    await buildPreviousToolArtifactsExecutionSection(caller)
 
   const tool: OpenAITool = {
     type: 'function',
@@ -2217,7 +2214,7 @@ async function executeFunctionWithJSONMode(
     'execution'
   )
   const previousToolArtifactsSection =
-    await buildPreviousToolArtifactsExecutionSection(caller, qualifiedName)
+    await buildPreviousToolArtifactsExecutionSection(caller)
 
   const executeSchema = {
     type: 'object',
@@ -2734,6 +2731,10 @@ export async function runToolExecution(
 
   const toolExecutionResult =
     await TOOL_EXECUTOR.executeTool(toolExecutionInput)
+  const outputLogPath =
+    typeof toolExecutionResult.data?.output_log_path === 'string'
+      ? toolExecutionResult.data.output_log_path
+      : null
   const toolOutput = toolExecutionResult.data?.output || {}
   const nestedResult = asRecord(toolOutput['result'])
   const toolOutputSuccess = toolOutput['success']
@@ -2850,6 +2851,7 @@ export async function runToolExecution(
     ...(effectiveStatus !== toolExecutionResult.status
       ? { raw_status: toolExecutionResult.status }
       : {}),
+    ...(outputLogPath ? { output_log_path: outputLogPath } : {}),
     message: effectiveMessage,
     data: toolExecutionResult.data,
     ...(hasObservedToolFailure

@@ -11,6 +11,8 @@ type ExecutionHistoryFormatMode = 'compact' | 'complete'
 
 const COMPACT_EXECUTION_HISTORY_MAX_DETAILED_STEPS = 6
 const STRUCTURED_SUMMARY_PRIORITIES = [
+  'output_log_path',
+  'outputLogPath',
   'content',
   'snippet',
   'text',
@@ -289,6 +291,10 @@ function formatObservationSummary(
     typeof parsed['status'] === 'string' ? parsed['status'].trim() : ''
   const message =
     typeof parsed['message'] === 'string' ? clipText(parsed['message'], 160) : ''
+  const outputLogPath =
+    typeof parsed['output_log_path'] === 'string'
+      ? parsed['output_log_path'].trim()
+      : ''
 
   if (status) {
     parts.push(status)
@@ -296,6 +302,10 @@ function formatObservationSummary(
 
   if (message) {
     parts.push(message)
+  }
+
+  if (outputLogPath) {
+    parts.push(`outputLogPath=${outputLogPath}`)
   }
 
   const toolFailure =
