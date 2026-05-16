@@ -15,6 +15,15 @@ interface ShellResult {
   stderr: string
   returncode: number
   command: string
+  attempts: ShellAttempt[]
+}
+
+interface ShellAttempt {
+  attempt: number
+  timeoutMs: number
+  durationMs: number
+  status: 'success' | 'timeout' | 'error'
+  error?: string
 }
 
 interface ExecuteOptions {
@@ -158,15 +167,18 @@ export default class ShellTool extends Tool {
         stdout: '',
         stderr: `Blocked unsafe shell command (${riskLevel} risk): This command may ${riskDescription}.`,
         returncode: -1,
-        command
+        command,
+        attempts: []
       }
     }
 
     const requiresVisibleTerminal = this.requiresVisibleTerminal(analyzedCommand)
     const effectiveTimeoutRetries = requiresVisibleTerminal ? 0 : timeoutRetries
     let timeoutMs = initialTimeoutMs
+    const attempts: ShellAttempt[] = []
 
     for (let attempt = 0; attempt <= effectiveTimeoutRetries; attempt += 1) {
+      const attemptStartedAt = Date.now()
       try {
         if (requiresVisibleTerminal) {
           await this.report('bridges.tools.command_requires_terminal_auth')
@@ -182,6 +194,12 @@ export default class ShellTool extends Tool {
             },
             skipBinaryDownload: true
           })
+          attempts.push({
+            attempt: attempt + 1,
+            timeoutMs,
+            durationMs: Date.now() - attemptStartedAt,
+            status: 'success'
+          })
 
           return {
             success: true,
@@ -189,7 +207,8 @@ export default class ShellTool extends Tool {
               'Command executed in a visible terminal. Review that terminal for command output.',
             stderr: '',
             returncode: 0,
-            command
+            command,
+            attempts
           }
         }
 
@@ -203,20 +222,35 @@ export default class ShellTool extends Tool {
           },
           skipBinaryDownload: true
         })
+        attempts.push({
+          attempt: attempt + 1,
+          timeoutMs,
+          durationMs: Date.now() - attemptStartedAt,
+          status: 'success'
+        })
 
         return {
           success: true,
           stdout: resultOutput.trim(),
           stderr: '',
           returncode: 0,
-          command
+          command,
+          attempts
         }
       } catch (error: unknown) {
         const errorMessage = (error as Error).message
         const processError = ShellTool.readProcessError(error)
         const timedOut = ShellTool.isTimeoutErrorMessage(errorMessage)
+        const durationMs = Date.now() - attemptStartedAt
 
         if (timedOut && attempt < effectiveTimeoutRetries) {
+          attempts.push({
+            attempt: attempt + 1,
+            timeoutMs,
+            durationMs,
+            status: 'timeout',
+            error: `Command timed out after ${ShellTool.formatTimeoutMs(timeoutMs)}`
+          })
           timeoutMs *= TIMEOUT_RETRY_MULTIPLIER
           continue
         }
@@ -230,7 +264,17 @@ export default class ShellTool extends Tool {
             stdout: '',
             stderr: timeoutMessage,
             returncode: -1,
-            command
+            command,
+            attempts: [
+              ...attempts,
+              {
+                attempt: attempt + 1,
+                timeoutMs,
+                durationMs,
+                status: 'timeout',
+                error: timeoutMessage
+              }
+            ]
           }
         }
 
@@ -252,6 +296,13 @@ export default class ShellTool extends Tool {
             processError.stdout,
             stderr
           ]) || errorMessage
+          attempts.push({
+            attempt: attempt + 1,
+            timeoutMs,
+            durationMs,
+            status: 'error',
+            error: failureOutput
+          })
 
           return {
             success: false,
@@ -263,20 +314,31 @@ export default class ShellTool extends Tool {
               ? `Command failed in the visible terminal with exit code ${exitCode}. Review that terminal for details.`
               : stderr,
             returncode: exitCode,
-            command
+            command,
+            attempts
           }
         }
 
+        const failureOutput = ShellTool.joinOutput([
+          processError.stdout,
+          processError.stderr
+        ]) || errorMessage
+        attempts.push({
+          attempt: attempt + 1,
+          timeoutMs,
+          durationMs,
+          status: 'error',
+          error: failureOutput
+        })
+
         return {
           success: false,
-          error: ShellTool.joinOutput([
-            processError.stdout,
-            processError.stderr
-          ]) || errorMessage,
+          error: failureOutput,
           stdout: processError.stdout,
           stderr: processError.stderr || errorMessage,
           returncode: -1,
-          command
+          command,
+          attempts
         }
       }
     }
@@ -287,7 +349,8 @@ export default class ShellTool extends Tool {
       stdout: '',
       stderr: 'Command failed without an execution result.',
       returncode: -1,
-      command
+      command,
+      attempts
     }
   }
 
