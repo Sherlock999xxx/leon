@@ -2130,6 +2130,30 @@ export class ReActLLMDuty extends LLMDuty {
       result = await LLM_PROVIDER.prompt(prompt, completionParams)
     }
 
+    if (
+      result &&
+      isLocalAgentProvider() &&
+      shouldStream &&
+      shouldEmitReasoning &&
+      typeof result.output === 'string'
+    ) {
+      this.logTitle(phase)
+      LogHelper.debug(
+        'Retrying local structured completion with thinking disabled after non-JSON streamed output.'
+      )
+      const retryCompletionParams = {
+        ...completionParams
+      }
+      delete retryCompletionParams.onReasoningToken
+
+      result = await LLM_PROVIDER.prompt(prompt, {
+        ...retryCompletionParams,
+        shouldStream: false,
+        reasoningMode: 'off',
+        disableThinking: true
+      })
+    }
+
     if (result) {
       const completionEndedAt = Date.now()
       this.observeCompletionMetrics({
