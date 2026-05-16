@@ -47,7 +47,7 @@ TERMINAL_AUTH_COMMANDS = set(ELEVATED_COMMAND_TOKENS)
 TERMINAL_AUTH_WRAPPERS = {"env", "command", "builtin", "nohup", "time"}
 
 
-class BashTool(BaseTool):
+class ShellTool(BaseTool):
     TOOLKIT = "operating_system_control"
 
     def __init__(self):
@@ -61,7 +61,7 @@ class BashTool(BaseTool):
 
     @property
     def tool_name(self) -> str:
-        return "bash"
+        return "shell"
 
     @property
     def toolkit(self) -> str:
@@ -71,7 +71,7 @@ class BashTool(BaseTool):
     def description(self) -> str:
         return self.config["description"]
 
-    def execute_bash_command(
+    def execute_command(
         self,
         command: str,
         cwd: Optional[str] = None,
@@ -89,11 +89,12 @@ class BashTool(BaseTool):
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"Blocked unsafe bash command ({risk_level} risk): This command may {risk_description}.",
+                "stderr": f"Blocked unsafe shell command ({risk_level} risk): This command may {risk_description}.",
                 "returncode": -1,
                 "command": command,
             }
 
+        binary_name, args = self._get_shell_invocation(command)
         requires_visible_terminal = self._requires_visible_terminal(analyzed_command)
         timeout_seconds = self._normalize_timeout_seconds(timeout, timeout_unit)
         timeout_retry_count = self._normalize_timeout_retries(timeout_retries)
@@ -104,10 +105,10 @@ class BashTool(BaseTool):
                 if requires_visible_terminal:
                     self.report("bridges.tools.command_requires_terminal_auth")
 
-                    self.execute_command(
+                    super().execute_command(
                         ExecuteCommandOptions(
-                            binary_name="bash",
-                            args=["-c", command],
+                            binary_name=binary_name,
+                            args=args,
                             options={
                                 "open_in_terminal": True,
                                 "wait_for_exit": True,
@@ -126,10 +127,10 @@ class BashTool(BaseTool):
                         "command": command,
                     }
 
-                result_output = self.execute_command(
+                result_output = super().execute_command(
                     ExecuteCommandOptions(
-                        binary_name="bash",
-                        args=["-c", command],
+                        binary_name=binary_name,
+                        args=args,
                         options={
                             "sync": True,
                             "cwd": cwd or os.getcwd(),
@@ -203,6 +204,37 @@ class BashTool(BaseTool):
             "returncode": -1,
             "command": command,
         }
+
+    @staticmethod
+    def _get_shell_invocation(command: str) -> tuple[str, List[str]]:
+        if os.name == "nt":
+            trimmed_command = command.strip()
+            if trimmed_command.lower().endswith(".ps1") and not any(
+                char.isspace() for char in trimmed_command
+            ):
+                return (
+                    "powershell.exe",
+                    [
+                        "-NoProfile",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-File",
+                        trimmed_command,
+                    ],
+                )
+
+            return (
+                "powershell.exe",
+                [
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    command,
+                ],
+            )
+
+        return "bash", ["-c", command]
 
     @staticmethod
     def _normalize_timeout_seconds(

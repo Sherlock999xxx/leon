@@ -291,12 +291,12 @@ describe('agent e2e', () => {
           turn3!.executionHistory.some(
             (item) =>
               item.function ===
-              'operating_system_control.bash.executeBashCommand'
+              'operating_system_control.shell.executeCommand'
           ) ||
             turn3!.toolCalls.some(
               (item) =>
                 item.toolkitId === 'operating_system_control' &&
-                item.toolId === 'bash'
+                item.toolId === 'shell'
             )
         ).toBe(true)
         expect(turn3Trace).toContain(result.assetPath!)

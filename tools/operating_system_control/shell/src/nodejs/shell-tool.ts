@@ -3,11 +3,12 @@ import path from 'node:path'
 
 import { Tool } from '@sdk/base-tool'
 import { ToolkitConfig } from '@sdk/toolkit-config'
+import { isWindows } from '@sdk/utils'
 
 const DEFAULT_SETTINGS: Record<string, unknown> = {}
 const REQUIRED_SETTINGS: string[] = []
 
-interface BashResult {
+interface ShellResult {
   success: boolean
   error?: string
   stdout: string
@@ -31,6 +32,11 @@ interface ProcessExecutionError extends Error {
   code?: number | string | null
 }
 
+interface ShellInvocation {
+  binaryName: string
+  args: string[]
+}
+
 const DEFAULT_TIMEOUT_SECONDS = 30
 const TIMEOUT_MILLISECONDS_INPUT_THRESHOLD = 10_000
 const DEFAULT_TIMEOUT_RETRIES = 2
@@ -48,6 +54,10 @@ const CRITICAL_COMMAND_TOKENS = ['mkfs', 'format', 'fdisk'] as const
 const HIGH_RISK_DD_TOKENS = ['dd'] as const
 const HIGH_RISK_EVAL_DOWNLOAD_TOKENS = ['curl', 'wget'] as const
 const ELEVATED_COMMAND_TOKENS = ['sudo', 'doas', 'pkexec', 'su'] as const
+const POWERSHELL_ELEVATED_COMMAND_TOKENS = [
+  'start-process',
+  'runas'
+] as const
 const PERMISSION_COMMAND_TOKENS = ['chmod', 'chown'] as const
 const PACKAGE_MANAGER_COMMAND_TOKENS = [
   'apt',
@@ -62,10 +72,29 @@ const MEDIUM_RISK_COMMAND_PATTERNS: string[] = []
 
 const UNSAFE_COMMAND_PATTERNS = [
   'fork()',
-  'while true; do'
+  'while true; do',
+  'while ($true)'
 ]
 
-const TERMINAL_AUTH_COMMANDS = new Set<string>(ELEVATED_COMMAND_TOKENS)
+const POWERSHELL_HIGH_RISK_COMMAND_TOKENS = [
+  'invoke-expression',
+  'iex',
+  'set-executionpolicy',
+  'stop-computer',
+  'restart-computer'
+] as const
+const POWERSHELL_DESTRUCTIVE_COMMAND_TOKENS = [
+  'remove-item',
+  'del',
+  'erase',
+  'rmdir',
+  'rd'
+] as const
+
+const TERMINAL_AUTH_COMMANDS = new Set<string>([
+  ...ELEVATED_COMMAND_TOKENS,
+  ...POWERSHELL_ELEVATED_COMMAND_TOKENS
+])
 const TERMINAL_AUTH_WRAPPERS = new Set<string>([
   'env',
   'command',
@@ -74,15 +103,15 @@ const TERMINAL_AUTH_WRAPPERS = new Set<string>([
   'time'
 ])
 
-export default class BashTool extends Tool {
+export default class ShellTool extends Tool {
   private static readonly TOOLKIT = 'operating_system_control'
   private readonly config: ReturnType<typeof ToolkitConfig.load>
 
   constructor() {
     super()
-    this.config = ToolkitConfig.load(BashTool.TOOLKIT, this.toolName)
+    this.config = ToolkitConfig.load(ShellTool.TOOLKIT, this.toolName)
     const toolSettings = ToolkitConfig.loadToolSettings(
-      BashTool.TOOLKIT,
+      ShellTool.TOOLKIT,
       this.toolName,
       DEFAULT_SETTINGS
     )
@@ -92,29 +121,30 @@ export default class BashTool extends Tool {
   }
 
   get toolName(): string {
-    return 'bash'
+    return 'shell'
   }
 
   get toolkit(): string {
-    return BashTool.TOOLKIT
+    return ShellTool.TOOLKIT
   }
 
   get description(): string {
     return this.config['description']
   }
 
-  async executeBashCommand(
+  async executeCommand(
     command: string,
     options: ExecuteOptions = {}
-  ): Promise<BashResult> {
+  ): Promise<ShellResult> {
     const { cwd = process.cwd() } = options
-    const initialTimeoutMs = BashTool.normalizeTimeoutMs(
+    const initialTimeoutMs = ShellTool.normalizeTimeoutMs(
       options.timeout,
       options.timeoutUnit
     )
-    const timeoutRetries = BashTool.normalizeTimeoutRetries(
+    const timeoutRetries = ShellTool.normalizeTimeoutRetries(
       options.timeoutRetries
     )
+    const shellInvocation = ShellTool.getShellInvocation(command)
     const analyzedCommand = await this.resolveCommandForSafetyAnalysis(command)
     const isSafe = await this.isSafeCommand(analyzedCommand)
 
@@ -124,9 +154,9 @@ export default class BashTool extends Tool {
 
       return {
         success: false,
-        error: `Blocked unsafe bash command (${riskLevel} risk): This command may ${riskDescription}.`,
+        error: `Blocked unsafe shell command (${riskLevel} risk): This command may ${riskDescription}.`,
         stdout: '',
-        stderr: `Blocked unsafe bash command (${riskLevel} risk): This command may ${riskDescription}.`,
+        stderr: `Blocked unsafe shell command (${riskLevel} risk): This command may ${riskDescription}.`,
         returncode: -1,
         command
       }
@@ -141,9 +171,9 @@ export default class BashTool extends Tool {
         if (requiresVisibleTerminal) {
           await this.report('bridges.tools.command_requires_terminal_auth')
 
-          await this.executeCommand({
-            binaryName: 'bash',
-            args: ['-c', command],
+          await super.executeCommand({
+            binaryName: shellInvocation.binaryName,
+            args: shellInvocation.args,
             options: {
               openInTerminal: true,
               waitForExit: true,
@@ -163,9 +193,9 @@ export default class BashTool extends Tool {
           }
         }
 
-        const resultOutput = await this.executeCommand({
-          binaryName: 'bash',
-          args: ['-c', command],
+        const resultOutput = await super.executeCommand({
+          binaryName: shellInvocation.binaryName,
+          args: shellInvocation.args,
           options: {
             sync: true,
             cwd,
@@ -183,8 +213,8 @@ export default class BashTool extends Tool {
         }
       } catch (error: unknown) {
         const errorMessage = (error as Error).message
-        const processError = BashTool.readProcessError(error)
-        const timedOut = BashTool.isTimeoutErrorMessage(errorMessage)
+        const processError = ShellTool.readProcessError(error)
+        const timedOut = ShellTool.isTimeoutErrorMessage(errorMessage)
 
         if (timedOut && attempt < effectiveTimeoutRetries) {
           timeoutMs *= TIMEOUT_RETRY_MULTIPLIER
@@ -192,7 +222,7 @@ export default class BashTool extends Tool {
         }
 
         if (timedOut) {
-          const timeoutMessage = `Command timed out after ${BashTool.formatTimeoutMs(timeoutMs)} (${attempt + 1} attempt${attempt === 0 ? '' : 's'})`
+          const timeoutMessage = `Command timed out after ${ShellTool.formatTimeoutMs(timeoutMs)} (${attempt + 1} attempt${attempt === 0 ? '' : 's'})`
 
           return {
             success: false,
@@ -218,7 +248,7 @@ export default class BashTool extends Tool {
           const stderrMatch = errorMessage.match(/exit code \d+: (.+)$/)
           const stderr = processError.stderr ||
             (stderrMatch && stderrMatch[1] ? stderrMatch[1] : errorMessage)
-          const failureOutput = BashTool.joinOutput([
+          const failureOutput = ShellTool.joinOutput([
             processError.stdout,
             stderr
           ]) || errorMessage
@@ -239,7 +269,7 @@ export default class BashTool extends Tool {
 
         return {
           success: false,
-          error: BashTool.joinOutput([
+          error: ShellTool.joinOutput([
             processError.stdout,
             processError.stderr
           ]) || errorMessage,
@@ -258,6 +288,43 @@ export default class BashTool extends Tool {
       stderr: 'Command failed without an execution result.',
       returncode: -1,
       command
+    }
+  }
+
+  private static getShellInvocation(command: string): ShellInvocation {
+    if (isWindows()) {
+      const trimmedCommand = command.trim()
+      if (
+        trimmedCommand.toLowerCase().endsWith('.ps1') &&
+        !/\s/.test(trimmedCommand)
+      ) {
+        return {
+          binaryName: 'powershell.exe',
+          args: [
+            '-NoProfile',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            trimmedCommand
+          ]
+        }
+      }
+
+      return {
+        binaryName: 'powershell.exe',
+        args: [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          command
+        ]
+      }
+    }
+
+    return {
+      binaryName: 'bash',
+      args: ['-c', command]
     }
   }
 
@@ -338,8 +405,8 @@ export default class BashTool extends Tool {
           : -1
 
     return {
-      stdout: BashTool.toOutputString(processError.stdout),
-      stderr: BashTool.toOutputString(processError.stderr),
+      stdout: ShellTool.toOutputString(processError.stdout),
+      stderr: ShellTool.toOutputString(processError.stderr),
       exitCode
     }
   }
@@ -372,6 +439,8 @@ export default class BashTool extends Tool {
     if (
       this.hasAnyTokenSequence(tokens, CRITICAL_COMMAND_SEQUENCES) ||
       this.hasCommandToken(tokens, CRITICAL_COMMAND_TOKENS) ||
+      this.hasCommandToken(tokens, POWERSHELL_HIGH_RISK_COMMAND_TOKENS) ||
+      this.hasDangerousPowerShellRemovePattern(tokens) ||
       this.hasDangerousDdPattern(tokens) ||
       this.hasEvalDownloadPattern(tokens)
     ) {
@@ -393,13 +462,15 @@ export default class BashTool extends Tool {
 
     if (
       this.hasAnyTokenSequence(tokens, CRITICAL_COMMAND_SEQUENCES) ||
-      this.hasCommandToken(tokens, CRITICAL_COMMAND_TOKENS)
+      this.hasCommandToken(tokens, CRITICAL_COMMAND_TOKENS) ||
+      this.hasDangerousPowerShellRemovePattern(tokens)
     ) {
       riskLevel = 'critical'
     }
 
     if (riskLevel === 'low') {
       if (
+        this.hasCommandToken(tokens, POWERSHELL_HIGH_RISK_COMMAND_TOKENS) ||
         this.hasDangerousDdPattern(tokens) ||
         this.hasEvalDownloadPattern(tokens)
       ) {
@@ -430,10 +501,19 @@ export default class BashTool extends Tool {
 
     if (this.hasCommandToken(tokens, ['rm'])) {
       return 'delete files or directories permanently'
-    } else if (this.hasCommandToken(tokens, ELEVATED_COMMAND_TOKENS)) {
+    } else if (
+      this.hasCommandToken(tokens, [
+        ...ELEVATED_COMMAND_TOKENS,
+        ...POWERSHELL_ELEVATED_COMMAND_TOKENS
+      ])
+    ) {
       return 'make system-level changes with elevated privileges'
-    } else if (this.hasCommandToken(tokens, ['kill'])) {
+    } else if (
+      this.hasCommandToken(tokens, ['kill', 'stop-process'])
+    ) {
       return 'terminate running processes'
+    } else if (this.hasDangerousPowerShellRemovePattern(tokens)) {
+      return 'delete files or directories recursively'
     } else if (this.hasCommandToken(tokens, PERMISSION_COMMAND_TOKENS)) {
       return 'change file permissions or ownership'
     } else if (
@@ -484,7 +564,10 @@ export default class BashTool extends Tool {
     const downloadsRemoteContent =
       this.hasCommandToken(this.tokenizeCommand(commandLower), ['curl', 'wget'])
     const pipesToShell =
-      commandLower.includes('| bash') || commandLower.includes('| sh')
+      commandLower.includes('| bash') ||
+      commandLower.includes('| sh') ||
+      commandLower.includes('| iex') ||
+      commandLower.includes('| invoke-expression')
 
     return downloadsRemoteContent && pipesToShell
   }
@@ -580,6 +663,16 @@ export default class BashTool extends Tool {
     })
   }
 
+  private hasDangerousPowerShellRemovePattern(tokens: string[]): boolean {
+    if (!this.hasCommandToken(tokens, POWERSHELL_DESTRUCTIVE_COMMAND_TOKENS)) {
+      return false
+    }
+
+    return tokens.some((token) =>
+      ['-recurse', '-r', '/s'].includes(token)
+    )
+  }
+
   private hasDangerousDdPattern(tokens: string[]): boolean {
     if (!this.hasCommandToken(tokens, HIGH_RISK_DD_TOKENS)) {
       return false
@@ -611,6 +704,10 @@ export default class BashTool extends Tool {
     const strippedToken = token.replace(/^[([{]+|[)\]}]+$/g, '')
     if (strippedToken.includes('/')) {
       return strippedToken.split('/').pop() || strippedToken
+    }
+
+    if (strippedToken.includes('\\')) {
+      return strippedToken.split('\\').pop() || strippedToken
     }
 
     return strippedToken

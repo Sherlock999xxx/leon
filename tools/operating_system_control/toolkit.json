@@ -12,7 +12,7 @@
     "STORAGE.md"
   ],
   "tools": [
-    "bash",
+    "shell",
     "file"
   ]
 }
