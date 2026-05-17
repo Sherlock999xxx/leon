@@ -130,7 +130,7 @@ ${REACT_EXECUTION_DISCIPLINE}
 - Previous Executions contain reusable observed values from earlier steps. Use them directly for later write/report/transform steps.
 - If an active Agent Skill is provided, its SKILL.md and active skill policy are binding for the current step.
 - Only provide required parameters. Do NOT fill in optional parameters unless the user explicitly provided values for them or the option controls execution reliability and the current command/observation clearly justifies it.
-- If the current tool input depends on uncertain external syntax, verify it with an authoritative source or local help before executing.
+- If the current tool input depends on uncertain external command syntax, verify it with an authoritative source or local help before executing. Do not verify routine shell syntax, shell builtins, or common commands/runtimes you are expected to know; use local help for unfamiliar third-party binaries or genuinely uncertain nonstandard usage.
 - For shell commands expected to run for a long time, set options.longRunning=true. Do not choose numeric timeout values.
 - Never guess or infer optional parameter values such as file paths, configurations, or system-specific settings.
 - Never emit placeholder or acknowledgment-only tool inputs that do not actually advance the current step.
