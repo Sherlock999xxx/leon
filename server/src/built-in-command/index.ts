@@ -1,9 +1,9 @@
 import { BuiltInCommandManager } from '@/built-in-command/built-in-command-manager'
-import { ConfigCommand } from '@/built-in-command/commands/config-command/config-command'
 import { DownloadCommand } from '@/built-in-command/commands/download-command/download-command'
 import { HelpCommand } from '@/built-in-command/commands/help-command/help-command'
 import { ModelCommand } from '@/built-in-command/commands/model-command/model-command'
 import { MoodCommand } from '@/built-in-command/commands/mood-command/mood-command'
+import { OpenCommand } from '@/built-in-command/commands/open-command/open-command'
 import { RoutingCommand } from '@/built-in-command/commands/routing-command/routing-command'
 import { SessionCommand } from '@/built-in-command/commands/session-command/session-command'
 import { SkillCommand } from '@/built-in-command/commands/skill-command/skill-command'
@@ -13,7 +13,7 @@ import { ToolCommand } from '@/built-in-command/commands/tool-command/tool-comma
 
 const WHITELISTED_BUILT_IN_COMMAND_NAMES = [
   'status',
-  'config',
+  'open',
   'routing',
   'help',
   'download',
@@ -27,7 +27,7 @@ const WHITELISTED_BUILT_IN_COMMAND_NAMES = [
 
 const BUILT_IN_COMMANDS = [
   new StatusCommand(),
-  new ConfigCommand(),
+  new OpenCommand(),
   new RoutingCommand(),
   new DownloadCommand(),
   new MoodCommand(),
