@@ -165,6 +165,12 @@ function toOptionalString(value) {
   return normalizedValue === '' ? null : normalizedValue
 }
 
+function toRoutingMode(value) {
+  const normalizedValue = String(value || '').trim()
+
+  return normalizedValue === 'workflow' ? 'controlled' : normalizedValue
+}
+
 function isEmptyList(value) {
   return !Array.isArray(value) || value.length === 0
 }
@@ -235,7 +241,7 @@ async function migrateLegacyConfigValues(document, shouldOverwriteScalarValues) 
     ['LEON_LANG', ['language'], (value) => value.trim()],
     ['LEON_HOST', ['server', 'host'], (value) => value.trim()],
     ['LEON_PORT', ['server', 'port'], toPort],
-    ['LEON_ROUTING_MODE', ['routing', 'mode'], (value) => value.trim()],
+    ['LEON_ROUTING_MODE', ['routing', 'mode'], toRoutingMode],
     ['LEON_MOOD', ['mood', 'mode'], (value) => value.trim()],
     ['LEON_LLM', ['llm', 'default'], toOptionalString],
     ['LEON_WORKFLOW_LLM', ['llm', 'workflow'], toOptionalString],

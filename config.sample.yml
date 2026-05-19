@@ -10,7 +10,7 @@ server:
   port: 5366
 
 routing:
-  # Routing mode: smart | workflow | agent
+  # Routing mode: smart | controlled | agent
   mode: smart
 
 llm:

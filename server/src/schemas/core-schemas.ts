@@ -41,7 +41,7 @@ export const configSchemaObject = strictObject({
   routing: strictObject({
     mode: Type.Union([
       Type.Literal('smart'),
-      Type.Literal('workflow'),
+      Type.Literal('controlled'),
       Type.Literal('agent')
     ])
   }),

@@ -89,7 +89,7 @@ describe('ConfigManager', () => {
         port: 5_499
       },
       routing: {
-        mode: 'workflow'
+        mode: 'controlled'
       },
       llm: {
         default: null,
@@ -205,7 +205,7 @@ describe('ConfigManager', () => {
     expect(process.env['LEON_LANG']).toBe('fr-FR')
     expect(process.env['LEON_HOST']).toBe('http://127.0.0.1')
     expect(process.env['LEON_PORT']).toBe('5499')
-    expect(process.env['LEON_ROUTING_MODE']).toBe('workflow')
+    expect(process.env['LEON_ROUTING_MODE']).toBe('controlled')
     expect(process.env['LEON_MOOD']).toBe('tired')
     expect(process.env['LEON_LLM']).toBe('')
     expect(process.env['LEON_WORKFLOW_LLM']).toBe('openai/gpt-4.1-mini')
