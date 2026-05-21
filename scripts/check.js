@@ -41,7 +41,7 @@ import {
   PROFILE_DOT_ENV_PATH,
   TSX_CLI_PATH,
   LANG,
-  HAS_STT,
+  HAS_ASR,
   HAS_TTS,
   HAS_WAKE_WORD,
   SHOULD_START_PYTHON_TCP_SERVER,
@@ -405,7 +405,7 @@ function checkTCPServerAssets() {
     }
   }
 
-  if (HAS_STT && !fs.existsSync(PYTHON_TCP_SERVER_ASR_MODEL_DIR_PATH)) {
+  if (HAS_ASR && !fs.existsSync(PYTHON_TCP_SERVER_ASR_MODEL_DIR_PATH)) {
     addFailure(
       result,
       `Missing ASR model directory at ${PYTHON_TCP_SERVER_ASR_MODEL_DIR_PATH}`
@@ -438,7 +438,7 @@ function checkTCPServerAssets() {
   if (result.ok) {
     addDetail(
       result,
-      `STT=${HAS_STT ? 'enabled' : 'disabled'}, TTS=${HAS_TTS ? 'enabled' : 'disabled'}, wake_word=${HAS_WAKE_WORD ? 'enabled' : 'disabled'}`
+      `ASR=${HAS_ASR ? 'enabled' : 'disabled'}, TTS=${HAS_TTS ? 'enabled' : 'disabled'}, wake_word=${HAS_WAKE_WORD ? 'enabled' : 'disabled'}`
     )
   }
 
@@ -745,7 +745,7 @@ function printCheckResult(result) {
     checks.pythonTCPServer.severity = 'warning'
     addDetail(
       checks.pythonTCPServer,
-      'Skipped because neither STT nor TTS is enabled'
+      'Skipped because neither ASR nor TTS is enabled'
     )
   }
 

@@ -467,8 +467,8 @@ export const TIME_ZONE = PROFILE_CONFIG.time_zone ?? undefined
 
 export const HAS_AFTER_SPEECH = PROFILE_CONFIG.after_speech_enabled
 
-export const HAS_STT = PROFILE_CONFIG.voice.stt.enabled
-export const STT_PROVIDER = PROFILE_CONFIG.voice.stt.provider
+export const HAS_ASR = PROFILE_CONFIG.voice.asr.enabled
+export const ASR_PROVIDER = PROFILE_CONFIG.voice.asr.provider
 export const HAS_TTS = PROFILE_CONFIG.voice.tts.enabled
 export const TTS_PROVIDER = PROFILE_CONFIG.voice.tts.provider
 export const HAS_WAKE_WORD = PROFILE_CONFIG.voice.wake_word_enabled
@@ -501,7 +501,7 @@ export const LEON_PRIVATE_DIARY_ENABLED =
   PROFILE_CONFIG.runtime.private_diary_enabled
 // Every 30 minutes
 export const LEON_PULSE_INTERVAL_MS = 30 * 60 * 1_000
-export const SHOULD_START_PYTHON_TCP_SERVER = HAS_STT || HAS_TTS
+export const SHOULD_START_PYTHON_TCP_SERVER = HAS_ASR || HAS_TTS
 export const LEON_CONTEXT_DISABLED_FILES =
   PROFILE_CONFIG.context.disabled_files
 export const LLM_DIR_PATH = path.join(MODELS_PATH, 'llm')

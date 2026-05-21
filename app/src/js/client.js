@@ -132,7 +132,7 @@ export default class Client {
   }
 
   asrStartRecording() {
-    if (!window.leonConfigInfo.stt.enabled) {
+    if (!window.leonConfigInfo.asr.enabled) {
       alert(ASR_DISABLED_MESSAGE)
       return
     }
@@ -472,7 +472,7 @@ export default class Client {
     this.socket.on('tts-end-of-speech', async () => {
       this.voiceEnergy.status = 'listening'
 
-      if (window.leonConfigInfo?.stt?.enabled) {
+      if (window.leonConfigInfo?.asr?.enabled) {
         this.socket.emit('asr-start-record')
       }
     })

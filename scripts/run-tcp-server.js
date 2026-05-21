@@ -16,10 +16,10 @@ import {
   PYTHON_TCP_SERVER_ENTRY_PATH,
   PYTHON_TCP_SERVER_RUNTIME_BIN_PATH,
   PYTORCH_TORCH_PATH,
-  HAS_STT,
+  HAS_ASR,
   HAS_TTS,
   HAS_WAKE_WORD,
-  STT_PROVIDER,
+  ASR_PROVIDER,
   TTS_PROVIDER,
   PYTHON_TCP_SERVER_HOST,
   PYTHON_TCP_SERVER_PORT
@@ -40,8 +40,8 @@ import {
     NVIDIA_LIBS_PATH
   ]
   const env = { ...process.env }
-  env['LEON_STT'] = HAS_STT ? 'true' : 'false'
-  env['LEON_STT_PROVIDER'] = STT_PROVIDER || ''
+  env['LEON_ASR'] = HAS_ASR ? 'true' : 'false'
+  env['LEON_ASR_PROVIDER'] = ASR_PROVIDER || ''
   env['LEON_TTS'] = HAS_TTS ? 'true' : 'false'
   env['LEON_TTS_PROVIDER'] = TTS_PROVIDER || ''
   env['LEON_WAKE_WORD'] = HAS_WAKE_WORD ? 'true' : 'false'

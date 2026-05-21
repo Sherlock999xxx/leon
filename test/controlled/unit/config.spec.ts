@@ -15,8 +15,8 @@ const syncedEnvKeys = [
   'LEON_WORKFLOW_LLM',
   'LEON_AGENT_LLM',
   'LEON_WAKE_WORD',
-  'LEON_STT',
-  'LEON_STT_PROVIDER',
+  'LEON_ASR',
+  'LEON_ASR_PROVIDER',
   'LEON_TTS',
   'LEON_TTS_PROVIDER',
   'LEON_TIME_ZONE',
@@ -176,7 +176,7 @@ describe('ConfigManager', () => {
       },
       voice: {
         wake_word_enabled: true,
-        stt: {
+        asr: {
           enabled: true,
           provider: 'local'
         },

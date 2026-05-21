@@ -5,7 +5,7 @@ import {
   API_VERSION,
   CODEBASE_PATH,
   GITHUB_URL,
-  HAS_STT,
+  HAS_ASR,
   HAS_TTS,
   INSTANCE_ID,
   IS_TELEMETRY_ENABLED,
@@ -13,7 +13,7 @@ import {
   LEON_PROFILE_PATH,
   LEON_FILE_PATH,
   LEON_VERSION,
-  STT_PROVIDER,
+  ASR_PROVIDER,
   TTS_PROVIDER
 } from '@/constants'
 import {
@@ -182,8 +182,8 @@ export class StatusCommand extends BuiltInCommand {
         value: modelState.getLocalModelName()
       },
       {
-        label: 'STT',
-        value: `${formatBooleanStatus(HAS_STT)} (${STT_PROVIDER || 'none'})`
+        label: 'ASR',
+        value: `${formatBooleanStatus(HAS_ASR)} (${ASR_PROVIDER || 'none'})`
       },
       {
         label: 'TTS',

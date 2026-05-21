@@ -103,7 +103,7 @@ python_tcp_server:
 
 voice:
   wake_word_enabled: false
-  stt:
+  asr:
     enabled: false
     provider: local
   tts:

@@ -257,8 +257,8 @@ async function migrateLegacyConfigValues(document, shouldOverwriteScalarValues) 
       (value) => value.trim()
     ],
     ['LEON_WAKE_WORD', ['voice', 'wake_word_enabled'], toBoolean],
-    ['LEON_STT', ['voice', 'stt', 'enabled'], toBoolean],
-    ['LEON_STT_PROVIDER', ['voice', 'stt', 'provider'], (value) => value.trim()],
+    ['LEON_ASR', ['voice', 'asr', 'enabled'], toBoolean],
+    ['LEON_ASR_PROVIDER', ['voice', 'asr', 'provider'], (value) => value.trim()],
     ['LEON_TTS', ['voice', 'tts', 'enabled'], toBoolean],
     ['LEON_TTS_PROVIDER', ['voice', 'tts', 'provider'], (value) => value.trim()],
     ['LEON_TIME_ZONE', ['time_zone'], toOptionalString],

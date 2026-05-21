@@ -91,7 +91,7 @@ export const configSchemaObject = strictObject({
   }),
   voice: strictObject({
     wake_word_enabled: Type.Boolean(),
-    stt: providerToggle,
+    asr: providerToggle,
     tts: providerToggle
   }),
   time_zone: optionalString,

@@ -46,7 +46,7 @@ const DEFAULT_CONFIG: LeonConfig = {
   },
   voice: {
     wake_word_enabled: false,
-    stt: {
+    asr: {
       enabled: false,
       provider: 'local'
     },
@@ -307,8 +307,8 @@ class ConfigManager {
     process.env['LEON_WAKE_WORD'] = this.config.voice.wake_word_enabled
       ? 'true'
       : 'false'
-    process.env['LEON_STT'] = this.config.voice.stt.enabled ? 'true' : 'false'
-    process.env['LEON_STT_PROVIDER'] = this.config.voice.stt.provider
+    process.env['LEON_ASR'] = this.config.voice.asr.enabled ? 'true' : 'false'
+    process.env['LEON_ASR_PROVIDER'] = this.config.voice.asr.provider
     process.env['LEON_TTS'] = this.config.voice.tts.enabled ? 'true' : 'false'
     process.env['LEON_TTS_PROVIDER'] = this.config.voice.tts.provider
     process.env['LEON_TIME_ZONE'] = toEnvString(this.config.time_zone)

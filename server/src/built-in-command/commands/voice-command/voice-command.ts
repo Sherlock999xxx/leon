@@ -15,7 +15,7 @@ import {
 import { createListResult } from '@/built-in-command/built-in-command-renderer'
 import { CONFIG_MANAGER } from '@/config'
 import { TTSProviders } from '@/core/tts/types'
-import { STTProviders } from '@/core/stt/types'
+import { ASRProviders } from '@/core/asr/types'
 import {
   areVoiceResourcesInstalled,
   getVoiceResourceState,
@@ -54,11 +54,11 @@ const VOICE_SUB_COMMANDS = [
 
 const VOICE_FEATURES = [
   {
-    name: 'stt',
-    label: 'STT',
-    enabledKeyPath: ['voice', 'stt', 'enabled'],
-    providerKeyPath: ['voice', 'stt', 'provider'],
-    provider: STTProviders.Local
+    name: 'asr',
+    label: 'ASR',
+    enabledKeyPath: ['voice', 'asr', 'enabled'],
+    providerKeyPath: ['voice', 'asr', 'provider'],
+    provider: ASRProviders.Local
   },
   {
     name: 'tts',
@@ -216,7 +216,7 @@ export class VoiceCommand extends BuiltInCommand {
 
   private getSubCommandDescription(subCommand: VoiceSubCommand): string {
     if (subCommand === VOICE_SETUP_SUB_COMMAND) {
-      return 'Install local voice resources and enable STT/TTS.'
+      return 'Install local voice resources and enable ASR/TTS.'
     }
 
     if (subCommand === VOICE_ENABLE_SUB_COMMAND) {
@@ -241,8 +241,8 @@ export class VoiceCommand extends BuiltInCommand {
         tone: 'info',
         items: [
           {
-            label: 'STT',
-            value: `${formatBoolean(voiceConfig.stt.enabled)} (${voiceConfig.stt.provider})`
+            label: 'ASR',
+            value: `${formatBoolean(voiceConfig.asr.enabled)} (${voiceConfig.asr.provider})`
           },
           {
             label: 'TTS',
@@ -295,8 +295,8 @@ export class VoiceCommand extends BuiltInCommand {
       }
     }
 
-    await CONFIG_MANAGER.setValue(['voice', 'stt', 'enabled'], true)
-    await CONFIG_MANAGER.setValue(['voice', 'stt', 'provider'], STTProviders.Local)
+    await CONFIG_MANAGER.setValue(['voice', 'asr', 'enabled'], true)
+    await CONFIG_MANAGER.setValue(['voice', 'asr', 'provider'], ASRProviders.Local)
     await CONFIG_MANAGER.setValue(['voice', 'tts', 'enabled'], true)
     await CONFIG_MANAGER.setValue(['voice', 'tts', 'provider'], TTSProviders.Local)
 
@@ -311,7 +311,7 @@ export class VoiceCommand extends BuiltInCommand {
             tone: 'success'
           },
           {
-            label: 'STT and TTS are enabled with the local provider.',
+            label: 'ASR and TTS are enabled with the local provider.',
             tone: 'success'
           },
           {

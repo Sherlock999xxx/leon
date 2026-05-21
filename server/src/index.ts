@@ -21,10 +21,10 @@ import {
   PYTHON_TCP_SERVER_ENTRY_PATH,
   PYTHON_TCP_SERVER_RUNTIME_BIN_PATH,
   SHOULD_START_PYTHON_TCP_SERVER,
-  HAS_STT,
+  HAS_ASR,
   HAS_TTS,
   HAS_WAKE_WORD,
-  STT_PROVIDER,
+  ASR_PROVIDER,
   TTS_PROVIDER,
   PYTHON_TCP_SERVER_HOST,
   PYTHON_TCP_SERVER_PORT
@@ -93,8 +93,8 @@ async function bootstrap(): Promise<void> {
     LogHelper.info(`Running command: ${tcpServerCmd}`)
 
     const tcpServerEnv = { ...process.env }
-    tcpServerEnv['LEON_STT'] = HAS_STT ? 'true' : 'false'
-    tcpServerEnv['LEON_STT_PROVIDER'] = STT_PROVIDER || ''
+    tcpServerEnv['LEON_ASR'] = HAS_ASR ? 'true' : 'false'
+    tcpServerEnv['LEON_ASR_PROVIDER'] = ASR_PROVIDER || ''
     tcpServerEnv['LEON_TTS'] = HAS_TTS ? 'true' : 'false'
     tcpServerEnv['LEON_TTS_PROVIDER'] = TTS_PROVIDER || ''
     tcpServerEnv['LEON_WAKE_WORD'] = HAS_WAKE_WORD ? 'true' : 'false'
@@ -153,7 +153,7 @@ async function bootstrap(): Promise<void> {
   } else {
     LogHelper.title('Python TCP Server')
     LogHelper.info(
-      'Skipped startup because routing mode is "agent" and ASR/STT + TTS are disabled'
+      'Skipped startup because routing mode is "agent" and ASR + TTS are disabled'
     )
   }
 
