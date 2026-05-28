@@ -12,6 +12,10 @@ const REMOTE_LLM_PROVIDERS = [
       { label: 'openai/gpt-5.4', value: 'openai/gpt-5.4' },
       { label: 'openai/gpt-5.4-mini', value: 'openai/gpt-5.4-mini' },
       {
+        label: 'anthropic/claude-opus-4.8',
+        value: 'anthropic/claude-opus-4.8'
+      },
+      {
         label: 'anthropic/claude-opus-4.7',
         value: 'anthropic/claude-opus-4.7'
       },
@@ -42,7 +46,8 @@ const REMOTE_LLM_PROVIDERS = [
   {
     ...getRequiredProviderAccountConfig('anthropic'),
     models: [
-      { label: 'Claude Opus 4.7 (Recommended)', value: 'claude-opus-4-7' },
+      { label: 'Claude Opus 4.8 (Recommended)', value: 'claude-opus-4-8' },
+      { label: 'Claude Opus 4.7', value: 'claude-opus-4-7' },
       { label: 'Claude Opus 4.6', value: 'claude-opus-4-6' },
       { label: 'Claude Sonnet 4.6', value: 'claude-sonnet-4-6' },
       { label: 'Claude Haiku 4.5', value: 'claude-haiku-4-5' }
