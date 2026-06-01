@@ -1,5 +1,5 @@
 {
-  "script_model": "google/gemini-3-flash-preview",
+  "script_model": "google/gemini-3.1-flash-lite",
   "host_voice": "en_female",
   "guest_voice": "en_male"
 }
