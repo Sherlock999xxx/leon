@@ -83,6 +83,7 @@
     "@openrouter/ai-sdk-provider": "2.9.0",
     "@segment/ajv-human-errors": "2.16.0",
     "@sinclair/typebox": "0.31.23",
+    "@tanstack/react-query": "5.101.0",
     "@tanstack/react-router": "1.170.10",
     "@tobilu/qmd": "2.5.3",
     "@vercel/ai-sdk-openai-websocket-fetch": "1.0.0",
